@@ -1,8 +1,8 @@
-# multi-party-sig
+# multiparty
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A Go implementation of multi-party threshold signing for:
+Lux implementation of multi-party threshold signing for:
 
 - ECDSA, using the "CGGMP" protocol by [Canetti et al.](https://eprint.iacr.org/2021/060) for threshold ECDSA signing.
   We implement both the 4 round "online" and the 7 round "presigning" protocols from the paper. The latter also supports identifiable aborts.
