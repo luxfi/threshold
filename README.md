@@ -158,9 +158,7 @@ Unfortunately, identifying the culprits in this case requires external assumptio
 
 ## Known Issues
 
-###
-
-<!-- ### Keygen
+### Keygen
 
 The [`protocols/keygen`](protocols/cmp/keygen) package can be used to perform a distributed key generation.
 
@@ -253,13 +251,3 @@ if err != nil {
 signature := r.(\*ecdsa.Signature)
 
 signature.Verify(refreshedConfig.PublicPoint(), message)
-
-``` -->
-
-## Intellectual property
-
-This code is copyright (c) Adrian Hamelink and Taurus SA, 2021, and under Apache 2.0 license.
-
-On potential patents: the company that sponsored the development of the CMP
-protocol [stated](https://apnews.com/press-release/pr-newswire/26aab91e254bc254d331ceafc20b9859)
-that it "will not be applying for patents on this technology."
