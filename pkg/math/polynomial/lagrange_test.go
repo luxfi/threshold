@@ -5,9 +5,9 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/stretchr/testify/assert"
-	"github.com/taurusgroup/multi-party-sig/internal/test"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/polynomial"
+	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/polynomial"
 )
 
 func TestLagrange(t *testing.T) {

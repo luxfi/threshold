@@ -1,6 +1,6 @@
-module github.com/taurusgroup/multi-party-sig
+module github.com/luxfi/threshold
 
-go 1.20
+go 1.24.5
 
 require (
 	github.com/cronokirby/saferith v0.33.0

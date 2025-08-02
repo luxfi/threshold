@@ -3,10 +3,10 @@ package example
 import (
 	"fmt"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/protocol"
-	"github.com/taurusgroup/multi-party-sig/protocols/example/xor"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/protocols/example/xor"
 )
 
 const (

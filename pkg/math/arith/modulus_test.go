@@ -7,7 +7,7 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/stretchr/testify/assert"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/math/sample"
 )
 
 func sampleCoprime(r io.Reader) (*saferith.Nat, *saferith.Nat, *saferith.Modulus) {

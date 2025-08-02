@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/taurusgroup/multi-party-sig/internal/params"
+	"github.com/luxfi/threshold/internal/params"
 )
 
 type (

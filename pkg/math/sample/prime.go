@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/internal/params"
-	"github.com/taurusgroup/multi-party-sig/pkg/pool"
+	"github.com/luxfi/threshold/internal/params"
+	"github.com/luxfi/threshold/pkg/pool"
 )
 
 // primes generates an array containing all the odd prime numbers < below

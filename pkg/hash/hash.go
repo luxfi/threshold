@@ -10,7 +10,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/taurusgroup/multi-party-sig/internal/params"
+	"github.com/luxfi/threshold/internal/params"
 	"github.com/zeebo/blake3"
 )
 

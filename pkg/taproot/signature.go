@@ -8,7 +8,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/curve"
 )
 
 // TaggedHash addes some domain separation to SHA-256.

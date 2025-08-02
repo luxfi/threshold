@@ -2,8 +2,8 @@ package polynomial
 
 import (
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 // Lagrange returns the Lagrange coefficients at 0 for all parties in the interpolation domain.

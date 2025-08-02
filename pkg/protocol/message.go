@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/hash"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/hash"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 type Message struct {

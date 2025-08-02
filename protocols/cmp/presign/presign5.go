@@ -3,11 +3,11 @@ package presign
 import (
 	"errors"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	zkelog "github.com/taurusgroup/multi-party-sig/pkg/zk/elog"
-	zklogstar "github.com/taurusgroup/multi-party-sig/pkg/zk/logstar"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
+	zkelog "github.com/luxfi/threshold/pkg/zk/elog"
+	zklogstar "github.com/luxfi/threshold/pkg/zk/logstar"
 )
 
 var _ round.Round = (*presign5)(nil)

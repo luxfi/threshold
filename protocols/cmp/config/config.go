@@ -6,14 +6,14 @@ import (
 	"io"
 	"math"
 
-	"github.com/taurusgroup/multi-party-sig/internal/bip32"
-	"github.com/taurusgroup/multi-party-sig/internal/params"
-	"github.com/taurusgroup/multi-party-sig/internal/types"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/polynomial"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/pedersen"
+	"github.com/luxfi/threshold/internal/bip32"
+	"github.com/luxfi/threshold/internal/params"
+	"github.com/luxfi/threshold/internal/types"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/polynomial"
+	"github.com/luxfi/threshold/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/pedersen"
 )
 
 // Config contains all necessary cryptographic keys necessary to generate a signature.
