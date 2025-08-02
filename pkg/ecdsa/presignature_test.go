@@ -5,10 +5,10 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/taurusgroup/multi-party-sig/internal/test"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 func generateShares(secret curve.Scalar, ids []party.ID) map[party.ID]curve.Scalar {

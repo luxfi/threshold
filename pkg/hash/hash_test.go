@@ -8,8 +8,8 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/stretchr/testify/assert"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
 )
 
 func TestHash_WriteAny(t *testing.T) {

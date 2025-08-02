@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/taurusgroup/multi-party-sig/internal/params"
-	"github.com/taurusgroup/multi-party-sig/pkg/hash"
+	"github.com/luxfi/threshold/internal/params"
+	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/zeebo/blake3"
 )
 

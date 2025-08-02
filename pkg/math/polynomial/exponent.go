@@ -7,7 +7,7 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/curve"
 )
 
 type rawExponentData struct {

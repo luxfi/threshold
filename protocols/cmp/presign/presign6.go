@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	zkelog "github.com/taurusgroup/multi-party-sig/pkg/zk/elog"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
+	zkelog "github.com/luxfi/threshold/pkg/zk/elog"
 )
 
 var _ round.Round = (*presign6)(nil)

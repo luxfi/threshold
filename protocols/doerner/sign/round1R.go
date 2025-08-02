@@ -3,12 +3,12 @@ package sign
 import (
 	"crypto/rand"
 
-	"github.com/taurusgroup/multi-party-sig/internal/ot"
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/hash"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
-	"github.com/taurusgroup/multi-party-sig/protocols/doerner/keygen"
+	"github.com/luxfi/threshold/internal/ot"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/hash"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
+	"github.com/luxfi/threshold/protocols/doerner/keygen"
 )
 
 // message1R is the first message sent by the Receiver.

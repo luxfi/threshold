@@ -1,10 +1,10 @@
 package presign
 
 import (
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/ecdsa"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 var _ round.Round = (*sign1)(nil)

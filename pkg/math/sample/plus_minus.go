@@ -4,8 +4,8 @@ import (
 	"io"
 
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/internal/params"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
+	"github.com/luxfi/threshold/internal/params"
+	"github.com/luxfi/threshold/pkg/math/curve"
 )
 
 func sampleNeg(rand io.Reader, bits int) *saferith.Int {

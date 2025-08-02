@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	zkaffg "github.com/taurusgroup/multi-party-sig/pkg/zk/affg"
-	zklogstar "github.com/taurusgroup/multi-party-sig/pkg/zk/logstar"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/party"
+	zkaffg "github.com/luxfi/threshold/pkg/zk/affg"
+	zklogstar "github.com/luxfi/threshold/pkg/zk/logstar"
 )
 
 var _ round.Round = (*round3)(nil)

@@ -3,10 +3,10 @@ package sign
 import (
 	"crypto/rand"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/party"
 	"github.com/zeebo/blake3"
 )
 
@@ -48,7 +48,7 @@ type round1 struct {
 func (r *round1) VerifyMessage(round.Message) error { return nil }
 func (r *round1) StoreMessage(round.Message) error  { return nil }
 
-const deriveHashKeyContext = "github.com/taurusgroup/multi-party-sig/frost 2021-07-30T09:48+00:00 Derive hash Key"
+const deriveHashKeyContext = "github.com/luxfi/threshold/frost 2021-07-30T09:48+00:00 Derive hash Key"
 
 // Finalize implements round.Round.
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {

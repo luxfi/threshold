@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/taurusgroup/multi-party-sig/internal/round"
+	"github.com/luxfi/threshold/internal/round"
 )
 
 // TwoPartyHandler represents a restriction of the Handler for 2 party protocols.

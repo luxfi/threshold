@@ -3,8 +3,8 @@ package sign
 import (
 	"errors"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/ecdsa"
 )
 
 // round2S is the final round of the signature protocol.

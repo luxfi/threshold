@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 // PartyIDs returns a party.IDSlice (sorted) with IDs represented as simple strings.
