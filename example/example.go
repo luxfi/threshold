@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/taurusgroup/multi-party-sig/internal/test"
-	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/pool"
-	"github.com/taurusgroup/multi-party-sig/pkg/protocol"
-	"github.com/taurusgroup/multi-party-sig/pkg/taproot"
-	"github.com/taurusgroup/multi-party-sig/protocols/cmp"
-	"github.com/taurusgroup/multi-party-sig/protocols/example"
-	"github.com/taurusgroup/multi-party-sig/protocols/frost"
+	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/ecdsa"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/pool"
+	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/pkg/taproot"
+	"github.com/luxfi/threshold/protocols/cmp"
+	"github.com/luxfi/threshold/protocols/example"
+	"github.com/luxfi/threshold/protocols/frost"
 )
 
 func XOR(id party.ID, ids party.IDSlice, n *test.Network) error {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
-	"github.com/taurusgroup/multi-party-sig/pkg/pedersen"
-	"github.com/taurusgroup/multi-party-sig/pkg/pool"
+	"github.com/luxfi/threshold/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/pedersen"
+	"github.com/luxfi/threshold/pkg/pool"
 )
 
 var (

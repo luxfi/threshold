@@ -6,11 +6,11 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/taurusgroup/multi-party-sig/internal/types"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/pedersen"
+	"github.com/luxfi/threshold/internal/types"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/pedersen"
 )
 
 // EmptyConfig creates an empty Config with a fixed group, ready for unmarshalling.

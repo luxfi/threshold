@@ -3,16 +3,16 @@ package keygen
 import (
 	"errors"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/internal/types"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/polynomial"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	zkfac "github.com/taurusgroup/multi-party-sig/pkg/zk/fac"
-	zkmod "github.com/taurusgroup/multi-party-sig/pkg/zk/mod"
-	zkprm "github.com/taurusgroup/multi-party-sig/pkg/zk/prm"
-	"github.com/taurusgroup/multi-party-sig/protocols/cmp/config"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/internal/types"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/polynomial"
+	"github.com/luxfi/threshold/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/party"
+	zkfac "github.com/luxfi/threshold/pkg/zk/fac"
+	zkmod "github.com/luxfi/threshold/pkg/zk/mod"
+	zkprm "github.com/luxfi/threshold/pkg/zk/prm"
+	"github.com/luxfi/threshold/protocols/cmp/config"
 )
 
 var _ round.Round = (*round4)(nil)

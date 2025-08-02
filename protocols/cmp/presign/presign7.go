@@ -3,14 +3,14 @@ package presign
 import (
 	"errors"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/internal/types"
-	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
-	"github.com/taurusgroup/multi-party-sig/pkg/hash"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	zkelog "github.com/taurusgroup/multi-party-sig/pkg/zk/elog"
-	zklog "github.com/taurusgroup/multi-party-sig/pkg/zk/log"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/internal/types"
+	"github.com/luxfi/threshold/pkg/ecdsa"
+	"github.com/luxfi/threshold/pkg/hash"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
+	zkelog "github.com/luxfi/threshold/pkg/zk/elog"
+	zklog "github.com/luxfi/threshold/pkg/zk/log"
 )
 
 var _ round.Round = (*presign7)(nil)

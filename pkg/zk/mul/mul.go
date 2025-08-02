@@ -4,11 +4,11 @@ import (
 	"crypto/rand"
 
 	"github.com/cronokirby/saferith"
-	"github.com/taurusgroup/multi-party-sig/pkg/hash"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/arith"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/hash"
+	"github.com/luxfi/threshold/pkg/math/arith"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/paillier"
 )
 
 type Public struct {

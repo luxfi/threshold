@@ -3,10 +3,10 @@ package round_test
 import (
 	"testing"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/internal/test"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 func TestNewSession(t *testing.T) {

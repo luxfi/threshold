@@ -3,10 +3,10 @@ package keygen
 import (
 	"fmt"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/protocol"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/protocol"
 )
 
 const (

@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"io"
 
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
 )
 
 type (

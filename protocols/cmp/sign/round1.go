@@ -3,13 +3,13 @@ package sign
 import (
 	"crypto/rand"
 
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/sample"
-	"github.com/taurusgroup/multi-party-sig/pkg/paillier"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/pedersen"
-	zkenc "github.com/taurusgroup/multi-party-sig/pkg/zk/enc"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/sample"
+	"github.com/luxfi/threshold/pkg/paillier"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/pedersen"
+	zkenc "github.com/luxfi/threshold/pkg/zk/enc"
 )
 
 var _ round.Round = (*round1)(nil)

@@ -1,12 +1,12 @@
 package frost
 
 import (
-	"github.com/taurusgroup/multi-party-sig/internal/round"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
-	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/protocol"
-	"github.com/taurusgroup/multi-party-sig/protocols/frost/keygen"
-	"github.com/taurusgroup/multi-party-sig/protocols/frost/sign"
+	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/protocols/frost/keygen"
+	"github.com/luxfi/threshold/protocols/frost/sign"
 )
 
 type (

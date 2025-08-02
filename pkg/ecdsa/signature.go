@@ -1,7 +1,7 @@
 package ecdsa
 
 import (
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/curve"
 )
 
 type Signature struct {
