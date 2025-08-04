@@ -42,9 +42,9 @@ help:
 ## all: Build and test everything
 all: clean deps lint test build
 
-## build: Build the project
+## build: Build all packages
 build:
-	$(GOBUILD) $(BUILDFLAGS) $(LDFLAGS) -o $(BINARY_NAME) ./...
+	$(GOBUILD) $(BUILDFLAGS) ./...
 
 ## build-cli: Build the threshold CLI tool
 build-cli:
