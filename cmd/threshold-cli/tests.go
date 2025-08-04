@@ -1,11 +1,9 @@
 package main
 
 import (
-	"crypto/rand"
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
@@ -222,7 +220,7 @@ func testBasicSignature(protocolName string) error {
 			case "cmp":
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
 			case "frost":
-				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 			
 			if err != nil {
@@ -271,7 +269,7 @@ func testBasicSignature(protocolName string) error {
 				h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
 			case "frost":
 				c := configs[i].(*frost.Config)
-				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
 			}
 			
 			if err != nil {
@@ -491,7 +489,7 @@ func setupTestConfigs(protocolName string, n, threshold int, pl *pool.Pool, netw
 			case "cmp":
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
 			case "frost":
-				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 			
 			if err != nil {
@@ -543,7 +541,7 @@ func performSign(protocolName string, configs []interface{}, signers []party.ID,
 				h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
 			case "frost":
 				c := cfg.(*frost.Config)
-				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
 			}
 			
 			if err != nil {

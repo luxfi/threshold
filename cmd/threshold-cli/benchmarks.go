@@ -223,7 +223,7 @@ func runSingleKeygen(protocolName string, n, threshold int) error {
 			case "cmp":
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
 			case "frost":
-				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 			
 			if err != nil {
@@ -265,7 +265,7 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 			case "cmp":
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
 			case "frost":
-				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 			
 			if err != nil {
@@ -331,7 +331,7 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 				h, err = protocol.NewMultiHandler(cmp.Sign(c, partyIDs, message, pl), nil)
 			case "frost":
 				c := cfg.(*frost.Config)
-				h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
 			}
 			
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math"
+	mathrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -279,7 +280,7 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 	}
 	
 	// Run protocol with Byzantine parties
-	configs, err := setupSimulationConfigs(protocolName, n, threshold, pl, byzantineNetwork, group)
+	configs, err := setupSimulationConfigs(protocolName, n, threshold, pl, byzantineNetwork.Network, group)
 	if err != nil {
 		return false, err
 	}
@@ -307,7 +308,7 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 	
 	group := curve.Secp256k1{}
 	
-	configs, err := setupSimulationConfigs(protocolName, n, threshold, pl, unreliableNetwork, group)
+	configs, err := setupSimulationConfigs(protocolName, n, threshold, pl, unreliableNetwork.Network, group)
 	if err != nil {
 		return "failure", err
 	}
@@ -324,7 +325,7 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 		go func(idx int, cfg interface{}) {
 			defer wg.Done()
 			
-			err := attemptSignWithConfig(protocolName, cfg, partyIDs, message, pl, unreliableNetwork)
+			err := attemptSignWithConfig(protocolName, cfg, partyIDs, message, pl, unreliableNetwork.Network)
 			if err == nil {
 				successCount++
 			}
@@ -363,7 +364,7 @@ func runLargeScaleRound(protocolName string, n, threshold int) error {
 	return runSingleSign(protocolName, configs[:threshold], message)
 }
 
-func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool, network protocol.Network, group curve.Curve) ([]interface{}, error) {
+func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool, network *test.Network, group curve.Curve) ([]interface{}, error) {
 	partyIDs := test.PartyIDs(n)
 	configs := make([]interface{}, n)
 	errors := make([]error, n)
@@ -385,7 +386,7 @@ func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool
 			case "cmp":
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
 			case "frost":
-				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold, pl), nil)
+				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 			
 			if err != nil {
@@ -416,7 +417,7 @@ func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool
 	return configs, nil
 }
 
-func attemptSignWithConfig(protocolName string, config interface{}, partyIDs []party.ID, message []byte, pl *pool.Pool, network protocol.Network) error {
+func attemptSignWithConfig(protocolName string, config interface{}, partyIDs []party.ID, message []byte, pl *pool.Pool, network *test.Network) error {
 	var h protocol.Handler
 	var err error
 	var id party.ID
@@ -433,7 +434,7 @@ func attemptSignWithConfig(protocolName string, config interface{}, partyIDs []p
 	case "frost":
 		c := config.(*frost.Config)
 		id = c.ID
-		h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message, pl), nil)
+		h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
 	}
 	
 	if err != nil {
@@ -462,16 +463,16 @@ type ByzantineNetwork struct {
 	ByzantineParties map[party.ID]bool
 }
 
-func (b *ByzantineNetwork) Send(from, to party.ID, msg protocol.Message) {
+func (b *ByzantineNetwork) Send(msg *protocol.Message) {
 	// Byzantine parties send corrupted messages
-	if b.ByzantineParties[from] {
+	if b.ByzantineParties[msg.From] {
 		// Randomly corrupt or drop message
-		if rand.Float64() < 0.5 {
+		if mathrand.Float64() < 0.5 {
 			return // Drop
 		}
 		// Otherwise send corrupted version (in real impl)
 	}
-	b.Network.Send(from, to, msg)
+	b.Network.Send(msg)
 }
 
 type UnreliableNetwork struct {
@@ -479,15 +480,15 @@ type UnreliableNetwork struct {
 	FailureRate float64
 }
 
-func (u *UnreliableNetwork) Send(from, to party.ID, msg protocol.Message) {
+func (u *UnreliableNetwork) Send(msg *protocol.Message) {
 	// Randomly drop messages
-	if rand.Float64() < u.FailureRate {
+	if mathrand.Float64() < u.FailureRate {
 		return
 	}
 	
 	// Add random delay
-	delay := time.Duration(rand.Intn(100)) * time.Millisecond
+	delay := time.Duration(mathrand.Intn(100)) * time.Millisecond
 	time.Sleep(delay)
 	
-	u.Network.Send(from, to, msg)
+	u.Network.Send(msg)
 }

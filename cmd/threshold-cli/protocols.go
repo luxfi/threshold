@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/luxfi/threshold/internal/test"
@@ -14,7 +14,6 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/threshold/pkg/taproot"
 	"github.com/luxfi/threshold/protocols/cmp"
 	"github.com/luxfi/threshold/protocols/frost"
 	"github.com/luxfi/threshold/protocols/lss"
@@ -182,7 +181,7 @@ func runCMPSign(config *cmp.Config, signers []party.ID, message []byte, pl *pool
 // FROST Protocol implementations
 
 func runFROSTKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, threshold int, pl *pool.Pool, network *test.Network) (*frost.Config, error) {
-	h, err := protocol.NewMultiHandler(frost.Keygen(group, selfID, partyIDs, threshold, pl), nil)
+	h, err := protocol.NewMultiHandler(frost.Keygen(group, selfID, partyIDs, threshold), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -205,8 +204,8 @@ func runFROSTKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, thr
 	}
 }
 
-func runFROSTSign(config *frost.Config, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) (*taproot.Signature, error) {
-	h, err := protocol.NewMultiHandler(frost.Sign(config, signers, message, pl), nil)
+func runFROSTSign(config *frost.Config, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) (*frost.Signature, error) {
+	h, err := protocol.NewMultiHandler(frost.Sign(config, signers, message), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +222,7 @@ func runFROSTSign(config *frost.Config, signers []party.ID, message []byte, pl *
 		if err != nil {
 			return nil, err
 		}
-		return result.(*taproot.Signature), nil
+		return result.(*frost.Signature), nil
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("signing timeout")
 	}
@@ -257,7 +256,7 @@ func verifyECDSA(sigData, pkData, message []byte) (bool, error) {
 }
 
 func verifySchnorr(sigData, pkData, message []byte) (bool, error) {
-	var sig taproot.Signature
+	var sig frost.Signature
 	if err := json.Unmarshal(sigData, &sig); err != nil {
 		return false, fmt.Errorf("failed to unmarshal signature: %w", err)
 	}

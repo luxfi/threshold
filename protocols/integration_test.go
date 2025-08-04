@@ -3,13 +3,13 @@ package protocols_test
 import (
 	"crypto/rand"
 	"fmt"
+	mathrand "math/rand"
 	"sync"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -19,7 +19,6 @@ import (
 	"github.com/luxfi/threshold/protocols/cmp"
 	"github.com/luxfi/threshold/protocols/frost"
 	"github.com/luxfi/threshold/protocols/lss"
-	"github.com/luxfi/threshold/pkg/taproot"
 )
 
 func TestIntegration(t *testing.T) {
@@ -186,9 +185,7 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 	Describe("Advanced Integration Scenarios", func() {
 		It("should handle mixed protocol signing in same session", func() {
 			n := 9
-			threshold := 5
 			partyIDs := test.PartyIDs(n)
-			network := test.NewNetwork(partyIDs)
 			
 			// Generate keys with different protocols for different parties
 			// First 3 use LSS
@@ -290,12 +287,13 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl, network)
 			
 			// Mark some parties as Byzantine
+			byzantineParties := make(map[party.ID]bool)
+			for i := 0; i < byzantineCount; i++ {
+				byzantineParties[partyIDs[i]] = true
+			}
 			byzantineNetwork := &ByzantineTestNetwork{
 				Network: network,
-				ByzantineParties: map[party.ID]bool{
-					partyIDs[0]: true,
-					partyIDs[1]: true,
-				},
+				ByzantineParties: byzantineParties,
 			}
 			
 			// Should still produce valid signatures with honest parties
@@ -421,7 +419,7 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 		i := i
 		go func(id party.ID) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold, pl), nil)
+			h, err := protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
 			
@@ -481,22 +479,22 @@ func runCMPSign(configs []*cmp.Config, signers []party.ID, messageHash []byte, p
 	return signatures
 }
 
-func runFROSTSign(configs []*frost.Config, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) []*taproot.Signature {
+func runFROSTSign(configs []*frost.Config, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) []*frost.Signature {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 
-	signatures := make([]*taproot.Signature, len(configs))
+	signatures := make([]*frost.Signature, len(configs))
 	for i, config := range configs {
 		i := i
 		go func(c *frost.Config) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(frost.Sign(c, signers, message, pl), nil)
+			h, err := protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
 			
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
-			signatures[i] = r.(*taproot.Signature)
+			signatures[i] = r.(*frost.Signature)
 		}(config)
 	}
 
@@ -622,7 +620,7 @@ func runLSSSignWithFaultTolerance(configs []*lss.Config, signers []party.ID, mes
 				return
 			}
 			
-			test.HandlerLoop(c.ID, h, network)
+			test.HandlerLoop(c.ID, h, network.Network)
 			
 			r, err := h.Result()
 			if err == nil {
@@ -685,7 +683,7 @@ func attemptLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl 
 			
 			done := make(chan bool, 1)
 			go func() {
-				test.HandlerLoop(id, h, network)
+				test.HandlerLoop(id, h, network.Network)
 				done <- true
 			}()
 			
@@ -745,15 +743,15 @@ type ByzantineTestNetwork struct {
 	ByzantineParties map[party.ID]bool
 }
 
-func (b *ByzantineTestNetwork) Send(from, to party.ID, msg protocol.Message) {
-	if b.ByzantineParties[from] {
+func (b *ByzantineTestNetwork) Send(msg *protocol.Message) {
+	if b.ByzantineParties[msg.From] {
 		// Byzantine party - drop or corrupt message
-		if rand.Float64() < 0.5 {
+		if mathrand.Float64() < 0.5 {
 			return // Drop
 		}
 		// Could corrupt message here
 	}
-	b.Network.Send(from, to, msg)
+	b.Network.Send(msg)
 }
 
 type UnreliableTestNetwork struct {
@@ -761,11 +759,11 @@ type UnreliableTestNetwork struct {
 	FailureRate float64
 }
 
-func (u *UnreliableTestNetwork) Send(from, to party.ID, msg protocol.Message) {
-	if rand.Float64() < u.FailureRate {
+func (u *UnreliableTestNetwork) Send(msg *protocol.Message) {
+	if mathrand.Float64() < u.FailureRate {
 		return // Drop message
 	}
-	u.Network.Send(from, to, msg)
+	u.Network.Send(msg)
 }
 
 // Benchmark helper
