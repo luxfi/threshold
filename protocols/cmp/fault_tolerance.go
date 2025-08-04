@@ -141,19 +141,19 @@ func (ftc *FaultTolerantCoordinator) attemptSign(config *Config, signers []party
 	timeout := time.After(ftc.recoveryTimeout)
 	done := make(chan bool)
 	var result interface{}
-	var err error
+	var protocolErr error
 	
 	go func() {
 		// In real implementation, this would handle actual protocol rounds
 		var resultErr error
 		result, resultErr = handler.Result()
-		err = resultErr
+		protocolErr = resultErr
 		done <- true
 	}()
 	
 	select {
 	case <-done:
-		if err != nil {
+		if protocolErr != nil {
 			// Determine which parties failed
 			for _, signer := range signers {
 				if !respondingParties[signer] {
