@@ -145,7 +145,9 @@ func (ftc *FaultTolerantCoordinator) attemptSign(config *Config, signers []party
 	
 	go func() {
 		// In real implementation, this would handle actual protocol rounds
-		result, err = handler.Result()
+		var resultErr error
+		result, resultErr = handler.Result()
+		err = resultErr
 		done <- true
 	}()
 	
