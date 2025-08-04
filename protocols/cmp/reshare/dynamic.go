@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 
+	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
@@ -161,7 +162,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		oldShare := r.Config.ECDSA
 		
 		// Compute blinded share: a_i · w_i
-		blindedShare := group.NewScalar().Mul(oldShare, r.WShares[r.SelfID()])
+		blindedShare := group.NewScalar().Set(oldShare)
+		blindedShare.Mul(r.WShares[r.SelfID()])
 		
 		// Send to coordinator (in distributed version, this would use MPC)
 		msg := &round2Message{
@@ -191,12 +193,14 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	qw := group.NewScalar()
 	for id, qShare := range r.QShares {
 		wShare := r.WShares[id]
-		contribution := group.NewScalar().Mul(qShare, wShare)
-		qw = qw.Add(qw, contribution)
+		contribution := group.NewScalar().Set(qShare)
+		contribution.Mul(wShare)
+		qw.Add(contribution)
 	}
 	
 	// Compute inverse: z = (q·w)^{-1}
-	r.InverseZ = group.NewScalar().Invert(qw)
+	r.InverseZ = group.NewScalar().Set(qw)
+	r.InverseZ.Invert()
 	
 	// Create polynomial for z shares
 	zPoly := polynomial.NewPolynomial(group, r.Threshold()-1, r.InverseZ)
@@ -235,8 +239,9 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 	zShare := r.InverseZ // In real impl, this would come from shares
 	
 	// Compute new share
-	r.NewShare = group.NewScalar().Mul(r.BlindedKey, qShare)
-	r.NewShare = r.NewShare.Mul(r.NewShare, zShare)
+	r.NewShare = group.NewScalar().Set(r.BlindedKey)
+	r.NewShare.Mul(qShare)
+	r.NewShare.Mul(zShare)
 	
 	// Create new config with updated shares
 	newConfig := &config.Config{
@@ -247,10 +252,8 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		// Copy other fields...
 	}
 	
-	// Set the result
-	r.SetResult(newConfig)
-	
-	return nil, nil
+	// Return the result round
+	return r.ResultRound(newConfig), nil
 }
 
 // Helper functions
@@ -304,8 +307,9 @@ func interpolateShares(group curve.Curve, shares map[party.ID]curve.Scalar, thre
 		coeff := lagrangeCoefficient(group, ids[:threshold], i, group.NewScalar())
 		
 		// Add contribution
-		contribution := group.NewScalar().Mul(share, coeff)
-		result = result.Add(result, contribution)
+		contribution := group.NewScalar().Set(share)
+		contribution.Mul(coeff)
+		result.Add(contribution)
 	}
 	
 	return result
@@ -313,8 +317,9 @@ func interpolateShares(group curve.Curve, shares map[party.ID]curve.Scalar, thre
 
 func lagrangeCoefficient(group curve.Curve, ids []party.ID, index int, x curve.Scalar) curve.Scalar {
 	// Compute Lagrange basis polynomial l_i(x)
-	num := group.NewScalar().SetNat(1)
-	den := group.NewScalar().SetNat(1)
+	one := new(saferith.Nat).SetUint64(1)
+	num := group.NewScalar().SetNat(one)
+	den := group.NewScalar().SetNat(one)
 	
 	xi := ids[index].Scalar(group)
 	
@@ -326,17 +331,22 @@ func lagrangeCoefficient(group curve.Curve, ids []party.ID, index int, x curve.S
 		xj := id.Scalar(group)
 		
 		// num *= (x - x_j)
-		diff := group.NewScalar().Sub(x, xj)
-		num = num.Mul(num, diff)
+		diff := group.NewScalar().Set(x)
+		diff.Sub(xj)
+		num.Mul(diff)
 		
 		// den *= (x_i - x_j)
-		diff = group.NewScalar().Sub(xi, xj)
-		den = den.Mul(den, diff)
+		diff = group.NewScalar().Set(xi)
+		diff.Sub(xj)
+		den.Mul(diff)
 	}
 	
 	// Return num/den
-	denInv := group.NewScalar().Invert(den)
-	return group.NewScalar().Mul(num, denInv)
+	denInv := group.NewScalar().Set(den)
+	denInv.Invert()
+	result := group.NewScalar().Set(num)
+	result.Mul(denInv)
+	return result
 }
 
 // Message types

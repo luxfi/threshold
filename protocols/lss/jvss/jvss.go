@@ -6,11 +6,11 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/math/sample"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/pkg/pedersen"
 	"github.com/luxfi/threshold/pkg/pool"
 )
 
@@ -85,7 +85,7 @@ func (j *JVSS) GenerateShares() (map[party.ID]*Share, *Commitment, curve.Scalar,
 // VerifyShare verifies a share received from another party
 func (j *JVSS) VerifyShare(share *Share, commitment *Commitment, partyID party.ID) bool {
 	// Verify the share against the polynomial commitment
-	x := j.group.NewScalar().SetNat(partyID.Scalar(j.group))
+	x := partyID.Scalar(j.group)
 	
 	// Compute expected commitment from polynomial
 	expectedCommit := j.evaluateCommitment(commitment, x)
@@ -131,9 +131,11 @@ func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 		valG := polyG.Evaluate(x)
 		
 		// C_i = g^{f(i)} * h^{g(i)}
-		g := val.ActOnBase()
-		h := valG.Act(pedersen.H(j.group))
-		points[i] = j.group.NewPoint().Add(g, h)
+		// For now, use a simple commitment without Pedersen h
+		// TODO: Implement proper Pedersen commitment with h generator
+		gPart := val.ActOnBase()
+		hPart := valG.ActOnBase() // Should use h generator
+		points[i] = gPart.Add(hPart)
 	}
 	
 	return &Commitment{Points: points}
@@ -141,13 +143,14 @@ func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 
 // evaluateCommitment evaluates the commitment polynomial at a point
 func (j *JVSS) evaluateCommitment(commitment *Commitment, x curve.Scalar) curve.Point {
-	result := j.group.NewPoint()
-	xPower := j.group.NewScalar().SetNat(1)
+	result := j.group.NewPoint() // Identity element
+	xPower := j.group.NewScalar().SetNat(new(saferith.Nat).SetUint64(1))
 	
 	for _, coeff := range commitment.Points {
-		term := j.group.NewPoint().ScalarMult(xPower, coeff)
-		result = result.Add(result, term)
-		xPower = xPower.Mul(xPower, x)
+		// term = coeff^{x^i}
+		term := xPower.Act(coeff)
+		result = result.Add(term)
+		xPower = xPower.Mul(x)
 	}
 	
 	return result
@@ -159,14 +162,14 @@ func (j *JVSS) createShareProof(share, shareG curve.Scalar, recipient party.ID) 
 	r := sample.Scalar(rand.Reader, j.group)
 	
 	// Commitment
-	commitment := j.group.NewPoint().ScalarBaseMult(r)
+	commitment := r.ActOnBase()
 	
 	// Challenge (Fiat-Shamir)
 	challenge := j.computeChallenge(commitment, recipient)
 	
 	// Response
-	response := j.group.NewScalar().Mul(challenge, share)
-	response = response.Add(response, r)
+	response := j.group.NewScalar().Mul(challenge).Mul(share)
+	response = response.Add(r)
 	
 	return &ShareProof{
 		Commitment: commitment,
@@ -184,9 +187,9 @@ func (j *JVSS) verifyShareProof(proof *ShareProof, expectedCommit curve.Point, p
 	}
 	
 	// Verify proof equation
-	lhs := j.group.NewPoint().ScalarBaseMult(proof.Response)
-	rhs := j.group.NewPoint().ScalarMult(challenge, expectedCommit)
-	rhs = rhs.Add(rhs, proof.Commitment)
+	lhs := proof.Response.ActOnBase()
+	rhs := challenge.Act(expectedCommit)
+	rhs = rhs.Add(proof.Commitment)
 	
 	return lhs.Equal(rhs)
 }
@@ -194,10 +197,12 @@ func (j *JVSS) verifyShareProof(proof *ShareProof, expectedCommit curve.Point, p
 // computeChallenge computes the Fiat-Shamir challenge
 func (j *JVSS) computeChallenge(commitment curve.Point, partyID party.ID) curve.Scalar {
 	// Hash commitment and party ID to create challenge
-	h := round.Hash(j.group)
-	h.WritePoint(commitment)
-	h.WriteBytes(partyID.Bytes())
-	return h.Sum()
+	h := hash.New()
+	_ = h.WriteAny(commitment)
+	_ = h.WriteAny(partyID)
+	digest := h.Sum()
+	natValue := new(saferith.Nat).SetBytes(digest)
+	return j.group.NewScalar().SetNat(natValue)
 }
 
 // StartJVSS starts a JVSS protocol round
@@ -205,7 +210,7 @@ func StartJVSS(group curve.Curve, selfID party.ID, parties []party.ID, threshold
 	jvss := NewJVSS(group, threshold, parties, selfID)
 	
 	// Generate shares for our contribution
-	shares, commitment, secret, err := jvss.GenerateShares()
+	shares, _, _, err := jvss.GenerateShares()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -230,11 +235,11 @@ func (j *JVSS) VerifyAndCombine(allShares map[party.ID]map[party.ID]*Share, comm
 	
 	// Combine shares from all dealers
 	finalShares := make(map[party.ID]*Share)
-	for recipient := range j.parties {
+	for _, recipient := range j.parties {
 		combinedValue := j.group.NewScalar()
 		for dealer := range allShares {
 			if share, ok := allShares[dealer][recipient]; ok {
-				combinedValue = combinedValue.Add(combinedValue, share.Value)
+				combinedValue.Add(share.Value)
 			}
 		}
 		finalShares[recipient] = &Share{Value: combinedValue}
