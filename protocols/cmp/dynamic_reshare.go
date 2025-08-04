@@ -103,56 +103,14 @@ func DynamicReshare(config *Config, newParties []party.ID, newThreshold int, pl 
 			return nil, err
 		}
 
-		// Wrap the session to filter results appropriately
-		return &dynamicReshareWrapper{
-			Session:        baseSession,
-			newParties:     newParties,
-			newPartySet:    newPartySet,
-			isNewParty:     isNewParty,
-			originalConfig: config,
-		}, nil
+		// Return the base session directly
+		// Result filtering would need to be done at a higher level
+		return baseSession, nil
 	}
 }
 
-// dynamicReshareWrapper wraps the base keygen session to handle dynamic aspects
-type dynamicReshareWrapper struct {
-	round.Session
-	newParties     []party.ID
-	newPartySet    map[party.ID]bool
-	isNewParty     bool
-	originalConfig *Config
-}
-
-// Result filters the output to ensure proper party membership
-func (w *dynamicReshareWrapper) Result() (interface{}, error) {
-	// Get the base result
-	result, err := w.Session.Result()
-	if err != nil {
-		return nil, err
-	}
-
-	// If we're not in the new party set, we shouldn't have a result
-	if !w.isNewParty {
-		return nil, nil
-	}
-
-	// Cast to config and filter parties
-	newConfig, ok := result.(*Config)
-	if !ok {
-		return nil, fmt.Errorf("unexpected result type: %T", result)
-	}
-
-	// Filter the public shares to only include new parties
-	filteredPublic := make(map[party.ID]*config.Public)
-	for id, pub := range newConfig.Public {
-		if w.newPartySet[id] {
-			filteredPublic[id] = pub
-		}
-	}
-	newConfig.Public = filteredPublic
-
-	return newConfig, nil
-}
+// Note: Result filtering for dynamic reshare needs to be done at the protocol handler level,
+// not within the session, as the Session interface doesn't expose a Result method.
 
 // AddParties is a convenience function to add new parties to an existing scheme
 func AddParties(config *Config, partiesToAdd []party.ID, pl *pool.Pool) protocol.StartFunc {
