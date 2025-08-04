@@ -128,7 +128,10 @@ func (ftc *FaultTolerantCoordinator) Sign(messageHash []byte, requestedSigners [
 // attemptSign tries to generate a signature with the given configuration
 func (ftc *FaultTolerantCoordinator) attemptSign(config *Config, signers []party.ID, messageHash []byte) (interface{}, []party.ID, error) {
 	// Create signing session
-	handler := protocol.NewMultiHandler(Sign(config, signers, messageHash, ftc.pool), nil)
+	handler, err := protocol.NewMultiHandler(Sign(config, signers, messageHash, ftc.pool), nil)
+	if err != nil {
+		return nil, signers, err
+	}
 	
 	// Track which parties respond
 	respondingParties := make(map[party.ID]bool)
@@ -317,10 +320,14 @@ func (ftc *FaultTolerantCoordinator) performRecovery(failedParties []party.ID) (
 	}
 	
 	// Execute dynamic reshare to remove failed parties
-	handler := protocol.NewMultiHandler(
+	handler, err := protocol.NewMultiHandler(
 		RemoveParties(ftc.config, partiesToRemove, newThreshold, ftc.pool),
 		nil,
 	)
+	if err != nil {
+		// If resharing fails, try rolling back to previous generation
+		return ftc.rollbackToPreviousGeneration()
+	}
 	
 	// Run the resharing protocol
 	result, err := handler.Result()
