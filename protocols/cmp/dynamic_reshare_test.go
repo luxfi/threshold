@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
-	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,6 @@ func TestDynamicReshare_AddParties(t *testing.T) {
 	}
 	
 	// Verify new parties can participate in signing
-	message := []byte("test message for dynamic reshare")
 	messageHash := make([]byte, 32)
 	rand.Read(messageHash)
 	
@@ -116,17 +116,33 @@ func TestDynamicReshare_ChangeThreshold(t *testing.T) {
 	
 	// Run dynamic reshare to change threshold
 	resharedConfigs := make(map[party.ID]*cmp.Config)
-	for id, config := range initialConfigs {
+	rounds := make([]round.Session, 0, len(initialConfigs))
+	
+	// Create all sessions first
+	for _, config := range initialConfigs {
 		pl := pool.NewPool(0)
-		handler := protocol.NewMultiHandler(cmp.ChangeThreshold(config, newThreshold, pl), nil)
-		
-		test.Rounds(t, handler, config)
-		
-		r, err := handler.Result()
+		r, err := cmp.ChangeThreshold(config, newThreshold, pl)(nil)
 		require.NoError(t, err)
-		require.IsType(t, &cmp.Config{}, r)
-		
-		resharedConfigs[id] = r.(*cmp.Config)
+		rounds = append(rounds, r)
+	}
+	
+	// Run protocol rounds
+	for {
+		err, done := test.Rounds(rounds, nil)
+		require.NoError(t, err)
+		if done {
+			break
+		}
+	}
+	
+	// Extract results
+	for i, r := range rounds {
+		require.IsType(t, &round.Output{}, r)
+		resultRound := r.(*round.Output)
+		require.IsType(t, &cmp.Config{}, resultRound.Result)
+		config := resultRound.Result.(*cmp.Config)
+		resharedConfigs[config.ID] = config
+		_ = i
 	}
 	
 	// Verify the public key remains the same
@@ -194,17 +210,33 @@ func TestDynamicReshare_MigrateParties(t *testing.T) {
 
 func runKeygen(t *testing.T, group curve.Curve, parties []party.ID, threshold int) map[party.ID]*cmp.Config {
 	configs := make(map[party.ID]*cmp.Config)
+	rounds := make([]round.Session, 0, len(parties))
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
 	
+	// Create all sessions
 	for _, id := range parties {
-		pl := pool.NewPool(0)
-		handler := protocol.NewMultiHandler(cmp.Keygen(group, id, parties, threshold, pl), nil)
-		test.Rounds(t, handler, nil)
-		
-		r, err := handler.Result()
+		r, err := cmp.Keygen(group, id, parties, threshold, pl)(nil)
 		require.NoError(t, err)
-		require.IsType(t, &cmp.Config{}, r)
-		
-		configs[id] = r.(*cmp.Config)
+		rounds = append(rounds, r)
+	}
+	
+	// Run protocol
+	for {
+		err, done := test.Rounds(rounds, nil)
+		require.NoError(t, err)
+		if done {
+			break
+		}
+	}
+	
+	// Extract results
+	for _, r := range rounds {
+		require.IsType(t, &round.Output{}, r)
+		resultRound := r.(*round.Output)
+		require.IsType(t, &cmp.Config{}, resultRound.Result)
+		config := resultRound.Result.(*cmp.Config)
+		configs[config.ID] = config
 	}
 	
 	return configs
@@ -212,16 +244,32 @@ func runKeygen(t *testing.T, group curve.Curve, parties []party.ID, threshold in
 
 func runDynamicReshare(t *testing.T, oldConfigs map[party.ID]*cmp.Config, newParties []party.ID, threshold int) map[party.ID]*cmp.Config {
 	allConfigs := make(map[party.ID]*cmp.Config)
+	rounds := make([]round.Session, 0)
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
 	
-	// Old parties run reshare with their configs
-	for id, config := range oldConfigs {
-		pl := pool.NewPool(0)
-		handler := protocol.NewMultiHandler(cmp.DynamicReshare(config, newParties, threshold, pl), nil)
-		test.Rounds(t, handler, config)
-		
-		r, err := handler.Result()
-		if err == nil && r != nil {
-			allConfigs[id] = r.(*cmp.Config)
+	// Create sessions for all parties (old + new)
+	for _, config := range oldConfigs {
+		r, err := cmp.DynamicReshare(config, newParties, threshold, pl)(nil)
+		require.NoError(t, err)
+		rounds = append(rounds, r)
+	}
+	
+	// Run protocol
+	for {
+		err, done := test.Rounds(rounds, nil)
+		require.NoError(t, err)
+		if done {
+			break
+		}
+	}
+	
+	// Extract results
+	for _, r := range rounds {
+		if outputRound, ok := r.(*round.Output); ok {
+			if config, ok := outputRound.Result.(*cmp.Config); ok {
+				allConfigs[config.ID] = config
+			}
 		}
 	}
 	
@@ -233,26 +281,38 @@ func runDynamicReshare(t *testing.T, oldConfigs map[party.ID]*cmp.Config, newPar
 
 func runDynamicReshareRemove(t *testing.T, oldConfigs map[party.ID]*cmp.Config, remainingParties []party.ID, newThreshold int) map[party.ID]*cmp.Config {
 	remainingConfigs := make(map[party.ID]*cmp.Config)
+	rounds := make([]round.Session, 0)
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
 	
-	// All old parties participate in reshare
-	for id, config := range oldConfigs {
-		pl := pool.NewPool(0)
-		handler := protocol.NewMultiHandler(cmp.RemoveParties(config, []party.ID{}, newThreshold, pl), nil)
-		test.Rounds(t, handler, config)
-		
-		r, err := handler.Result()
-		
-		// Only remaining parties should get results
-		isRemaining := false
-		for _, rid := range remainingParties {
-			if id == rid {
-				isRemaining = true
-				break
-			}
+	// Create sessions for all old parties
+	for _, config := range oldConfigs {
+		r, err := cmp.RemoveParties(config, []party.ID{}, newThreshold, pl)(nil)
+		require.NoError(t, err)
+		rounds = append(rounds, r)
+	}
+	
+	// Run protocol
+	for {
+		err, done := test.Rounds(rounds, nil)
+		require.NoError(t, err)
+		if done {
+			break
 		}
-		
-		if isRemaining && err == nil && r != nil {
-			remainingConfigs[id] = r.(*cmp.Config)
+	}
+	
+	// Extract results - only remaining parties should get results
+	for _, r := range rounds {
+		if outputRound, ok := r.(*round.Output); ok {
+			if config, ok := outputRound.Result.(*cmp.Config); ok {
+				// Check if this party is in the remaining set
+				for _, rid := range remainingParties {
+					if config.ID == rid {
+						remainingConfigs[config.ID] = config
+						break
+					}
+				}
+			}
 		}
 	}
 	
@@ -261,49 +321,77 @@ func runDynamicReshareRemove(t *testing.T, oldConfigs map[party.ID]*cmp.Config, 
 
 func runMigration(t *testing.T, oldConfigs map[party.ID]*cmp.Config, removeParties, addParties []party.ID, threshold int) map[party.ID]*cmp.Config {
 	migratedConfigs := make(map[party.ID]*cmp.Config)
+	rounds := make([]round.Session, 0)
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
 	
-	// Use any old party's config to initiate migration
-	var initiatorConfig *cmp.Config
+	// Create sessions for all parties
 	for _, config := range oldConfigs {
-		initiatorConfig = config
-		break
+		r, err := cmp.MigrateParties(config, removeParties, addParties, threshold, pl)(nil)
+		require.NoError(t, err)
+		rounds = append(rounds, r)
 	}
 	
-	pl := pool.NewPool(0)
-	handler := protocol.NewMultiHandler(
-		cmp.MigrateParties(initiatorConfig, removeParties, addParties, threshold, pl), 
-		nil,
-	)
-	
-	// Run the migration protocol
-	// In real implementation, this would coordinate between all parties
-	
-	return migratedConfigs
-}
-
-func runSign(t *testing.T, configs map[party.ID]*cmp.Config, signers []party.ID, messageHash []byte) *cmp.Signature {
-	// Simple signing simulation
-	// In real implementation, this would run the full CMP signing protocol
-	
-	var signature *cmp.Signature
-	
-	for _, id := range signers {
-		config, ok := configs[id]
-		if !ok {
-			continue
-		}
-		
-		pl := pool.NewPool(0)
-		handler := protocol.NewMultiHandler(cmp.Sign(config, signers, messageHash, pl), nil)
-		test.Rounds(t, handler, config)
-		
-		r, err := handler.Result()
-		if err == nil && r != nil {
-			signature = r.(*cmp.Signature)
+	// Run protocol
+	for {
+		err, done := test.Rounds(rounds, nil)
+		require.NoError(t, err)
+		if done {
 			break
 		}
 	}
 	
-	require.NotNil(t, signature)
-	return signature
+	// Extract results
+	for _, r := range rounds {
+		if outputRound, ok := r.(*round.Output); ok {
+			if config, ok := outputRound.Result.(*cmp.Config); ok {
+				migratedConfigs[config.ID] = config
+			}
+		}
+	}
+	
+	return migratedConfigs
+}
+
+func runSign(t *testing.T, configs map[party.ID]*cmp.Config, signers []party.ID, messageHash []byte) *ecdsa.Signature {
+	// Simple signing simulation
+	// In real implementation, this would run the full CMP signing protocol
+	
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
+	rounds := make([]round.Session, 0, len(signers))
+	
+	// Create sessions for all signers
+	for _, id := range signers {
+		if config, ok := configs[id]; ok {
+			r, err := cmp.Sign(config, signers, messageHash, pl)(nil)
+			if err == nil {
+				rounds = append(rounds, r)
+			}
+		}
+	}
+	
+	// Run protocol
+	for {
+		err, done := test.Rounds(rounds, nil)
+		if err != nil {
+			t.Logf("Sign error: %v", err)
+			break
+		}
+		if done {
+			break
+		}
+	}
+	
+	// Extract signature from any successful round
+	for _, r := range rounds {
+		if outputRound, ok := r.(*round.Output); ok {
+			if sig, ok := outputRound.Result.(*ecdsa.Signature); ok {
+				return sig
+			}
+		}
+	}
+	
+	require.Fail(t, "Failed to produce signature")
+	return nil
 }
