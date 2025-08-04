@@ -18,7 +18,6 @@ import (
 	"errors"
 
 	"github.com/luxfi/threshold/internal/round"
-	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
@@ -117,7 +116,7 @@ func IsCompatibleForSigning(c1, c2 *Config) bool {
 	if !c1.PublicKey.Equal(c2.PublicKey) {
 		return false
 	}
-	if !c1.Group.Name().Eq(c2.Group.Name()) {
+	if c1.Group.Name() != c2.Group.Name() {
 		return false
 	}
 	// Same generation (must be at same re-share state)
@@ -132,8 +131,9 @@ func IsCompatibleForSigning(c1, c2 *Config) bool {
 func AdaptForEdDSA(config *Config) *Config {
 	// EdDSA uses different hash function and signing equation
 	// This would require modifications to the signing protocol
+	// TODO: Implement when Edwards25519 curve is available
 	eddsaConfig := *config
-	eddsaConfig.Group = curve.Edwards25519{}
+	// eddsaConfig.Group = curve.Edwards25519{}
 	return &eddsaConfig
 }
 
@@ -156,8 +156,8 @@ func GetSignatureType(config *Config) string {
 	switch config.Group.Name() {
 	case "secp256k1":
 		return "ECDSA"
-	case "edwards25519":
-		return "EdDSA"
+	// case "edwards25519":
+	// 	return "EdDSA"
 	default:
 		return "Unknown"
 	}

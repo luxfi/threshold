@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -235,7 +234,6 @@ func TestLSSSign(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create message to sign
-			message := []byte("Test message for LSS signing")
 			messageHash := make([]byte, 32)
 			_, err := rand.Read(messageHash)
 			require.NoError(t, err)
@@ -317,7 +315,6 @@ func TestLSSSignWithBlinding(t *testing.T) {
 
 	for _, p := range protocols {
 		t.Run(p.name, func(t *testing.T) {
-			message := []byte("Test message for blinded signing")
 			messageHash := make([]byte, 32)
 			_, err := rand.Read(messageHash)
 			require.NoError(t, err)
@@ -529,8 +526,7 @@ func TestLSSConcurrentOperations(t *testing.T) {
 	wg.Add(numOperations)
 
 	for op := 0; op < numOperations; op++ {
-		op := op
-		go func() {
+		go func(op int) {
 			defer wg.Done()
 			
 			messageHash := make([]byte, 32)
@@ -558,7 +554,7 @@ func TestLSSConcurrentOperations(t *testing.T) {
 			}
 			
 			sigWg.Wait()
-		}()
+		}(op)
 	}
 
 	wg.Wait()
