@@ -21,11 +21,11 @@ import (
 
 var (
 	// Global flags
-	configDir   string
-	protocol    string
-	curveType   string
-	networkAddr string
-	verbose     bool
+	configDir     string
+	protocolName  string
+	curveType     string
+	networkAddr   string
+	verbose       bool
 
 	// Protocol options
 	threshold   int
@@ -117,7 +117,7 @@ including LSS-MPC, CGG21 (CMP), and FROST protocols.`,
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&configDir, "config-dir", "d", "./threshold-data", "Configuration directory")
-	rootCmd.PersistentFlags().StringVarP(&protocol, "protocol", "p", "lss", "Protocol to use: lss, cmp, frost")
+	rootCmd.PersistentFlags().StringVarP(&protocolName, "protocol", "p", "lss", "Protocol to use: lss, cmp, frost")
 	rootCmd.PersistentFlags().StringVarP(&curveType, "curve", "c", "secp256k1", "Elliptic curve: secp256k1, p256, ed25519")
 	rootCmd.PersistentFlags().StringVarP(&networkAddr, "network", "n", "", "Network address for distributed mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
@@ -242,7 +242,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 
 	var config interface{}
 	
-	switch protocol {
+	switch protocolName {
 	case "lss":
 		config, err = runLSSKeygen(group, partyIDs[ourIndex], partyIDs, threshold, pl, network)
 	case "cmp":
@@ -250,7 +250,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 	case "frost":
 		config, err = runFROSTKeygen(group, partyIDs[ourIndex], partyIDs, threshold, pl, network)
 	default:
-		return fmt.Errorf("unknown protocol: %s", protocol)
+		return fmt.Errorf("unknown protocol: %s", protocolName)
 	}
 
 	if err != nil {
@@ -259,7 +259,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 
 	// Save config
 	if outputFile == "" {
-		outputFile = filepath.Join(configDir, fmt.Sprintf("%s-%s.json", protocol, partyID))
+		outputFile = filepath.Join(configDir, fmt.Sprintf("%s-%s.json", protocolName, partyID))
 	}
 
 	data, err := json.MarshalIndent(config, "", "  ")
@@ -276,11 +276,26 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 	// Display public key
 	switch c := config.(type) {
 	case *lss.Config:
-		fmt.Printf("Public key: %s\n", hex.EncodeToString(c.PublicKey.XBytes()))
+		if c.PublicKey != nil {
+			pkBytes, err := c.PublicKey.MarshalBinary()
+			if err == nil {
+				fmt.Printf("Public key: %s\n", hex.EncodeToString(pkBytes))
+			}
+		}
 	case *cmp.Config:
-		fmt.Printf("Public key: %s\n", hex.EncodeToString(c.PublicPoint().XBytes()))
+		if pk := c.PublicPoint(); pk != nil {
+			pkBytes, err := pk.MarshalBinary()
+			if err == nil {
+				fmt.Printf("Public key: %s\n", hex.EncodeToString(pkBytes))
+			}
+		}
 	case *frost.Config:
-		fmt.Printf("Public key: %s\n", hex.EncodeToString(c.PublicKey.XBytes()))
+		if c.PublicKey != nil {
+			pkBytes, err := c.PublicKey.MarshalBinary()
+			if err == nil {
+				fmt.Printf("Public key: %s\n", hex.EncodeToString(pkBytes))
+			}
+		}
 	}
 
 	return nil
@@ -322,7 +337,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 
 	var signature interface{}
 	
-	switch protocol {
+	switch protocolName {
 	case "lss":
 		var config lss.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
@@ -351,7 +366,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 		signature, err = runFROSTSign(&config, signers, message, pl, network)
 		
 	default:
-		return fmt.Errorf("unknown protocol: %s", protocol)
+		return fmt.Errorf("unknown protocol: %s", protocolName)
 	}
 
 	if err != nil {
@@ -392,7 +407,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	}
 
 	// Currently only LSS supports resharing
-	if protocol != "lss" {
+	if protocolName != "lss" {
 		return fmt.Errorf("resharing is currently only supported for LSS protocol")
 	}
 
@@ -423,7 +438,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 
 	// Save new config
 	if outputFile == "" {
-		outputFile = filepath.Join(configDir, fmt.Sprintf("%s-%s-reshared.json", protocol, config.ID))
+		outputFile = filepath.Join(configDir, fmt.Sprintf("%s-%s-reshared.json", protocolName, config.ID))
 	}
 
 	data, err := json.MarshalIndent(newConfig, "", "  ")
@@ -474,7 +489,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 	// Verify based on protocol
 	valid := false
-	switch protocol {
+	switch protocolName {
 	case "lss", "cmp":
 		// ECDSA verification
 		valid, err = verifyECDSA(sigData, pkData, message)
@@ -482,7 +497,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 		// Schnorr verification
 		valid, err = verifySchnorr(sigData, pkData, message)
 	default:
-		return fmt.Errorf("unknown protocol: %s", protocol)
+		return fmt.Errorf("unknown protocol: %s", protocolName)
 	}
 
 	if err != nil {
@@ -503,7 +518,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	operation, _ := cmd.Flags().GetString("operation")
 	enableProfile, _ := cmd.Flags().GetBool("profile")
 
-	fmt.Printf("Running %s benchmarks for %s protocol...\n", operation, protocol)
+	fmt.Printf("Running %s benchmarks for %s protocol...\n", operation, protocolName)
 	fmt.Printf("Iterations: %d\n", iterations)
 	
 	if enableProfile {
@@ -514,22 +529,22 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	// Run benchmarks based on operation
 	switch operation {
 	case "keygen":
-		return benchmarkKeygen(protocol, iterations)
+		return benchmarkKeygen(protocolName, iterations)
 	case "sign":
-		return benchmarkSign(protocol, iterations)
+		return benchmarkSign(protocolName, iterations)
 	case "reshare":
-		if protocol != "lss" {
+		if protocolName != "lss" {
 			return fmt.Errorf("reshare benchmark only available for LSS protocol")
 		}
 		return benchmarkReshare(iterations)
 	case "all":
-		if err := benchmarkKeygen(protocol, iterations); err != nil {
+		if err := benchmarkKeygen(protocolName, iterations); err != nil {
 			return err
 		}
-		if err := benchmarkSign(protocol, iterations); err != nil {
+		if err := benchmarkSign(protocolName, iterations); err != nil {
 			return err
 		}
-		if protocol == "lss" {
+		if protocolName == "lss" {
 			if err := benchmarkReshare(iterations); err != nil {
 				return err
 			}
@@ -546,35 +561,35 @@ func runTests(cmd *cobra.Command, args []string) error {
 	useGinkgo, _ := cmd.Flags().GetBool("ginkgo")
 	timeout, _ := cmd.Flags().GetDuration("timeout")
 
-	fmt.Printf("Running %s test suite for %s protocol...\n", suite, protocol)
+	fmt.Printf("Running %s test suite for %s protocol...\n", suite, protocolName)
 
 	if useGinkgo {
 		fmt.Println("Using Ginkgo test runner")
 		// Run Ginkgo tests
-		return runGinkgoTests(protocol, suite, timeout)
+		return runGinkgoTests(protocolName, suite, timeout)
 	}
 
 	// Run standard Go tests
 	switch suite {
 	case "functional":
-		return runFunctionalTests(protocol)
+		return runFunctionalTests(protocolName)
 	case "security":
-		return runSecurityTests(protocol)
+		return runSecurityTests(protocolName)
 	case "property":
-		return runPropertyTests(protocol)
+		return runPropertyTests(protocolName)
 	case "fuzz":
-		return runFuzzTests(protocol)
+		return runFuzzTests(protocolName)
 	case "all":
-		if err := runFunctionalTests(protocol); err != nil {
+		if err := runFunctionalTests(protocolName); err != nil {
 			return err
 		}
-		if err := runSecurityTests(protocol); err != nil {
+		if err := runSecurityTests(protocolName); err != nil {
 			return err
 		}
-		if err := runPropertyTests(protocol); err != nil {
+		if err := runPropertyTests(protocolName); err != nil {
 			return err
 		}
-		if err := runFuzzTests(protocol); err != nil {
+		if err := runFuzzTests(protocolName); err != nil {
 			return err
 		}
 	default:
@@ -589,18 +604,18 @@ func runSimulation(cmd *cobra.Command, args []string) error {
 	rounds, _ := cmd.Flags().GetInt("rounds")
 	failureRate, _ := cmd.Flags().GetFloat64("failure-rate")
 
-	fmt.Printf("Running %s simulation for %s protocol...\n", scenario, protocol)
+	fmt.Printf("Running %s simulation for %s protocol...\n", scenario, protocolName)
 	fmt.Printf("Rounds: %d, Failure rate: %.2f%%\n", rounds, failureRate*100)
 
 	switch scenario {
 	case "byzantine":
-		return simulateByzantine(protocol, rounds, failureRate)
+		return simulateByzantine(protocolName, rounds, failureRate)
 	case "network-failure":
-		return simulateNetworkFailure(protocol, rounds, failureRate)
+		return simulateNetworkFailure(protocolName, rounds, failureRate)
 	case "concurrent-signing":
-		return simulateConcurrentSigning(protocol, rounds)
+		return simulateConcurrentSigning(protocolName, rounds)
 	case "large-scale":
-		return simulateLargeScale(protocol, rounds)
+		return simulateLargeScale(protocolName, rounds)
 	default:
 		return fmt.Errorf("unknown scenario: %s", scenario)
 	}
@@ -617,7 +632,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 
 	var exported []byte
 	
-	switch protocol {
+	switch protocolName {
 	case "lss":
 		var config lss.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
@@ -637,7 +652,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 		}
 		exported, err = exportFROSTConfig(&config, format)
 	default:
-		return fmt.Errorf("unknown protocol: %s", protocol)
+		return fmt.Errorf("unknown protocol: %s", protocolName)
 	}
 
 	if err != nil {
@@ -668,7 +683,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	var config interface{}
 	
-	switch protocol {
+	switch protocolName {
 	case "lss":
 		config, err = importLSSConfig(data, format)
 	case "cmp":
@@ -676,7 +691,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	case "frost":
 		config, err = importFROSTConfig(data, format)
 	default:
-		return fmt.Errorf("unknown protocol: %s", protocol)
+		return fmt.Errorf("unknown protocol: %s", protocolName)
 	}
 
 	if err != nil {
@@ -685,7 +700,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	// Save config
 	if outputFile == "" {
-		outputFile = fmt.Sprintf("%s-imported.json", protocol)
+		outputFile = fmt.Sprintf("%s-imported.json", protocolName)
 	}
 
 	configData, err := json.MarshalIndent(config, "", "  ")
@@ -726,7 +741,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	
 	if verbose {
 		fmt.Printf("Configuration Directory: %s\n", configDir)
-		fmt.Printf("Current Protocol: %s\n", protocol)
+		fmt.Printf("Current Protocol: %s\n", protocolName)
 		fmt.Printf("Current Curve: %s\n", curveType)
 	}
 	
@@ -740,7 +755,7 @@ func getCurve(curveType string) (curve.Curve, error) {
 	case "secp256k1":
 		return curve.Secp256k1{}, nil
 	case "p256":
-		return curve.P256{}, nil
+		return nil, fmt.Errorf("p256 not yet supported")
 	case "ed25519":
 		return nil, fmt.Errorf("ed25519 not yet supported")
 	default:
