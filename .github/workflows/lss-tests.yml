@@ -48,7 +48,7 @@ jobs:
         go tool cover -html=coverage.out -o coverage.html
     
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-reports
         path: |
@@ -83,7 +83,7 @@ jobs:
         make bench | tee -a benchmark-results.txt
     
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
         path: benchmark-results.txt
@@ -132,7 +132,7 @@ jobs:
         ginkgo -v --race --fail-fast --coverprofile=ginkgo-coverage.out ./protocols/lss
     
     - name: Upload Ginkgo coverage
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ginkgo-coverage
         path: ginkgo-coverage.out
