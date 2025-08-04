@@ -1,9 +1,14 @@
-package lss_test
+package lss
 
 import (
+	"crypto/rand"
+	"fmt"
 	"math/big"
+	mathrand "math/rand"
+	"sync"
 	"testing"
 	"testing/quick"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -11,7 +16,7 @@ import (
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
-	"github.com/luxfi/threshold/protocols/lss"
+	"github.com/luxfi/threshold/pkg/protocol"
 )
 
 var _ = Describe("LSS Property-Based Tests", func() {
@@ -200,7 +205,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			
 			// Create a fuzzing network
 			fuzzNetwork := &FuzzingNetwork{
-				Network: test.NewNetwork(partyIDs),
+				Network:  test.NewNetwork(partyIDs),
 				FuzzRate: 0.1, // 10% of messages will be fuzzed
 			}
 			
@@ -386,7 +391,7 @@ type FuzzingNetwork struct {
 
 func (f *FuzzingNetwork) Send(from, to party.ID, msg protocol.Message) {
 	// Randomly corrupt messages
-	if rand.Float64() < f.FuzzRate {
+	if mathrand.Float64() < f.FuzzRate {
 		// Corrupt the message somehow
 		// In real implementation, this would modify message bytes
 	}
@@ -456,7 +461,7 @@ func FuzzLSSProtocol(f *testing.F) {
 		partyIDs := test.PartyIDs(int(n))
 		network := test.NewNetwork(partyIDs)
 		
-		configs := make([]*lss.Config, n)
+		configs := make([]*Config, n)
 		var wg sync.WaitGroup
 		wg.Add(int(n))
 		
@@ -464,7 +469,7 @@ func FuzzLSSProtocol(f *testing.F) {
 			i := i
 			go func(id party.ID) {
 				defer wg.Done()
-				h, err := protocol.NewMultiHandler(lss.Keygen(curve.Secp256k1{}, id, partyIDs, int(threshold), pl), nil)
+				h, err := protocol.NewMultiHandler(Keygen(curve.Secp256k1{}, id, partyIDs, int(threshold), pl), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -474,7 +479,7 @@ func FuzzLSSProtocol(f *testing.F) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				configs[i] = r.(*lss.Config)
+				configs[i] = r.(*Config)
 			}(id)
 		}
 		
@@ -489,7 +494,7 @@ func FuzzLSSProtocol(f *testing.F) {
 			i := i
 			go func() {
 				defer wg.Done()
-				h, err := protocol.NewMultiHandler(lss.Sign(configs[i], signers, messageHash, pl), nil)
+				h, err := protocol.NewMultiHandler(Sign(configs[i], signers, messageHash, pl), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
