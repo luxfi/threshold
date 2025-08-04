@@ -1,7 +1,7 @@
 package lss
 
 import (
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
@@ -49,7 +50,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				network := test.NewNetwork(partyIDs)
 				
 				// Run keygen
-				configs := runKeygen(partyIDs, t, group, pl, network)
+				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
 				
 				// Test: Any t parties can sign
 				messageHash := randomHash()
@@ -81,7 +82,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				network := test.NewNetwork(partyIDs)
 				
 				// Initial keygen
-				configs := runKeygen(partyIDs, t, group, pl, network)
+				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
 				publicKey := configs[0].PublicKey
 				
 				// Add parties
@@ -100,7 +101,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				if add > 0 || remove > 0 {
 					allParties := append(remainingConfigs[0].PartyIDs, newParties...)
 					network = test.NewNetwork(allParties)
-					newConfigs := runReshare(remainingConfigs, t, newParties, publicKey, pl, network)
+					newConfigs := runReshare(remainingConfigs, t, newParties, pl, network)
 					
 					// Verify new configuration
 					return newConfigs[0].PublicKey.Equal(publicKey) &&
@@ -122,7 +123,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
 				
-				configs := runKeygen(partyIDs, t, group, pl, network)
+				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
 				
 				// Use seed to generate deterministic message
 				messageHash := make([]byte, 32)
@@ -159,11 +160,11 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				network := test.NewNetwork(partyIDs)
 				
 				// Initial setup with oldThreshold
-				configs := runKeygen(partyIDs, oldThreshold, group, pl, network)
+				configs := runKeygenGinkgo(partyIDs, oldThreshold, group, pl, network)
 				publicKey := configs[0].PublicKey
 				
 				// Reshare with new threshold
-				newConfigs := runReshare(configs, newThreshold, nil, publicKey, pl, network)
+				newConfigs := runReshare(configs, newThreshold, nil, pl, network)
 				
 				// Test: exactly newThreshold parties needed
 				messageHash := randomHash()
@@ -209,7 +210,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				FuzzRate: 0.1, // 10% of messages will be fuzzed
 			}
 			
-			configs := runKeygen(partyIDs, threshold, group, pl, fuzzNetwork)
+			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, fuzzNetwork)
 			
 			// Try signing with fuzzy network
 			successCount := 0
@@ -246,7 +247,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
 				
-				configs := runKeygen(partyIDs, threshold, group, pl, network)
+				configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
 				
 				// Create dropout network based on pattern
 				dropoutNetwork := &DropoutNetwork{
@@ -259,7 +260,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				signers := partyIDs
 				
 				// Should still work with some dropouts
-				signatures := runSignWithTimeout(configs, signers, messageHash, pl, dropoutNetwork, 5*time.Second)
+				signatures := runSignWithTimeout(configs, signers, messageHash, pl, dropoutNetwork.Network, 5*time.Second)
 				
 				// Count successful signatures
 				successCount := 0
@@ -288,7 +289,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				MaxDelay: 500 * time.Millisecond,
 			}
 			
-			configs := runKeygen(partyIDs, threshold, group, pl, delayNetwork)
+			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, delayNetwork)
 			
 			messageHash := randomHash()
 			signers := partyIDs[:threshold]
@@ -314,7 +315,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
 			
-			configs := runKeygen(partyIDs, threshold, group, pl, network)
+			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
 			
 			messageHash := randomHash()
 			signers := partyIDs[:threshold]
@@ -330,7 +331,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
 			
-			configs := runKeygen(partyIDs, threshold, group, pl, network)
+			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
 			
 			// Rapid fire signing
 			numOps := 20
@@ -369,7 +370,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				partyIDs := test.PartyIDs(tc.n)
 				network := test.NewNetwork(partyIDs)
 				
-				configs := runKeygen(partyIDs, tc.threshold, group, pl, network)
+				configs := runKeygenGinkgo(partyIDs, tc.threshold, group, pl, network)
 				
 				messageHash := randomHash()
 				signers := partyIDs[:tc.threshold]
@@ -389,13 +390,13 @@ type FuzzingNetwork struct {
 	FuzzRate float64
 }
 
-func (f *FuzzingNetwork) Send(from, to party.ID, msg protocol.Message) {
+func (f *FuzzingNetwork) Send(msg *protocol.Message) {
 	// Randomly corrupt messages
 	if mathrand.Float64() < f.FuzzRate {
 		// Corrupt the message somehow
 		// In real implementation, this would modify message bytes
 	}
-	f.Network.Send(from, to, msg)
+	f.Network.Send(msg)
 }
 
 type DropoutNetwork struct {
@@ -404,18 +405,18 @@ type DropoutNetwork struct {
 	MaxDropouts    int
 }
 
-func (d *DropoutNetwork) Send(from, to party.ID, msg protocol.Message) {
+func (d *DropoutNetwork) Send(msg *protocol.Message) {
 	// Simulate random dropouts based on pattern
 	dropouts := 0
 	for i := 0; i < 32 && dropouts < d.MaxDropouts; i++ {
 		if d.DropoutPattern&(1<<i) != 0 {
 			dropouts++
-			if from == party.ID(fmt.Sprintf("%d", i)) || to == party.ID(fmt.Sprintf("%d", i)) {
+			if msg.From == party.ID(fmt.Sprintf("%d", i)) || msg.To == party.ID(fmt.Sprintf("%d", i)) {
 				return // Drop message
 			}
 		}
 	}
-	d.Network.Send(from, to, msg)
+	d.Network.Send(msg)
 }
 
 type DelayNetwork struct {
@@ -424,11 +425,11 @@ type DelayNetwork struct {
 	MaxDelay time.Duration
 }
 
-func (d *DelayNetwork) Send(from, to party.ID, msg protocol.Message) {
+func (d *DelayNetwork) Send(msg *protocol.Message) {
 	// Add random delay
-	delay := d.MinDelay + time.Duration(rand.Int63n(int64(d.MaxDelay-d.MinDelay)))
+	delay := d.MinDelay + time.Duration(mathrand.Int63n(int64(d.MaxDelay-d.MinDelay)))
 	time.Sleep(delay)
-	d.Network.Send(from, to, msg)
+	d.Network.Send(msg)
 }
 
 // Standard Go fuzz test
@@ -515,4 +516,126 @@ func FuzzLSSProtocol(f *testing.F) {
 			t.Fatal("Invalid signature")
 		}
 	})
+}
+
+// Helper functions for Ginkgo tests
+
+func runKeygenGinkgo(partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*Config {
+	var wg sync.WaitGroup
+	wg.Add(len(partyIDs))
+
+	configs := make([]*Config, len(partyIDs))
+	for i, id := range partyIDs {
+		i := i
+		go func(id party.ID) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(Keygen(group, id, partyIDs, threshold, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(id, h, network)
+			
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			configs[i] = r.(*Config)
+		}(id)
+	}
+
+	wg.Wait()
+	return configs
+}
+
+func runSign(configs []*Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network) []*ecdsa.Signature {
+	var wg sync.WaitGroup
+	wg.Add(len(configs))
+
+	signatures := make([]*ecdsa.Signature, len(configs))
+	for i, config := range configs {
+		i := i
+		go func(config *Config) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(Sign(config, signers, messageHash, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(config.ID, h, network)
+			
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			signatures[i] = r.(*ecdsa.Signature)
+		}(config)
+	}
+
+	wg.Wait()
+	return signatures
+}
+
+func runSignWithTimeout(configs []*Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network, timeout time.Duration) []*ecdsa.Signature {
+	done := make(chan struct{})
+	var signatures []*ecdsa.Signature
+	
+	go func() {
+		signatures = runSign(configs, signers, messageHash, pl, network)
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		return signatures
+	case <-time.After(timeout):
+		Fail("Sign operation timed out")
+		return nil
+	}
+}
+
+func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, pl *pool.Pool, network *test.Network) []*Config {
+	allParties := append(oldConfigs[0].PartyIDs, newParties...)
+	newConfigs := make([]*Config, len(allParties))
+	
+	var wg sync.WaitGroup
+	wg.Add(len(oldConfigs) + len(newParties))
+	
+	// Existing parties reshare
+	for i, config := range oldConfigs {
+		i := i
+		go func(c *Config) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(Reshare(c, newThreshold, newParties, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(c.ID, h, network)
+			
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			newConfigs[i] = r.(*Config)
+		}(config)
+	}
+	
+	// New parties join
+	for i, newID := range newParties {
+		idx := len(oldConfigs) + i
+		go func(id party.ID, idx int) {
+			defer wg.Done()
+			emptyConfig := &Config{
+				ID:           id,
+				Group:        oldConfigs[0].Group,
+				PublicKey:    oldConfigs[0].PublicKey,
+				Generation:   oldConfigs[0].Generation,
+				PartyIDs:     oldConfigs[0].PartyIDs,
+				PublicShares: make(map[party.ID]curve.Point),
+			}
+			h, err := protocol.NewMultiHandler(Reshare(emptyConfig, newThreshold, newParties, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(id, h, network)
+			
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			newConfigs[idx] = r.(*Config)
+		}(newID, idx)
+	}
+	
+	wg.Wait()
+	return newConfigs
+}
+
+func randomHash() []byte {
+	hash := make([]byte, 32)
+	_, err := cryptorand.Read(hash)
+	Expect(err).NotTo(HaveOccurred())
+	return hash
 }
