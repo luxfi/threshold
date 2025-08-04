@@ -760,7 +760,7 @@ func runReshare(configs []*lss.Config, newThreshold int, newParties []party.ID, 
 			
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
-			newConfigs[i] = r.(*lss.Config)
+			newConfigs[currentIdx] = r.(*lss.Config)
 		}(config)
 	}
 
@@ -784,7 +784,7 @@ func runReshare(configs []*lss.Config, newThreshold int, newParties []party.ID, 
 			
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
-			newConfigs[i] = r.(*lss.Config)
+			newConfigs[currentIdx] = r.(*lss.Config)
 		}(newID)
 	}
 
