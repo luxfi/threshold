@@ -80,7 +80,7 @@ func BenchmarkLSSSign(b *testing.B) {
 			network := test.NewNetwork(partyIDs)
 
 			// Run keygen once
-			configs := runKeygen(b, partyIDs, bm.threshold, curve.Secp256k1{}, pl, network)
+			configs := runKeygenBench(b, partyIDs, bm.threshold, curve.Secp256k1{}, pl, network)
 			signers := partyIDs[:bm.signers]
 
 			b.ResetTimer()
@@ -131,7 +131,7 @@ func BenchmarkLSSReshare(b *testing.B) {
 			network := test.NewNetwork(initialPartyIDs)
 
 			// Run initial keygen
-			configs := runKeygen(b, initialPartyIDs, bm.threshold, curve.Secp256k1{}, pl, network)
+			configs := runKeygenBench(b, initialPartyIDs, bm.threshold, curve.Secp256k1{}, pl, network)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -200,7 +200,7 @@ func BenchmarkLSSSignWithBlinding(b *testing.B) {
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
 
-			configs := runKeygen(b, partyIDs, threshold, curve.Secp256k1{}, pl, network)
+			configs := runKeygenBench(b, partyIDs, threshold, curve.Secp256k1{}, pl, network)
 			signers := partyIDs[:threshold]
 
 			b.ResetTimer()
@@ -239,7 +239,7 @@ func BenchmarkLSSParallelSigning(b *testing.B) {
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
 
-			configs := runKeygen(b, partyIDs, threshold, curve.Secp256k1{}, pl, network)
+			configs := runKeygenBench(b, partyIDs, threshold, curve.Secp256k1{}, pl, network)
 			signers := partyIDs[:threshold]
 
 			b.ResetTimer()
@@ -275,7 +275,7 @@ func BenchmarkLSSParallelSigning(b *testing.B) {
 }
 
 // Helper for benchmarks - same as in test but returns testing.TB
-func runKeygen(tb testing.TB, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*Config {
+func runKeygenBench(tb testing.TB, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*Config {
 	var wg sync.WaitGroup
 	wg.Add(len(partyIDs))
 
