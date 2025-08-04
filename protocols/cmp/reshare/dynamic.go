@@ -13,7 +13,6 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/cmp/config"
-	"github.com/luxfi/threshold/protocols/cmp/keygen"
 )
 
 // DynamicReshareConfig contains parameters for dynamic re-sharing
