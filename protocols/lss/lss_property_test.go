@@ -3,7 +3,6 @@ package lss
 import (
 	cryptorand "crypto/rand"
 	"fmt"
-	"math/big"
 	mathrand "math/rand"
 	"sync"
 	"testing"
@@ -210,7 +209,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				FuzzRate: 0.1, // 10% of messages will be fuzzed
 			}
 			
-			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, fuzzNetwork)
+			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, fuzzNetwork.Network)
 			
 			// Try signing with fuzzy network
 			successCount := 0
@@ -228,7 +227,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 						}
 					}()
 					
-					signatures := runSign(configs[:threshold], signers, messageHash, pl, fuzzNetwork)
+					signatures := runSign(configs[:threshold], signers, messageHash, pl, fuzzNetwork.Network)
 					if signatures[0] != nil && signatures[0].Verify(configs[0].PublicKey, messageHash) {
 						successCount++
 					}
@@ -289,13 +288,13 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				MaxDelay: 500 * time.Millisecond,
 			}
 			
-			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, delayNetwork)
+			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, delayNetwork.Network)
 			
 			messageHash := randomHash()
 			signers := partyIDs[:threshold]
 			
 			// Should complete despite delays
-			signatures := runSignWithTimeout(configs[:threshold], signers, messageHash, pl, delayNetwork, 30*time.Second)
+			signatures := runSignWithTimeout(configs[:threshold], signers, messageHash, pl, delayNetwork.Network, 30*time.Second)
 			
 			Expect(signatures[0]).NotTo(BeNil())
 			Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
