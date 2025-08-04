@@ -1,0 +1,212 @@
+name: LSS Protocol Tests and Benchmarks
+
+on:
+  push:
+    branches: [ main, lss-dynamic-resharing ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        go mod download
+        go install github.com/onsi/ginkgo/v2/ginkgo@latest
+        make install-tools
+    
+    - name: Run unit tests
+      run: make test-unit
+    
+    - name: Run LSS tests
+      run: make test-lss
+    
+    - name: Run CMP tests
+      run: make test-cmp
+    
+    - name: Run FROST tests
+      run: make test-frost
+    
+    - name: Run integration tests
+      run: make test-integration
+    
+    - name: Generate coverage report
+      run: |
+        make test-coverage
+        go tool cover -html=coverage.out -o coverage.html
+    
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: |
+          coverage.out
+          coverage.html
+    
+    - name: Run security checks
+      run: make sec
+
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run LSS benchmarks
+      run: |
+        echo "=== LSS Protocol Benchmarks ===" > benchmark-results.txt
+        make bench-lss | tee -a benchmark-results.txt
+    
+    - name: Run all protocol benchmarks
+      run: |
+        echo -e "\n\n=== All Protocol Benchmarks ===" >> benchmark-results.txt
+        make bench | tee -a benchmark-results.txt
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmark-results.txt
+    
+    - name: Comment PR with benchmark results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const benchmarkResults = fs.readFileSync('benchmark-results.txt', 'utf8');
+          
+          const comment = `## Benchmark Results
+          
+          <details>
+          <summary>Click to expand benchmark results</summary>
+          
+          \`\`\`
+          ${benchmarkResults}
+          \`\`\`
+          </details>`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  ginkgo-tests:
+    name: Run Ginkgo Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Install Ginkgo
+      run: go install github.com/onsi/ginkgo/v2/ginkgo@latest
+    
+    - name: Run Ginkgo tests with detailed output
+      run: |
+        ginkgo -v --race --fail-fast --coverprofile=ginkgo-coverage.out ./protocols/lss
+    
+    - name: Upload Ginkgo coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: ginkgo-coverage
+        path: ginkgo-coverage.out
+
+  property-tests:
+    name: Run Property-Based Tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Run property-based tests
+      run: |
+        go test -v -run Property ./protocols/lss/... -count=1
+    
+    - name: Run fuzz tests (short)
+      run: |
+        go test -fuzz=Fuzz -fuzztime=30s ./protocols/lss/...
+
+  cli-build:
+    name: Build and Test CLI
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Build CLI
+      run: make build-cli
+    
+    - name: Test CLI commands
+      run: |
+        ./bin/threshold-cli --help
+        ./bin/threshold-cli info
+        ./bin/threshold-cli test --suite functional --protocol lss
+
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+
+  matrix-test:
+    name: Test on Multiple Go Versions
+    strategy:
+      matrix:
+        go-version: ['1.20', '1.21', '1.22']
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+    
+    - name: Run tests
+      run: go test -v ./protocols/lss/...

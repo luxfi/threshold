@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, lss-dynamic-resharing ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run tests
+      run: |
+        go test -v -race -coverprofile=coverage.out ./...
+    
+    - name: Upload coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage
+        path: coverage.out
+
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run benchmarks
+      run: |
+        echo "LSS Benchmarks:" > benchmarks.txt
+        go test -bench=. -benchmem ./protocols/lss/... | tee -a benchmarks.txt
+        echo -e "\n\nIntegration Benchmarks:" >> benchmarks.txt
+        go test -bench=. -benchmem ./protocols/... | tee -a benchmarks.txt
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmarks
+        path: benchmarks.txt
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Run go vet
+      run: go vet ./...
+    
+    - name: Check formatting
+      run: |
+        fmt_files=$(gofmt -l .)
+        if [ -n "$fmt_files" ]; then
+          echo "The following files need formatting:"
+          echo "$fmt_files"
+          exit 1
+        fi
