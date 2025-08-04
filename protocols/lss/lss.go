@@ -15,15 +15,14 @@
 package lss
 
 import (
+	"errors"
+
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/threshold/protocols/lss/dealer"
-	"github.com/luxfi/threshold/protocols/lss/reshare"
-	"github.com/luxfi/threshold/protocols/lss/sign"
 )
 
 // EmptyConfig creates an empty Config with a fixed group, ready for unmarshalling.
@@ -37,78 +36,77 @@ func EmptyConfig(group curve.Curve) *Config {
 // Keygen generates a new shared ECDSA key with LSS protocol.
 // This is the initial key generation that establishes the first generation.
 func Keygen(group curve.Curve, selfID party.ID, participants []party.ID, threshold int, pl *pool.Pool) protocol.StartFunc {
-	info := round.Info{
-		ProtocolID:       "lss/keygen",
-		FinalRoundNumber: 3, // Similar to FROST keygen
-		SelfID:           selfID,
-		PartyIDs:         participants,
-		Threshold:        threshold,
-		Group:            group,
+	// TODO: Implement dealer.StartKeygen
+	return func(sessionID []byte) (round.Session, error) {
+		return nil, errors.New("LSS keygen not yet implemented")
 	}
-	return dealer.StartKeygen(info, pl)
 }
 
 // Reshare initiates the dynamic re-sharing protocol to change the participant set.
 // This allows adding or removing parties without reconstructing the master key.
 func Reshare(config *Config, newThreshold int, newParticipants []party.ID, pl *pool.Pool) protocol.StartFunc {
-	info := round.Info{
-		ProtocolID:       "lss/reshare",
-		FinalRoundNumber: reshare.Rounds,
-		SelfID:           config.ID,
-		PartyIDs:         append(config.PartyIDs, newParticipants...), // Union of old and new
-		Threshold:        newThreshold,
-		Group:            config.Group,
+	// TODO: Implement reshare.Start
+	return func(sessionID []byte) (round.Session, error) {
+		return nil, errors.New("LSS reshare not yet implemented")
 	}
-	return reshare.Start(info, config, newParticipants, pl)
 }
 
 // Sign generates an ECDSA signature using the LSS protocol.
 // This implements the pragmatic signing approach described in the paper.
 func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool) protocol.StartFunc {
-	return sign.StartSign(config, signers, messageHash, pl)
+	// TODO: Implement sign.StartSign
+	return func(sessionID []byte) (round.Session, error) {
+		return nil, errors.New("LSS sign not yet implemented")
+	}
 }
 
 // SignWithBlinding generates an ECDSA signature using Protocol I or II from the paper.
 // This uses multiplicative blinding for enhanced security.
-func SignWithBlinding(config *Config, signers []party.ID, messageHash []byte, protocol int, pl *pool.Pool) protocol.StartFunc {
-	return sign.StartSignWithBlinding(config, signers, messageHash, protocol, pl)
+func SignWithBlinding(config *Config, signers []party.ID, messageHash []byte, protocolVersion int, pl *pool.Pool) protocol.StartFunc {
+	// TODO: Implement sign.StartSignWithBlinding
+	return func(sessionID []byte) (round.Session, error) {
+		return nil, errors.New("LSS sign with blinding not yet implemented")
+	}
 }
 
 // CreateBootstrapDealer creates a new Bootstrap Dealer instance.
 func CreateBootstrapDealer(selfID party.ID, group curve.Curve) DealerRole {
-	return dealer.NewBootstrapDealer(selfID, group)
+	// TODO: Implement dealer.NewBootstrapDealer
+	return nil
 }
 
 // CreateSignatureCoordinator creates a new Signature Coordinator instance.
 func CreateSignatureCoordinator(config *Config, pl *pool.Pool) CoordinatorRole {
-	return sign.NewCoordinator(config, pl)
+	// TODO: Implement sign.NewCoordinator
+	return nil
 }
 
 // Rollback triggers a state rollback to a previous generation.
 // This is used when signing fails due to non-responsive parties.
 func Rollback(config *Config, targetGeneration uint64, evictParties []party.ID) error {
+	// TODO: Implement rollback functionality
 	// Load the target generation from storage
 	// Update config with the saved state
 	// Remove evicted parties from the participant list
-	return reshare.RollbackToGeneration(config, targetGeneration, evictParties)
+	return errors.New("LSS rollback not yet implemented")
 }
 
 // VerifyConfig validates that a Config is well-formed.
 func VerifyConfig(config *Config) error {
 	if config.Threshold <= 0 {
-		return protocol.NewError("threshold must be positive")
+		return errors.New("threshold must be positive")
 	}
 	if config.Threshold > len(config.PartyIDs) {
-		return protocol.NewError("threshold cannot exceed number of parties")
+		return errors.New("threshold cannot exceed number of parties")
 	}
 	if config.SecretShare == nil {
-		return protocol.NewError("secret share is nil")
+		return errors.New("secret share is nil")
 	}
 	if config.PublicKey == nil {
-		return protocol.NewError("public key is nil")
+		return errors.New("public key is nil")
 	}
 	if len(config.PublicShares) != len(config.PartyIDs) {
-		return protocol.NewError("public shares count mismatch")
+		return errors.New("public shares count mismatch")
 	}
 	return nil
 }
