@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/cronokirby/saferith"
-	"github.com/stretchr/testify/assert"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/sample"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHash_WriteAny(t *testing.T) {

@@ -12,7 +12,8 @@ import (
 )
 
 // This round corresponds with steps 2-4 of Round 2, Figure 1 in the Frost paper:
-//   https://eprint.iacr.org/2020/852.pdf
+//
+//	https://eprint.iacr.org/2020/852.pdf
 type round3 struct {
 	*round2
 

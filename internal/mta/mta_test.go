@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/cronokirby/saferith"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/sample"
@@ -14,6 +12,8 @@ import (
 	"github.com/luxfi/threshold/pkg/zk"
 	zkaffg "github.com/luxfi/threshold/pkg/zk/affg"
 	zkaffp "github.com/luxfi/threshold/pkg/zk/affp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_newMtA(t *testing.T) {

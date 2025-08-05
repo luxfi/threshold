@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/protocols/cmp/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var group = curve.Secp256k1{}

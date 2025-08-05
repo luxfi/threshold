@@ -6,7 +6,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -14,6 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/doerner/keygen"
+	"github.com/stretchr/testify/require"
 )
 
 func runHandler(wg *sync.WaitGroup, id party.ID, handler protocol.Handler, network *test.Network) {

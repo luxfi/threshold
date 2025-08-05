@@ -18,7 +18,7 @@ import (
 
 func benchmarkKeygen(protocolName string, iterations int) error {
 	fmt.Printf("\n=== Keygen Benchmark ===\n")
-	
+
 	testCases := []struct {
 		name      string
 		n         int
@@ -31,21 +31,21 @@ func benchmarkKeygen(protocolName string, iterations int) error {
 
 	for _, tc := range testCases {
 		fmt.Printf("\nTesting %s:\n", tc.name)
-		
+
 		var totalTime time.Duration
 		var minTime = time.Hour
 		var maxTime time.Duration
-		
+
 		for i := 0; i < iterations; i++ {
 			start := time.Now()
-			
+
 			if err := runSingleKeygen(protocolName, tc.n, tc.threshold); err != nil {
 				return fmt.Errorf("keygen failed: %w", err)
 			}
-			
+
 			elapsed := time.Since(start)
 			totalTime += elapsed
-			
+
 			if elapsed < minTime {
 				minTime = elapsed
 			}
@@ -53,33 +53,33 @@ func benchmarkKeygen(protocolName string, iterations int) error {
 				maxTime = elapsed
 			}
 		}
-		
+
 		avgTime := totalTime / time.Duration(iterations)
-		
+
 		fmt.Printf("  Average: %v\n", avgTime)
 		fmt.Printf("  Min:     %v\n", minTime)
 		fmt.Printf("  Max:     %v\n", maxTime)
 		fmt.Printf("  Total:   %v\n", totalTime)
 	}
-	
+
 	return nil
 }
 
 func benchmarkSign(protocolName string, iterations int) error {
 	fmt.Printf("\n=== Sign Benchmark ===\n")
-	
+
 	// Setup phase
 	n := 5
 	threshold := 3
-	
+
 	fmt.Printf("Setting up %d-of-%d configuration...\n", threshold, n)
-	
+
 	// First generate keys
 	configs, err := setupBenchmarkConfigs(protocolName, n, threshold)
 	if err != nil {
 		return fmt.Errorf("setup failed: %w", err)
 	}
-	
+
 	// Run signing benchmarks
 	testCases := []struct {
 		name    string
@@ -88,27 +88,27 @@ func benchmarkSign(protocolName string, iterations int) error {
 		{"threshold signers", threshold},
 		{"all signers", n},
 	}
-	
+
 	for _, tc := range testCases {
 		fmt.Printf("\nTesting with %s:\n", tc.name)
-		
+
 		var totalTime time.Duration
 		var minTime = time.Hour
 		var maxTime time.Duration
-		
+
 		for i := 0; i < iterations; i++ {
 			message := make([]byte, 32)
 			rand.Read(message)
-			
+
 			start := time.Now()
-			
+
 			if err := runSingleSign(protocolName, configs[:tc.signers], message); err != nil {
 				return fmt.Errorf("signing failed: %w", err)
 			}
-			
+
 			elapsed := time.Since(start)
 			totalTime += elapsed
-			
+
 			if elapsed < minTime {
 				minTime = elapsed
 			}
@@ -116,36 +116,36 @@ func benchmarkSign(protocolName string, iterations int) error {
 				maxTime = elapsed
 			}
 		}
-		
+
 		avgTime := totalTime / time.Duration(iterations)
-		
+
 		fmt.Printf("  Average: %v\n", avgTime)
 		fmt.Printf("  Min:     %v\n", minTime)
 		fmt.Printf("  Max:     %v\n", maxTime)
 		fmt.Printf("  Total:   %v\n", totalTime)
 	}
-	
+
 	return nil
 }
 
 func benchmarkReshare(iterations int) error {
 	fmt.Printf("\n=== Reshare Benchmark (LSS only) ===\n")
-	
+
 	// Setup initial configuration
 	initialN := 5
 	initialThreshold := 3
-	
+
 	fmt.Printf("Setting up initial %d-of-%d configuration...\n", initialThreshold, initialN)
-	
+
 	configs, err := setupBenchmarkConfigs("lss", initialN, initialThreshold)
 	if err != nil {
 		return fmt.Errorf("setup failed: %w", err)
 	}
-	
+
 	testCases := []struct {
-		name         string
-		newThreshold int
-		addParties   int
+		name          string
+		newThreshold  int
+		addParties    int
 		removeParties int
 	}{
 		{"increase threshold 3->4", 4, 0, 0},
@@ -153,30 +153,30 @@ func benchmarkReshare(iterations int) error {
 		{"remove 1 party", 3, 0, 1},
 		{"add 1 remove 1", 3, 1, 1},
 	}
-	
+
 	for _, tc := range testCases {
 		fmt.Printf("\nTesting %s:\n", tc.name)
-		
+
 		var totalTime time.Duration
 		var minTime = time.Hour
 		var maxTime time.Duration
-		
+
 		for i := 0; i < iterations; i++ {
 			// Clone configs for this iteration
 			iterConfigs := make([]*lss.Config, len(configs))
 			for j, c := range configs {
 				iterConfigs[j] = c.(*lss.Config)
 			}
-			
+
 			start := time.Now()
-			
+
 			if err := runSingleReshare(iterConfigs, tc.newThreshold, tc.addParties, tc.removeParties); err != nil {
 				return fmt.Errorf("reshare failed: %w", err)
 			}
-			
+
 			elapsed := time.Since(start)
 			totalTime += elapsed
-			
+
 			if elapsed < minTime {
 				minTime = elapsed
 			}
@@ -184,15 +184,15 @@ func benchmarkReshare(iterations int) error {
 				maxTime = elapsed
 			}
 		}
-		
+
 		avgTime := totalTime / time.Duration(iterations)
-		
+
 		fmt.Printf("  Average: %v\n", avgTime)
 		fmt.Printf("  Min:     %v\n", minTime)
 		fmt.Printf("  Max:     %v\n", maxTime)
 		fmt.Printf("  Total:   %v\n", totalTime)
 	}
-	
+
 	return nil
 }
 
@@ -201,22 +201,22 @@ func benchmarkReshare(iterations int) error {
 func runSingleKeygen(protocolName string, n, threshold int) error {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	partyIDs := test.PartyIDs(n)
 	network := test.NewNetwork(partyIDs)
-	
+
 	var wg sync.WaitGroup
 	wg.Add(n)
-	
+
 	group := curve.Secp256k1{}
-	
+
 	for _, id := range partyIDs {
 		go func(id party.ID) {
 			defer wg.Done()
-			
+
 			var h protocol.Handler
 			var err error
-			
+
 			switch protocolName {
 			case "lss":
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
@@ -225,15 +225,15 @@ func runSingleKeygen(protocolName string, n, threshold int) error {
 			case "frost":
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
-			
+
 			if err != nil {
 				return
 			}
-			
+
 			test.HandlerLoop(id, h, network)
 		}(id)
 	}
-	
+
 	wg.Wait()
 	return nil
 }
@@ -241,24 +241,24 @@ func runSingleKeygen(protocolName string, n, threshold int) error {
 func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	partyIDs := test.PartyIDs(n)
 	network := test.NewNetwork(partyIDs)
-	
+
 	configs := make([]interface{}, n)
 	var wg sync.WaitGroup
 	wg.Add(n)
-	
+
 	group := curve.Secp256k1{}
-	
+
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
 			defer wg.Done()
-			
+
 			var h protocol.Handler
 			var err error
-			
+
 			switch protocolName {
 			case "lss":
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
@@ -267,20 +267,20 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 			case "frost":
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
-			
+
 			if err != nil {
 				return
 			}
-			
+
 			test.HandlerLoop(id, h, network)
-			
+
 			result, err := h.Result()
 			if err == nil {
 				configs[i] = result
 			}
 		}(id)
 	}
-	
+
 	wg.Wait()
 	return configs, nil
 }
@@ -288,9 +288,9 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 func runSingleSign(protocolName string, configs []interface{}, message []byte) error {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	var partyIDs []party.ID
-	
+
 	// Extract party IDs based on protocol
 	switch protocolName {
 	case "lss":
@@ -309,19 +309,19 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 			partyIDs[i] = c.(*frost.Config).ID
 		}
 	}
-	
+
 	network := test.NewNetwork(partyIDs)
-	
+
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
-	
+
 	for i, config := range configs {
 		go func(idx int, cfg interface{}) {
 			defer wg.Done()
-			
+
 			var h protocol.Handler
 			var err error
-			
+
 			switch protocolName {
 			case "lss":
 				c := cfg.(*lss.Config)
@@ -333,15 +333,15 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 				c := cfg.(*frost.Config)
 				h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
 			}
-			
+
 			if err != nil {
 				return
 			}
-			
+
 			test.HandlerLoop(partyIDs[idx], h, network)
 		}(i, config)
 	}
-	
+
 	wg.Wait()
 	return nil
 }
@@ -349,50 +349,50 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 func runSingleReshare(configs []*lss.Config, newThreshold, addParties, removeParties int) error {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Determine final configuration
 	remainingConfigs := configs
 	if removeParties > 0 {
 		remainingConfigs = configs[:len(configs)-removeParties]
 	}
-	
+
 	// Create new party IDs
 	newPartyIDs := make([]party.ID, addParties)
 	for i := 0; i < addParties; i++ {
 		newPartyIDs[i] = party.ID(fmt.Sprintf("new-%d", i))
 	}
-	
+
 	// All parties involved in resharing
 	allParties := make([]party.ID, len(remainingConfigs)+len(newPartyIDs))
 	for i, c := range remainingConfigs {
 		allParties[i] = c.ID
 	}
 	copy(allParties[len(remainingConfigs):], newPartyIDs)
-	
+
 	network := test.NewNetwork(allParties)
-	
+
 	var wg sync.WaitGroup
 	wg.Add(len(allParties))
-	
+
 	// Existing parties reshare
 	for _, config := range remainingConfigs {
 		go func(c *lss.Config) {
 			defer wg.Done()
-			
+
 			h, err := protocol.NewMultiHandler(lss.Reshare(c, newThreshold, newPartyIDs, pl), nil)
 			if err != nil {
 				return
 			}
-			
+
 			test.HandlerLoop(c.ID, h, network)
 		}(config)
 	}
-	
+
 	// New parties join
 	for _, newID := range newPartyIDs {
 		go func(id party.ID) {
 			defer wg.Done()
-			
+
 			emptyConfig := &lss.Config{
 				ID:           id,
 				Group:        configs[0].Group,
@@ -401,16 +401,16 @@ func runSingleReshare(configs []*lss.Config, newThreshold, addParties, removePar
 				PartyIDs:     remainingConfigs[0].PartyIDs,
 				PublicShares: make(map[party.ID]curve.Point),
 			}
-			
+
 			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newThreshold, newPartyIDs, pl), nil)
 			if err != nil {
 				return
 			}
-			
+
 			test.HandlerLoop(id, h, network)
 		}(newID)
 	}
-	
+
 	wg.Wait()
 	return nil
 }

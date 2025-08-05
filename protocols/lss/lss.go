@@ -42,7 +42,7 @@ func Keygen(group curve.Curve, selfID party.ID, participants []party.ID, thresho
 		if threshold < 1 || threshold > len(participants) {
 			return nil, errors.New("invalid threshold")
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "lss/keygen",
 			FinalRoundNumber: 3,
@@ -51,7 +51,7 @@ func Keygen(group curve.Curve, selfID party.ID, participants []party.ID, thresho
 			Threshold:        threshold,
 			Group:            group,
 		}
-		
+
 		// Get the start function and execute it
 		startFunc := keygen.Start(info, pl, nil)
 		return startFunc(sessionID)
@@ -65,25 +65,25 @@ func Reshare(config *Config, newThreshold int, newParticipants []party.ID, pl *p
 		// Combine old and new parties
 		allParties := make([]party.ID, 0, len(config.PartyIDs)+len(newParticipants))
 		partySet := make(map[party.ID]bool)
-		
+
 		for _, id := range config.PartyIDs {
 			if !partySet[id] {
 				allParties = append(allParties, id)
 				partySet[id] = true
 			}
 		}
-		
+
 		for _, id := range newParticipants {
 			if !partySet[id] {
 				allParties = append(allParties, id)
 				partySet[id] = true
 			}
 		}
-		
+
 		if newThreshold < 1 || newThreshold > len(allParties) {
 			return nil, errors.New("invalid new threshold")
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "lss/reshare",
 			FinalRoundNumber: 3,
@@ -92,7 +92,7 @@ func Reshare(config *Config, newThreshold int, newParticipants []party.ID, pl *p
 			Threshold:        newThreshold,
 			Group:            config.Group,
 		}
-		
+
 		// Convert to reshare.Config
 		reshareConfig := &reshare.Config{
 			ID:           config.ID,
@@ -104,7 +104,7 @@ func Reshare(config *Config, newThreshold int, newParticipants []party.ID, pl *p
 			PublicShares: config.PublicShares,
 			PartyIDs:     config.PartyIDs,
 		}
-		
+
 		// Get the start function and execute it
 		startFunc := reshare.Start(info, pl, reshareConfig, newParticipants)
 		return startFunc(sessionID)
@@ -118,11 +118,11 @@ func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool)
 		if len(signers) < config.Threshold {
 			return nil, errors.New("not enough signers")
 		}
-		
+
 		if len(messageHash) != 32 {
 			return nil, errors.New("message hash must be 32 bytes")
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "lss/sign",
 			FinalRoundNumber: 3,
@@ -131,7 +131,7 @@ func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool)
 			Threshold:        config.Threshold,
 			Group:            config.Group,
 		}
-		
+
 		// Convert to sign.Config
 		signConfig := &sign.Config{
 			ID:           config.ID,
@@ -143,10 +143,10 @@ func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool)
 			PublicShares: config.PublicShares,
 			PartyIDs:     config.PartyIDs,
 		}
-		
+
 		// Get the start function
 		startFunc := sign.StartSign(info, pl, signConfig, messageHash)
-		
+
 		// Execute it to get the session
 		return startFunc(sessionID)
 	}
@@ -255,4 +255,3 @@ func GetSignatureType(config *Config) string {
 		return "Unknown"
 	}
 }
-

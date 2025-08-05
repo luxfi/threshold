@@ -115,7 +115,7 @@ func DynamicReshare(config *Config, newParties []party.ID, newThreshold int, pl 
 func AddParties(config *Config, partiesToAdd []party.ID, pl *pool.Pool) protocol.StartFunc {
 	// Combine existing parties with new ones
 	newParties := append(config.PartyIDs(), partiesToAdd...)
-	
+
 	// Keep the same threshold
 	return DynamicReshare(config, newParties, config.Threshold, pl)
 }
