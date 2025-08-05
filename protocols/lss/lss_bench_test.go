@@ -86,7 +86,10 @@ func BenchmarkLSSSign(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				messageHash := make([]byte, 32)
-				rand.Read(messageHash)
+				_, err := rand.Read(messageHash)
+				if err != nil {
+					b.Fatal(err)
+				}
 
 				var wg sync.WaitGroup
 				wg.Add(bm.signers)
@@ -206,7 +209,10 @@ func BenchmarkLSSSignWithBlinding(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				messageHash := make([]byte, 32)
-				rand.Read(messageHash)
+				_, err := rand.Read(messageHash)
+				if err != nil {
+					b.Fatal(err)
+				}
 
 				var wg sync.WaitGroup
 				wg.Add(threshold)
@@ -251,7 +257,10 @@ func BenchmarkLSSParallelSigning(b *testing.B) {
 					go func() {
 						defer opWg.Done()
 						messageHash := make([]byte, 32)
-						rand.Read(messageHash)
+						_, err := rand.Read(messageHash)
+						if err != nil {
+							b.Fatal(err)
+						}
 
 						var wg sync.WaitGroup
 						wg.Add(threshold)
