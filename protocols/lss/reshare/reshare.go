@@ -4,81 +4,124 @@ package reshare
 import (
 	"errors"
 
+	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
-	"github.com/luxfi/threshold/pkg/math/sample"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/threshold/protocols/lss"
 )
+
+// Config represents the configuration for an LSS party
+type Config struct {
+	ID           party.ID
+	Group        curve.Curve
+	Threshold    int
+	Generation   uint64
+	SecretShare  curve.Scalar
+	PublicKey    curve.Point
+	PublicShares map[party.ID]curve.Point
+	PartyIDs     []party.ID
+}
+
+// Start initiates the resharing protocol
+func Start(info round.Info, pl *pool.Pool, oldConfig *Config, newParties []party.ID) protocol.StartFunc {
+	return func(sessionID []byte) (round.Session, error) {
+		helper, err := round.NewSession(info, sessionID, pl)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Create polynomial with current share as constant term
+		poly := polynomial.NewPolynomial(helper.Group(), info.Threshold, oldConfig.SecretShare)
+		
+		// Generate shares for all parties
+		shares := make(map[party.ID]curve.Scalar)
+		for _, id := range info.PartyIDs {
+			x := id.Scalar(helper.Group())
+			shares[id] = poly.Evaluate(x)
+		}
+		
+		return &round1{
+			Helper:       helper,
+			oldConfig:    oldConfig,
+			newThreshold: info.Threshold,
+			newParties:   newParties,
+			poly:         poly,
+			shares:       shares,
+		}, nil
+	}
+}
 
 // round1 initiates resharing
 type round1 struct {
 	*round.Helper
 	
-	oldConfig    *lss.Config
+	oldConfig    *Config
 	newThreshold int
 	newParties   []party.ID
 	
 	// Re-sharing polynomial
-	poly   polynomial.Polynomial
+	poly   *polynomial.Polynomial
 	shares map[party.ID]curve.Scalar
 }
 
-// Start initiates the resharing protocol
-func Start(info round.Info, pl *pool.Pool, oldConfig *lss.Config, newParties []party.ID) (round.Session, error) {
-	helper, err := round.NewSession(info, oldConfig.ID, info.PartyIDs, nil)
-	if err != nil {
-		return nil, err
-	}
-	
-	// Create polynomial with current share as constant term
-	poly := polynomial.NewPolynomial(info.Group, info.Threshold, oldConfig.SecretShare)
-	
-	// Generate shares for all parties (old and new)
-	shares := make(map[party.ID]curve.Scalar)
-	for i, id := range info.PartyIDs {
-		x := info.Group.NewScalar().SetNat(uint(i + 1))
-		shares[id] = poly.Evaluate(x)
-	}
-	
-	return &round1{
-		Helper:       helper,
-		oldConfig:    oldConfig,
-		newThreshold: info.Threshold,
-		newParties:   newParties,
-		poly:         poly,
-		shares:       shares,
-	}, nil
+// reshareCommitment1 contains polynomial commitments
+type reshareCommitment1 struct {
+	round.NormalBroadcastContent
+	Commitments []curve.Point
+	Generation  uint64
+}
+
+// RoundNumber implements round.Content
+func (reshareCommitment1) RoundNumber() round.Number { return 1 }
+
+// BroadcastContent implements round.BroadcastRound
+func (r *round1) BroadcastContent() round.BroadcastContent {
+	return &reshareCommitment1{}
+}
+
+// Number implements round.Round
+func (r *round1) Number() round.Number {
+	return 1
+}
+
+// StoreBroadcastMessage implements round.BroadcastRound
+func (r *round1) StoreBroadcastMessage(msg round.Message) error {
+	// No messages to store in round 1
+	return nil
 }
 
 // VerifyMessage implements round.Round
 func (r *round1) VerifyMessage(msg round.Message) error {
-	// No messages in round 1
+	// No P2P messages in round 1
 	return nil
 }
 
 // StoreMessage implements round.Round
 func (r *round1) StoreMessage(msg round.Message) error {
-	// No messages in round 1
+	// No P2P messages in round 1
 	return nil
 }
 
 // Finalize implements round.Round
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Broadcast commitments to polynomial coefficients
-	commitments := make([]curve.Point, r.newThreshold)
-	for i := 0; i < r.newThreshold; i++ {
-		coeff := r.poly.Coefficient(i)
-		commitments[i] = coeff.ActOnBase()
+	commitments := make([]curve.Point, r.newThreshold+1)
+	for i := 0; i <= r.newThreshold; i++ {
+		// Similar approach as keygen
+		index := r.Group().NewScalar()
+		indexNat := new(saferith.Nat).SetUint64(uint64(i + 1))
+		index.SetNat(indexNat)
+		shareAtIndex := r.poly.Evaluate(index)
+		commitments[i] = shareAtIndex.ActOnBase()
 	}
 	
 	// Create commitment message
-	commitment := &reshareCommitment{
-		commitments: commitments,
-		generation:  r.oldConfig.Generation + 1,
+	commitment := &reshareCommitment1{
+		Commitments: commitments,
+		Generation:  r.oldConfig.Generation + 1,
 	}
 	
 	// Broadcast to all parties
@@ -94,19 +137,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 // MessageContent implements round.Round
 func (r *round1) MessageContent() round.Content {
-	return &reshareCommitment{}
-}
-
-// Number implements round.Round
-func (r *round1) Number() round.Number {
-	return 1
-}
-
-// reshareCommitment contains polynomial commitments
-type reshareCommitment struct {
-	round.NormalBroadcastContent
-	commitments []curve.Point
-	generation  uint64
+	return nil // No P2P messages
 }
 
 // round2 distributes shares
@@ -115,19 +146,38 @@ type round2 struct {
 	commitments map[party.ID][]curve.Point
 }
 
-// VerifyMessage implements round.Round
-func (r *round2) VerifyMessage(msg round.Message) error {
+// reshareShare2 contains a reshared secret share
+type reshareShare2 struct {
+	Share      curve.Scalar
+	Generation uint64
+}
+
+// RoundNumber implements round.Content
+func (reshareShare2) RoundNumber() round.Number { return 2 }
+
+// Number implements round.Round
+func (r *round2) Number() round.Number {
+	return 2
+}
+
+// BroadcastContent implements round.BroadcastRound
+func (r *round2) BroadcastContent() round.BroadcastContent {
+	return &reshareCommitment1{}
+}
+
+// StoreBroadcastMessage implements round.BroadcastRound
+func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	from := msg.From
-	body, ok := msg.Content.(*reshareCommitment)
+	body, ok := msg.Content.(*reshareCommitment1)
 	if !ok {
 		return round.ErrInvalidContent
 	}
 	
-	if len(body.commitments) != r.newThreshold {
+	if len(body.Commitments) != r.newThreshold+1 {
 		return errors.New("wrong number of commitments")
 	}
 	
-	if body.generation != r.oldConfig.Generation+1 {
+	if body.Generation != r.oldConfig.Generation+1 {
 		return errors.New("wrong generation")
 	}
 	
@@ -144,7 +194,7 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 	}
 	
 	// Verify commitments are valid points
-	for _, c := range body.commitments {
+	for _, c := range body.Commitments {
 		if c == nil || c.IsIdentity() {
 			return errors.New("invalid commitment")
 		}
@@ -152,18 +202,23 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 	
 	// Verify first commitment matches sender's public share
 	expectedFirst := r.oldConfig.PublicShares[from]
-	if !body.commitments[0].Equal(expectedFirst) {
+	if !body.Commitments[0].Equal(expectedFirst) {
 		return errors.New("first commitment doesn't match public share")
 	}
 	
+	r.commitments[from] = body.Commitments
+	return nil
+}
+
+// VerifyMessage implements round.Round
+func (r *round2) VerifyMessage(msg round.Message) error {
+	// Verify in StoreMessage
 	return nil
 }
 
 // StoreMessage implements round.Round
 func (r *round2) StoreMessage(msg round.Message) error {
-	from := msg.From
-	body := msg.Content.(*reshareCommitment)
-	r.commitments[from] = body.commitments
+	// P2P messages received in round 3
 	return nil
 }
 
@@ -172,9 +227,9 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Send shares to each party
 	for _, id := range r.OtherPartyIDs() {
 		share := r.shares[id]
-		msg := &reshareShare{
-			share:      share,
-			generation: r.oldConfig.Generation + 1,
+		msg := &reshareShare2{
+			Share:      share,
+			Generation: r.oldConfig.Generation + 1,
 		}
 		if err := r.SendMessage(out, msg, id); err != nil {
 			return nil, err
@@ -184,10 +239,13 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Add own commitments if we're an old party
 	for _, oldID := range r.oldConfig.PartyIDs {
 		if oldID == r.SelfID() {
-			myCommitments := make([]curve.Point, r.newThreshold)
-			for i := 0; i < r.newThreshold; i++ {
-				coeff := r.poly.Coefficient(i)
-				myCommitments[i] = coeff.ActOnBase()
+			myCommitments := make([]curve.Point, r.newThreshold+1)
+			for i := 0; i <= r.newThreshold; i++ {
+				index := r.Group().NewScalar()
+				indexNat := new(saferith.Nat).SetUint64(uint64(i + 1))
+				index.SetNat(indexNat)
+				shareAtIndex := r.poly.Evaluate(index)
+				myCommitments[i] = shareAtIndex.ActOnBase()
 			}
 			r.commitments[r.SelfID()] = myCommitments
 			break
@@ -202,19 +260,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 // MessageContent implements round.Round
 func (r *round2) MessageContent() round.Content {
-	return &reshareShare{}
-}
-
-// Number implements round.Round
-func (r *round2) Number() round.Number {
-	return 2
-}
-
-// reshareShare contains a reshared secret share
-type reshareShare struct {
-	round.NormalBroadcastContent
-	share      curve.Scalar
-	generation uint64
+	return &reshareShare2{}
 }
 
 // round3 verifies shares and produces new config
@@ -223,15 +269,31 @@ type round3 struct {
 	shares map[party.ID]curve.Scalar
 }
 
+// Number implements round.Round
+func (r *round3) Number() round.Number {
+	return 3
+}
+
+// BroadcastContent implements round.BroadcastRound
+func (r *round3) BroadcastContent() round.BroadcastContent {
+	return nil // No broadcast in round 3
+}
+
+// StoreBroadcastMessage implements round.BroadcastRound
+func (r *round3) StoreBroadcastMessage(msg round.Message) error {
+	// No broadcast messages in round 3
+	return nil
+}
+
 // VerifyMessage implements round.Round
 func (r *round3) VerifyMessage(msg round.Message) error {
 	from := msg.From
-	body, ok := msg.Content.(*reshareShare)
+	body, ok := msg.Content.(*reshareShare2)
 	if !ok {
 		return round.ErrInvalidContent
 	}
 	
-	if body.generation != r.oldConfig.Generation+1 {
+	if body.Generation != r.oldConfig.Generation+1 {
 		return errors.New("wrong generation")
 	}
 	
@@ -242,29 +304,25 @@ func (r *round3) VerifyMessage(msg round.Message) error {
 	}
 	
 	// Verify share is consistent with commitment
-	myIndex := r.PartyIDIndex(r.SelfID()) + 1
-	x := r.Group().NewScalar().SetNat(uint(myIndex))
+	myScalar := r.SelfID().Scalar(r.Group())
 	
 	expected := r.Group().NewPoint()
-	for k := 0; k < r.newThreshold; k++ {
-		// x^k
-		exp := r.Group().NewScalar()
-		if k == 0 {
-			exp = r.Group().NewScalar().SetNat(1)
-		} else {
-			exp = x
-			for j := 1; j < k; j++ {
-				exp = r.Group().NewScalar().Mul(exp, x)
-			}
-		}
-		
-		// commitment^(x^k)
-		term := exp.Act(commitments[k])
+	one := new(saferith.Nat).SetUint64(1)
+	xPower := r.Group().NewScalar().SetNat(one) // x^0 = 1
+	
+	for k := 0; k <= r.newThreshold; k++ {
+		// commitment_k^(x^k)
+		term := xPower.Act(commitments[k])
 		expected = expected.Add(term)
+		
+		// Update x^k to x^(k+1)
+		if k < r.newThreshold {
+			xPower = xPower.Mul(myScalar)
+		}
 	}
 	
 	// Check if g^share == expected
-	sharePoint := body.share.ActOnBase()
+	sharePoint := body.Share.ActOnBase()
 	if !sharePoint.Equal(expected) {
 		return errors.New("share verification failed")
 	}
@@ -275,8 +333,8 @@ func (r *round3) VerifyMessage(msg round.Message) error {
 // StoreMessage implements round.Round
 func (r *round3) StoreMessage(msg round.Message) error {
 	from := msg.From
-	body := msg.Content.(*reshareShare)
-	r.shares[from] = body.share
+	body := msg.Content.(*reshareShare2)
+	r.shares[from] = body.Share
 	return nil
 }
 
@@ -290,20 +348,19 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	for _, id := range r.oldConfig.PartyIDs {
 		if id == r.SelfID() {
 			isOldParty = true
-			finalShare = r.shares[r.SelfID()]
+			myX := r.SelfID().Scalar(r.Group())
+			finalShare = r.poly.Evaluate(myX)
 			break
 		}
 	}
 	
 	// Add shares from other old parties
 	for id, share := range r.shares {
-		if id != r.SelfID() {
-			// Check if sender is old party
-			for _, oldID := range r.oldConfig.PartyIDs {
-				if oldID == id {
-					finalShare = finalShare.Add(share)
-					break
-				}
+		// Check if sender is old party
+		for _, oldID := range r.oldConfig.PartyIDs {
+			if oldID == id {
+				finalShare = finalShare.Add(share)
+				break
 			}
 		}
 	}
@@ -319,31 +376,27 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Compute public shares for all parties
 	publicShares := make(map[party.ID]curve.Point)
 	for _, id := range r.PartyIDs() {
-		idx := r.PartyIDIndex(id) + 1
-		x := r.Group().NewScalar().SetNat(uint(idx))
+		x := id.Scalar(r.Group())
 		
 		pubShare := r.Group().NewPoint()
 		for from, commitments := range r.commitments {
 			// Only include contributions from old parties
 			for _, oldID := range r.oldConfig.PartyIDs {
 				if oldID == from {
-					// Compute contribution from this party's polynomial
+					// Evaluate polynomial at x
 					contrib := r.Group().NewPoint()
-					for k := 0; k < r.newThreshold; k++ {
-						// x^k
-						exp := r.Group().NewScalar()
-						if k == 0 {
-							exp = r.Group().NewScalar().SetNat(1)
-						} else {
-							exp = x
-							for j := 1; j < k; j++ {
-								exp = r.Group().NewScalar().Mul(exp, x)
-							}
-						}
-						
-						// commitment^(x^k)
-						term := exp.Act(commitments[k])
+					one := new(saferith.Nat).SetUint64(1)
+					xPower := r.Group().NewScalar().SetNat(one) // x^0 = 1
+					
+					for k := 0; k <= r.newThreshold; k++ {
+						// commitment_k^(x^k)
+						term := xPower.Act(commitments[k])
 						contrib = contrib.Add(term)
+						
+						// Update x^k to x^(k+1)
+						if k < r.newThreshold {
+							xPower = xPower.Mul(x)
+						}
 					}
 					pubShare = pubShare.Add(contrib)
 					break
@@ -354,7 +407,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 	
 	// Create new config with updated generation
-	newConfig := &lss.Config{
+	newConfig := &Config{
 		ID:           r.SelfID(),
 		Group:        r.Group(),
 		Threshold:    r.newThreshold,
@@ -366,16 +419,10 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 	
 	// Return result
-	r.UpdateResult(protocol.Result(newConfig))
-	return r.ResultRound(out), nil
+	return r.ResultRound(newConfig), nil
 }
 
 // MessageContent implements round.Round
 func (r *round3) MessageContent() round.Content {
-	return nil
-}
-
-// Number implements round.Round
-func (r *round3) Number() round.Number {
-	return 3
+	return &reshareShare2{}
 }
