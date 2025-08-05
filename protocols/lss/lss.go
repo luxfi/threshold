@@ -154,28 +154,28 @@ func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool)
 
 // SignWithBlinding generates an ECDSA signature using Protocol I or II from the paper.
 // This uses multiplicative blinding for enhanced security.
-func SignWithBlinding(config *Config, signers []party.ID, messageHash []byte, protocolVersion int, pl *pool.Pool) protocol.StartFunc {
+func SignWithBlinding(_ *Config, _ []party.ID, _ []byte, _ int, _ *pool.Pool) protocol.StartFunc {
 	// TODO: Implement sign.StartSignWithBlinding
-	return func(sessionID []byte) (round.Session, error) {
+	return func(_ []byte) (round.Session, error) {
 		return nil, errors.New("LSS sign with blinding not yet implemented")
 	}
 }
 
 // CreateBootstrapDealer creates a new Bootstrap Dealer instance.
-func CreateBootstrapDealer(selfID party.ID, group curve.Curve) DealerRole {
+func CreateBootstrapDealer(_ party.ID, _ curve.Curve) DealerRole {
 	// TODO: Implement dealer.NewBootstrapDealer
 	return nil
 }
 
 // CreateSignatureCoordinator creates a new Signature Coordinator instance.
-func CreateSignatureCoordinator(config *Config, pl *pool.Pool) CoordinatorRole {
+func CreateSignatureCoordinator(_ *Config, _ *pool.Pool) CoordinatorRole {
 	// TODO: Implement sign.NewCoordinator
 	return nil
 }
 
 // Rollback triggers a state rollback to a previous generation.
 // This is used when signing fails due to non-responsive parties.
-func Rollback(config *Config, targetGeneration uint64, evictParties []party.ID) error {
+func Rollback(_ *Config, _ uint64, _ []party.ID) error {
 	// TODO: Implement rollback functionality
 	// Load the target generation from storage
 	// Update config with the saved state
