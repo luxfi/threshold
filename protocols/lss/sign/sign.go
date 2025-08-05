@@ -35,11 +35,11 @@ func StartSign(info round.Info, pl *pool.Pool, config *Config, messageHash []byt
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Generate random nonce
 		k := sample.Scalar(rand.Reader, helper.Group())
 		K := k.ActOnBase()
-		
+
 		return &round1{
 			Helper:      helper,
 			config:      config,
@@ -54,11 +54,11 @@ func StartSign(info round.Info, pl *pool.Pool, config *Config, messageHash []byt
 // round1 generates nonces
 type round1 struct {
 	*round.Helper
-	
+
 	config      *Config
 	signers     []party.ID
 	messageHash []byte
-	
+
 	// Local nonce
 	k curve.Scalar
 	K curve.Point
@@ -107,11 +107,11 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	commitment := &nonceCommitment1{
 		K: r.K,
 	}
-	
+
 	if err := r.BroadcastMessage(out, commitment); err != nil {
 		return nil, err
 	}
-	
+
 	return &round2{
 		round1:      r,
 		nonces:      make(map[party.ID]curve.Point),
@@ -158,11 +158,11 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	if !ok {
 		return round.ErrInvalidContent
 	}
-	
+
 	if body.K == nil || body.K.IsIdentity() {
 		return errors.New("invalid nonce commitment")
 	}
-	
+
 	// Verify sender is in signers list
 	found := false
 	for _, id := range r.signers {
@@ -174,7 +174,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	if !found {
 		return errors.New("sender not in signers list")
 	}
-	
+
 	r.nonces[from] = body.K
 	return nil
 }
@@ -195,18 +195,18 @@ func (r *round2) StoreMessage(msg round.Message) error {
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Add own nonce
 	r.nonces[r.SelfID()] = r.K
-	
+
 	// Check we have enough nonces
 	if len(r.nonces) < r.config.Threshold {
 		return nil, errors.New("not enough nonces received")
 	}
-	
+
 	// Compute combined nonce R = sum of all K values
 	R := r.Group().NewPoint()
 	for _, K := range r.nonces {
 		R = R.Add(K)
 	}
-	
+
 	// Get r coordinate
 	rBytes, err := R.MarshalBinary()
 	if err != nil {
@@ -224,19 +224,19 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	rBig = rBig.Mod(rBig, orderBig)
 	rNat := new(saferith.Nat).SetBytes(rBig.Bytes())
 	rScalar.SetNat(rNat)
-	
+
 	// Compute Lagrange coefficients for participating signers
 	activeSigners := make([]party.ID, 0, len(r.nonces))
 	for id := range r.nonces {
 		activeSigners = append(activeSigners, id)
 	}
-	
+
 	// For each signer i, compute Lagrange coefficient
 	for _, i := range activeSigners {
 		lambda := i.Scalar(r.Group()) // Simplified - use party scalar as coefficient
 		r.lagrangeMap[i] = lambda
 	}
-	
+
 	// Compute partial signature: s_i = k_i + r * lambda_i * x_i * m
 	m := r.Group().NewScalar()
 	// Convert message hash to scalar
@@ -246,27 +246,25 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	mBig = mBig.Mod(mBig, orderBig2)
 	mNat := new(saferith.Nat).SetBytes(mBig.Bytes())
 	m.SetNat(mNat)
-	
-	si := r.Group().NewScalar()
-	
+
 	// si = ki + r * lambda_i * x_i * m
 	lambda := r.lagrangeMap[r.SelfID()]
-	si = r.Group().NewScalar().Set(rScalar)
+	si := r.Group().NewScalar().Set(rScalar)
 	si = si.Mul(lambda)
 	si = si.Mul(r.config.SecretShare)
 	si = si.Mul(m)
 	si = si.Add(r.k)
-	
+
 	// Send partial signature
 	partial := &partialSignature2{
 		Si: si,
 		R:  R,
 	}
-	
+
 	if err := r.BroadcastMessage(out, partial); err != nil {
 		return nil, err
 	}
-	
+
 	return &round3{
 		round2:      r,
 		R:           R,
@@ -307,15 +305,15 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 	if !ok {
 		return round.ErrInvalidContent
 	}
-	
+
 	// Verify R matches
 	if !body.R.Equal(r.R) {
 		return errors.New("R mismatch")
 	}
-	
+
 	// Simple verification - just check signature is not nil
 	// Full verification would check against public shares
-	
+
 	r.partialSigs[from] = body.Si
 	return nil
 }
@@ -333,7 +331,7 @@ func (r *round3) StoreMessage(msg round.Message) error {
 }
 
 // Finalize implements round.Round
-func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
+func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 	// Add own partial signature
 	lambda := r.lagrangeMap[r.SelfID()]
 	si := r.Group().NewScalar().Set(r.rScalar)
@@ -341,20 +339,20 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	si = si.Mul(r.config.SecretShare)
 	si = si.Mul(r.m)
 	si = si.Add(r.k)
-	
+
 	r.partialSigs[r.SelfID()] = si
-	
+
 	// Check we have enough signatures
 	if len(r.partialSigs) < r.config.Threshold {
 		return nil, errors.New("not enough partial signatures")
 	}
-	
+
 	// Combine partial signatures: s = sum(si)
 	s := r.Group().NewScalar()
 	for _, si := range r.partialSigs {
 		s = s.Add(si)
 	}
-	
+
 	// Return ECDSA signature
 	return r.ResultRound(&ecdsa.Signature{
 		R: r.R,
@@ -366,3 +364,4 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 func (r *round3) MessageContent() round.Content {
 	return &partialSignature2{}
 }
+
