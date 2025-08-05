@@ -364,4 +364,3 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 func (r *round3) MessageContent() round.Content {
 	return &partialSignature2{}
 }
-

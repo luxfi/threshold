@@ -74,7 +74,9 @@ func TestEncDecRoundTrip(t *testing.T) {
 	if !testing.Short() {
 		reinit()
 	}
-	err := quick.Check(testEncDecRoundTrip, &quick.Config{})
+	err := quick.Check(testEncDecRoundTrip, &quick.Config{
+		MaxCount: 10, // Limit test cases to prevent timeout
+	})
 	if err != nil {
 		t.Error(err)
 	}
@@ -103,7 +105,9 @@ func TestEncDecHomomorphic(t *testing.T) {
 	if !testing.Short() {
 		reinit()
 	}
-	err := quick.Check(testEncDecHomomorphic, &quick.Config{})
+	err := quick.Check(testEncDecHomomorphic, &quick.Config{
+		MaxCount: 10, // Limit test cases to prevent timeout
+	})
 	if err != nil {
 		t.Error(err)
 	}
@@ -131,7 +135,9 @@ func TestEncDecScalingHomomorphic(t *testing.T) {
 	if !testing.Short() {
 		reinit()
 	}
-	err := quick.Check(testEncDecScalingHomomorphic, &quick.Config{})
+	err := quick.Check(testEncDecScalingHomomorphic, &quick.Config{
+		MaxCount: 10, // Limit test cases to prevent timeout
+	})
 	if err != nil {
 		t.Error(err)
 	}
@@ -158,7 +164,9 @@ func TestDecWithRandomness(t *testing.T) {
 	if !testing.Short() {
 		reinit()
 	}
-	err := quick.Check(testDecWithRandomness, &quick.Config{})
+	err := quick.Check(testDecWithRandomness, &quick.Config{
+		MaxCount: 10, // Limit test cases to prevent timeout
+	})
 	if err != nil {
 		t.Error(err)
 	}

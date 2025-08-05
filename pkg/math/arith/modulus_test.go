@@ -48,11 +48,10 @@ func TestModulus_Exp(t *testing.T) {
 
 func benchmarkExpCRT(b *testing.B, m *Modulus, size int) {
 	r := mrand.New(mrand.NewSource(0))
-	x := new(saferith.Nat)
 	e := new(saferith.Nat)
 	buf := make([]byte, size)
 	for i := 0; i < b.N; i++ {
-		x = sample.ModN(r, n)
+		x := sample.ModN(r, n)
 		r.Read(buf)
 		e.SetBytes(buf)
 		m.Exp(x, e)
@@ -60,11 +59,10 @@ func benchmarkExpCRT(b *testing.B, m *Modulus, size int) {
 }
 func benchmarkExpICRT(b *testing.B, m *Modulus, size int) {
 	r := mrand.New(mrand.NewSource(0))
-	x := new(saferith.Nat)
 	e := new(saferith.Int)
 	buf := make([]byte, size)
 	for i := 0; i < b.N; i++ {
-		x = sample.ModN(r, n)
+		x := sample.ModN(r, n)
 		r.Read(buf)
 		e.SetBytes(buf)
 		e.Neg(saferith.Choice(r.Uint32() & 1))

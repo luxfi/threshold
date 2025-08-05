@@ -42,13 +42,15 @@ type command struct {
 	f func(int) interface{}
 	// This is the array where we put results
 	results []interface{}
+	// Mutex to protect concurrent access to results array during search
+	mu *sync.Mutex
 }
 
 // workerSearch is the subroutine called when doing a search command.
 //
 // We need to keep searching for successful queries of f while *ctr > 0.
 // When we find a successful result, we decrement *ctr.
-func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int) interface{}, ctr *int64) {
+func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int) interface{}, ctr *int64, mu *sync.Mutex) {
 	for atomic.LoadInt64(ctr) > 0 {
 		res := f(0)
 		if res == nil {
@@ -56,7 +58,9 @@ func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int)
 		}
 		i := atomic.AddInt64(ctr, -1)
 		if i >= 0 {
+			mu.Lock()
 			results[i] = res
+			mu.Unlock()
 		}
 		ctrChanged <- struct{}{}
 	}
@@ -66,7 +70,7 @@ func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int)
 func worker(commands <-chan command) {
 	for c := range commands {
 		if c.search {
-			workerSearch(c.results, c.ctrChanged, c.f, c.ctr)
+			workerSearch(c.results, c.ctrChanged, c.f, c.ctr, c.mu)
 		} else {
 			c.results[c.i] = c.f(c.i)
 			atomic.AddInt64(c.ctr, -1)
@@ -136,12 +140,14 @@ func (p *Pool) Search(count int, f func() interface{}) []interface{} {
 
 	ctr := int64(count)
 	ctrChanged := make(chan struct{})
+	mu := &sync.Mutex{}
 	cmd := command{
 		search:     true,
 		ctr:        &ctr,
 		ctrChanged: ctrChanged,
 		f:          func(i int) interface{} { return f() },
 		results:    results,
+		mu:         mu,
 	}
 	cmdI := 0
 	for cmdI < p.workerCount {
