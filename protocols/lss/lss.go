@@ -22,6 +22,9 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/protocols/lss/keygen"
+	"github.com/luxfi/threshold/protocols/lss/reshare"
+	"github.com/luxfi/threshold/protocols/lss/sign"
 )
 
 // EmptyConfig creates an empty Config with a fixed group, ready for unmarshalling.
@@ -35,27 +38,86 @@ func EmptyConfig(group curve.Curve) *Config {
 // Keygen generates a new shared ECDSA key with LSS protocol.
 // This is the initial key generation that establishes the first generation.
 func Keygen(group curve.Curve, selfID party.ID, participants []party.ID, threshold int, pl *pool.Pool) protocol.StartFunc {
-	// TODO: Implement dealer.StartKeygen
 	return func(sessionID []byte) (round.Session, error) {
-		return nil, errors.New("LSS keygen not yet implemented")
+		if threshold < 1 || threshold > len(participants) {
+			return nil, errors.New("invalid threshold")
+		}
+		
+		info := round.Info{
+			ProtocolID:       "lss/keygen",
+			FinalRoundNumber: 3,
+			SelfID:           selfID,
+			PartyIDs:         participants,
+			Threshold:        threshold,
+			Group:            group,
+		}
+		
+		// Import the keygen package
+		return keygen.Start(info, pl, nil)
 	}
 }
 
 // Reshare initiates the dynamic re-sharing protocol to change the participant set.
 // This allows adding or removing parties without reconstructing the master key.
 func Reshare(config *Config, newThreshold int, newParticipants []party.ID, pl *pool.Pool) protocol.StartFunc {
-	// TODO: Implement reshare.Start
 	return func(sessionID []byte) (round.Session, error) {
-		return nil, errors.New("LSS reshare not yet implemented")
+		// Combine old and new parties
+		allParties := make([]party.ID, 0, len(config.PartyIDs)+len(newParticipants))
+		partySet := make(map[party.ID]bool)
+		
+		for _, id := range config.PartyIDs {
+			if !partySet[id] {
+				allParties = append(allParties, id)
+				partySet[id] = true
+			}
+		}
+		
+		for _, id := range newParticipants {
+			if !partySet[id] {
+				allParties = append(allParties, id)
+				partySet[id] = true
+			}
+		}
+		
+		if newThreshold < 1 || newThreshold > len(allParties) {
+			return nil, errors.New("invalid new threshold")
+		}
+		
+		info := round.Info{
+			ProtocolID:       "lss/reshare",
+			FinalRoundNumber: 3,
+			SelfID:           config.ID,
+			PartyIDs:         allParties,
+			Threshold:        newThreshold,
+			Group:            config.Group,
+		}
+		
+		return reshare.Start(info, pl, config, newParticipants)
 	}
 }
 
 // Sign generates an ECDSA signature using the LSS protocol.
 // This implements the pragmatic signing approach described in the paper.
 func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool) protocol.StartFunc {
-	// TODO: Implement sign.StartSign
 	return func(sessionID []byte) (round.Session, error) {
-		return nil, errors.New("LSS sign not yet implemented")
+		if len(signers) < config.Threshold {
+			return nil, errors.New("not enough signers")
+		}
+		
+		if len(messageHash) != 32 {
+			return nil, errors.New("message hash must be 32 bytes")
+		}
+		
+		info := round.Info{
+			ProtocolID:       "lss/sign",
+			FinalRoundNumber: 3,
+			SelfID:           config.ID,
+			PartyIDs:         signers,
+			Threshold:        config.Threshold,
+			Group:            config.Group,
+		}
+		
+		return sign.StartSign(info, pl, config, messageHash)
 	}
 }
 
