@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/luxfi/threshold/internal/round"
@@ -28,6 +29,7 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 		errGroup  errgroup.Group
 		N         = len(rounds)
 		out       = make(chan *round.Message, N*(N+1))
+		mu        sync.Mutex
 	)
 
 	if roundType, err = checkAllRoundsSame(rounds); err != nil {
@@ -39,11 +41,12 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 		r := rounds[idx]
 		errGroup.Go(func() error {
 			var rNew, rNewReal round.Session
+			var finalizeErr error
 			if rule != nil {
 				rReal := getRound(r)
 				rule.ModifyBefore(rReal)
 				outFake := make(chan *round.Message, N+1)
-				rNew, err = r.Finalize(outFake)
+				rNew, finalizeErr = r.Finalize(outFake)
 				close(outFake)
 				rNewReal = getRound(rNew)
 				rule.ModifyAfter(rNewReal)
@@ -52,15 +55,17 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 					out <- msg
 				}
 			} else {
-				rNew, err = r.Finalize(out)
+				rNew, finalizeErr = r.Finalize(out)
 			}
 
-			if err != nil {
-				return err
+			if finalizeErr != nil {
+				return finalizeErr
 			}
 
 			if rNew != nil {
+				mu.Lock()
 				rounds[idx] = rNew
+				mu.Unlock()
 			}
 			return nil
 		})
@@ -92,6 +97,8 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 			if msg.From == r.SelfID() || msg.Content.RoundNumber() != r.Number() {
 				continue
 			}
+			msgBytesCopy := make([]byte, len(msgBytes))
+			copy(msgBytesCopy, msgBytes)
 			errGroup.Go(func() error {
 				if m.Broadcast {
 					b, ok := r.(round.BroadcastRound)
@@ -99,25 +106,25 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 						return errors.New("broadcast message but not broadcast round")
 					}
 					m.Content = b.BroadcastContent()
-					if err = cbor.Unmarshal(msgBytes, m.Content); err != nil {
-						return err
+					if unmarshalErr := cbor.Unmarshal(msgBytesCopy, m.Content); unmarshalErr != nil {
+						return unmarshalErr
 					}
 
-					if err = b.StoreBroadcastMessage(m); err != nil {
-						return err
+					if storeErr := b.StoreBroadcastMessage(m); storeErr != nil {
+						return storeErr
 					}
 				} else {
 					m.Content = r.MessageContent()
-					if err = cbor.Unmarshal(msgBytes, m.Content); err != nil {
-						return err
+					if unmarshalErr := cbor.Unmarshal(msgBytesCopy, m.Content); unmarshalErr != nil {
+						return unmarshalErr
 					}
 
 					if m.To == "" || m.To == r.SelfID() {
-						if err = r.VerifyMessage(m); err != nil {
-							return err
+						if verifyErr := r.VerifyMessage(m); verifyErr != nil {
+							return verifyErr
 						}
-						if err = r.StoreMessage(m); err != nil {
-							return err
+						if storeErr := r.StoreMessage(m); storeErr != nil {
+							return storeErr
 						}
 					}
 				}

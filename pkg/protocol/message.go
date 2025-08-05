@@ -97,7 +97,7 @@ func (m *Message) MarshalBinary() ([]byte, error) {
 func (m *Message) UnmarshalBinary(data []byte) error {
 	deserialized := m.toMarshallable()
 	if err := cbor.Unmarshal(data, deserialized); err != nil {
-		return nil
+		return err
 	}
 	m.SSID = deserialized.SSID
 	m.From = deserialized.From
