@@ -426,4 +426,3 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 func (r *round3) MessageContent() round.Content {
 	return &reshareShare2{}
 }
-
