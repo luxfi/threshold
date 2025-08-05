@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -19,6 +17,8 @@ import (
 	"github.com/luxfi/threshold/protocols/cmp"
 	"github.com/luxfi/threshold/protocols/frost"
 	"github.com/luxfi/threshold/protocols/lss"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 func TestIntegration(t *testing.T) {
@@ -44,7 +44,7 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			pl.TearDown()
 		}
 	})
-	
+
 	// Set timeout for each test
 	SetDefaultEventuallyTimeout(60 * time.Second)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
@@ -57,23 +57,23 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			// Generate keys with LSS
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl, network)
 			publicKey := lssConfigs[0].PublicKey
-			
+
 			// Convert LSS configs to CMP format
 			cmpConfigs := make([]*cmp.Config, n)
 			for i, lssConfig := range lssConfigs {
 				cmpConfigs[i] = convertLSSToCMP(lssConfig)
 			}
-			
+
 			// Sign with CMP protocol
 			messageHash := randomHash()
 			signers := partyIDs[:threshold]
-			
+
 			signatures := runCMPSign(cmpConfigs[:threshold], signers, messageHash, pl, network)
-			
+
 			// Verify signature
 			Expect(signatures[0].Verify(publicKey, messageHash)).To(BeTrue())
 		})
@@ -85,29 +85,29 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			threshold := 4
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl, network)
 			publicKey := lssConfigs[0].PublicKey
-			
+
 			// Perform resharing with LSS
 			newParties := []party.ID{"new-1", "new-2"}
 			allParties := append(partyIDs, newParties...)
 			network = test.NewNetwork(allParties)
-			
+
 			newLSSConfigs := runLSSReshare(lssConfigs, threshold, newParties, publicKey, pl, network)
-			
+
 			// Convert to FROST format
 			frostConfigs := make([]*frost.Config, len(newLSSConfigs))
 			for i, lssConfig := range newLSSConfigs {
 				frostConfigs[i] = convertLSSToFROST(lssConfig)
 			}
-			
+
 			// Sign with FROST
 			message := []byte("Cross-protocol test message")
 			signers := allParties[:threshold]
-			
+
 			frostSignatures := runFROSTSign(frostConfigs[:threshold], signers, message, pl, network)
-			
+
 			// Verify Schnorr signature
 			Expect(frostSignatures[0].Verify(publicKey, message)).To(BeTrue())
 		})
@@ -118,30 +118,30 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			// Start with CMP
 			cmpConfigs := runCMPKeygen(partyIDs, threshold, group, pl, network)
 			publicKey := cmpConfigs[0].PublicPoint()
-			
+
 			// Convert to LSS for resharing capability
 			lssConfigs := make([]*lss.Config, n)
 			for i, cmpConfig := range cmpConfigs {
 				lssConfigs[i] = convertCMPToLSS(cmpConfig)
 			}
-			
+
 			// Test that threshold is maintained
 			messageHash := randomHash()
-			
+
 			// Try with T-1 parties (should fail)
 			insufficientSigners := partyIDs[:threshold-1]
 			Expect(func() {
 				runLSSSign(lssConfigs[:threshold-1], insufficientSigners, messageHash, pl, network)
 			}).Should(Panic())
-			
+
 			// Try with T parties (should succeed)
 			signers := partyIDs[:threshold]
 			signatures := runLSSSign(lssConfigs[:threshold], signers, messageHash, pl, network)
-			
+
 			Expect(signatures[0].Verify(publicKey, messageHash)).To(BeTrue())
 		})
 	})
@@ -156,9 +156,9 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			n := 7
 			threshold := 4
 			iterations := 10
-			
+
 			results := make(map[string]time.Duration)
-			
+
 			// Benchmark LSS
 			start := time.Now()
 			for i := 0; i < iterations; i++ {
@@ -167,7 +167,7 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 				runLSSKeygen(partyIDs, threshold, group, pl, network)
 			}
 			results["LSS Keygen"] = time.Since(start) / time.Duration(iterations)
-			
+
 			// Benchmark CMP
 			start = time.Now()
 			for i := 0; i < iterations; i++ {
@@ -176,7 +176,7 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 				runCMPKeygen(partyIDs, threshold, group, pl, network)
 			}
 			results["CMP Keygen"] = time.Since(start) / time.Duration(iterations)
-			
+
 			// Benchmark FROST
 			start = time.Now()
 			for i := 0; i < iterations; i++ {
@@ -185,7 +185,7 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 				runFROSTKeygen(partyIDs, threshold, group, pl, network)
 			}
 			results["FROST Keygen"] = time.Since(start) / time.Duration(iterations)
-			
+
 			// Print results
 			fmt.Println("\n=== Protocol Performance Comparison ===")
 			for protocol, avgTime := range results {
@@ -199,23 +199,23 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			Skip("Temporarily skip - protocols timing out")
 			n := 9
 			partyIDs := test.PartyIDs(n)
-			
+
 			// Generate keys with different protocols for different parties
 			// First 3 use LSS
 			lssParties := partyIDs[:3]
 			lssNetwork := test.NewNetwork(lssParties)
 			lssConfigs := runLSSKeygen(lssParties, 2, group, pl, lssNetwork)
-			
+
 			// Next 3 use CMP
 			cmpParties := partyIDs[3:6]
 			cmpNetwork := test.NewNetwork(cmpParties)
 			cmpConfigs := runCMPKeygen(cmpParties, 2, group, pl, cmpNetwork)
-			
+
 			// Last 3 use FROST
 			frostParties := partyIDs[6:9]
 			frostNetwork := test.NewNetwork(frostParties)
 			frostConfigs := runFROSTKeygen(frostParties, 2, group, pl, frostNetwork)
-			
+
 			// Each group should have generated valid configs
 			Expect(lssConfigs).To(HaveLen(3))
 			Expect(cmpConfigs).To(HaveLen(3))
@@ -228,10 +228,10 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			// Start with CMP
 			cmpConfigs := runCMPKeygen(partyIDs, threshold, group, pl, network)
-			
+
 			// Perform some signatures
 			for i := 0; i < 5; i++ {
 				messageHash := randomHash()
@@ -239,13 +239,13 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 				signatures := runCMPSign(cmpConfigs[:threshold], signers, messageHash, pl, network)
 				Expect(signatures[0].Verify(cmpConfigs[0].PublicPoint(), messageHash)).To(BeTrue())
 			}
-			
+
 			// Migrate to LSS for resharing capability
 			lssConfigs := make([]*lss.Config, n)
 			for i, cmpConfig := range cmpConfigs {
 				lssConfigs[i] = convertCMPToLSS(cmpConfig)
 			}
-			
+
 			// Continue signing with LSS
 			for i := 0; i < 5; i++ {
 				messageHash := randomHash()
@@ -261,29 +261,29 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			threshold := 4
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			// CMP with presignatures for faster online signing
 			cmpConfigs := runCMPKeygen(partyIDs, threshold, group, pl, network)
-			
+
 			// Generate presignatures
 			signers := partyIDs[:threshold]
 			presigs := runCMPPresign(cmpConfigs[:threshold], signers, pl, network)
-			
+
 			// Fast online signing with presignatures
 			messageHash := randomHash()
 			start := time.Now()
 			onlineSignatures := runCMPPresignOnline(cmpConfigs[:threshold], presigs, messageHash, pl, network)
 			onlineTime := time.Since(start)
-			
+
 			Expect(onlineSignatures[0].Verify(cmpConfigs[0].PublicPoint(), messageHash)).To(BeTrue())
-			
+
 			// Compare with regular signing
 			start = time.Now()
 			regularSignatures := runCMPSign(cmpConfigs[:threshold], signers, messageHash, pl, network)
 			regularTime := time.Since(start)
-			
+
 			Expect(regularSignatures[0].Verify(cmpConfigs[0].PublicPoint(), messageHash)).To(BeTrue())
-			
+
 			// Online signing should be faster
 			fmt.Printf("Online signing: %v, Regular signing: %v\n", onlineTime, regularTime)
 		})
@@ -295,30 +295,30 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			n := 9
 			threshold := 5
 			byzantineCount := 2
-			
+
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			// Setup with LSS (supports better fault tolerance)
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl, network)
-			
+
 			// Mark some parties as Byzantine
 			byzantineParties := make(map[party.ID]bool)
 			for i := 0; i < byzantineCount; i++ {
 				byzantineParties[partyIDs[i]] = true
 			}
 			byzantineNetwork := &ByzantineTestNetwork{
-				Network: network,
+				Network:          network,
 				ByzantineParties: byzantineParties,
 			}
-			
+
 			// Should still produce valid signatures with honest parties
 			messageHash := randomHash()
 			signers := partyIDs // All parties attempt, but some are Byzantine
-			
+
 			// Run with fault tolerance
 			signatures := runLSSSignWithFaultTolerance(lssConfigs, signers, messageHash, pl, byzantineNetwork)
-			
+
 			// Count valid signatures
 			validCount := 0
 			for _, sig := range signatures {
@@ -326,7 +326,7 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 					validCount++
 				}
 			}
-			
+
 			Expect(validCount).To(BeNumerically(">=", threshold))
 		})
 
@@ -335,24 +335,24 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			n := 7
 			threshold := 4
 			partyIDs := test.PartyIDs(n)
-			
+
 			// Simulate network with failures
 			unreliableNetwork := &UnreliableTestNetwork{
-				Network: test.NewNetwork(partyIDs),
+				Network:     test.NewNetwork(partyIDs),
 				FailureRate: 0.2, // 20% message drop
 			}
-			
+
 			// Try keygen with each protocol
 			protocols := []string{"lss", "cmp", "frost"}
 			successRates := make(map[string]float64)
-			
+
 			for _, protocolName := range protocols {
 				successCount := 0
 				attempts := 10
-				
+
 				for i := 0; i < attempts; i++ {
 					var err error
-					
+
 					switch protocolName {
 					case "lss":
 						_, err = attemptLSSKeygen(partyIDs, threshold, group, pl, unreliableNetwork)
@@ -361,15 +361,15 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 					case "frost":
 						_, err = attemptFROSTKeygen(partyIDs, threshold, group, pl, unreliableNetwork)
 					}
-					
+
 					if err == nil {
 						successCount++
 					}
 				}
-				
+
 				successRates[protocolName] = float64(successCount) / float64(attempts)
 			}
-			
+
 			// All protocols should achieve some success despite network issues
 			for protocol, rate := range successRates {
 				fmt.Printf("%s success rate: %.2f%%\n", protocol, rate*100)
@@ -387,7 +387,7 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 
 	configs := make([]*lss.Config, len(partyIDs))
 	done := make(chan struct{})
-	
+
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
@@ -395,7 +395,7 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 			h, err := protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			configs[i] = r.(*lss.Config)
@@ -406,14 +406,14 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// Success
 	case <-time.After(30 * time.Second):
 		Fail("LSS keygen timed out after 30 seconds")
 	}
-	
+
 	return configs
 }
 
@@ -423,7 +423,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 
 	configs := make([]*cmp.Config, len(partyIDs))
 	done := make(chan struct{})
-	
+
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
@@ -431,7 +431,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 			h, err := protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			configs[i] = r.(*cmp.Config)
@@ -442,7 +442,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// Success
@@ -458,7 +458,7 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 
 	configs := make([]*frost.Config, len(partyIDs))
 	done := make(chan struct{})
-	
+
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
@@ -466,7 +466,7 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 			h, err := protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			configs[i] = r.(*frost.Config)
@@ -477,14 +477,14 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// Success
 	case <-time.After(30 * time.Second):
 		Fail("FROST keygen timed out after 30 seconds")
 	}
-	
+
 	return configs
 }
 
@@ -500,7 +500,7 @@ func runLSSSign(configs []*lss.Config, signers []party.ID, messageHash []byte, p
 			h, err := protocol.NewMultiHandler(lss.Sign(c, signers, messageHash, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*ecdsa.Signature)
@@ -523,7 +523,7 @@ func runCMPSign(configs []*cmp.Config, signers []party.ID, messageHash []byte, p
 			h, err := protocol.NewMultiHandler(cmp.Sign(c, signers, messageHash, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*ecdsa.Signature)
@@ -546,7 +546,7 @@ func runFROSTSign(configs []*frost.Config, signers []party.ID, message []byte, p
 			h, err := protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*frost.Signature)
@@ -574,7 +574,7 @@ func runLSSReshare(configs []*lss.Config, newThreshold int, newParties []party.I
 			h, err := protocol.NewMultiHandler(lss.Reshare(c, newThreshold, newParties, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			newConfigs[i] = r.(*lss.Config)
@@ -598,7 +598,7 @@ func runLSSReshare(configs []*lss.Config, newThreshold int, newParties []party.I
 			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newThreshold, newParties, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			newConfigs[i] = r.(*lss.Config)
@@ -621,7 +621,7 @@ func runCMPPresign(configs []*cmp.Config, signers []party.ID, pl *pool.Pool, net
 			h, err := protocol.NewMultiHandler(cmp.Presign(c, signers, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			presigs[i] = r.(*ecdsa.PreSignature)
@@ -644,7 +644,7 @@ func runCMPPresignOnline(configs []*cmp.Config, presigs []*ecdsa.PreSignature, m
 			h, err := protocol.NewMultiHandler(cmp.PresignOnline(c, presig, messageHash, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*ecdsa.Signature)
@@ -664,19 +664,19 @@ func runLSSSignWithFaultTolerance(configs []*lss.Config, signers []party.ID, mes
 		i := i
 		go func(c *lss.Config) {
 			defer wg.Done()
-			
+
 			// Skip if Byzantine
 			if network.ByzantineParties[c.ID] {
 				return
 			}
-			
+
 			h, err := protocol.NewMultiHandler(lss.Sign(c, signers, messageHash, pl), nil)
 			if err != nil {
 				return
 			}
-			
+
 			test.HandlerLoop(c.ID, h, network.Network)
-			
+
 			r, err := h.Result()
 			if err == nil {
 				signatures[i] = r.(*ecdsa.Signature)
@@ -735,13 +735,13 @@ func attemptLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl 
 				errors[i] = err
 				return
 			}
-			
+
 			done := make(chan bool, 1)
 			go func() {
 				test.HandlerLoop(id, h, network.Network)
 				done <- true
 			}()
-			
+
 			select {
 			case <-done:
 				r, err := h.Result()
@@ -825,11 +825,11 @@ func (u *UnreliableTestNetwork) Send(msg *protocol.Message) {
 func BenchmarkProtocolComparison(b *testing.B) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	n := 5
 	threshold := 3
 	group := curve.Secp256k1{}
-	
+
 	b.Run("LSS", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			partyIDs := test.PartyIDs(n)
@@ -837,7 +837,7 @@ func BenchmarkProtocolComparison(b *testing.B) {
 			runLSSKeygen(partyIDs, threshold, group, pl, network)
 		}
 	})
-	
+
 	b.Run("CMP", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			partyIDs := test.PartyIDs(n)
@@ -845,7 +845,7 @@ func BenchmarkProtocolComparison(b *testing.B) {
 			runCMPKeygen(partyIDs, threshold, group, pl, network)
 		}
 	})
-	
+
 	b.Run("FROST", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			partyIDs := test.PartyIDs(n)

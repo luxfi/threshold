@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/internal/params"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/test"
@@ -16,6 +14,8 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/taproot"
 	"github.com/luxfi/threshold/protocols/frost/keygen"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func checkOutput(t *testing.T, rounds []round.Session, public curve.Point, m []byte) {

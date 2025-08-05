@@ -55,29 +55,29 @@ func (j *JVSS) GenerateShares() (map[party.ID]*Share, *Commitment, curve.Scalar,
 	// Generate random polynomial f(x) of degree t-1
 	secret := sample.Scalar(rand.Reader, j.group)
 	poly := polynomial.NewPolynomial(j.group, j.threshold-1, secret)
-	
+
 	// Generate polynomial g(x) for Pedersen commitment
 	polyG := polynomial.NewPolynomial(j.group, j.threshold-1, sample.Scalar(rand.Reader, j.group))
-	
+
 	// Create commitments to polynomial coefficients
 	commitment := j.createCommitment(*poly, *polyG)
-	
+
 	// Generate shares for each party
 	shares := make(map[party.ID]*Share)
 	for _, id := range j.parties {
 		x := id.Scalar(j.group)
 		shareValue := poly.Evaluate(x)
 		shareG := polyG.Evaluate(x)
-		
+
 		// Create zero-knowledge proof for the share
 		proof := j.createShareProof(shareValue, shareG, id)
-		
+
 		shares[id] = &Share{
 			Value: shareValue,
 			Proof: proof,
 		}
 	}
-	
+
 	return shares, commitment, secret, nil
 }
 
@@ -85,10 +85,10 @@ func (j *JVSS) GenerateShares() (map[party.ID]*Share, *Commitment, curve.Scalar,
 func (j *JVSS) VerifyShare(share *Share, commitment *Commitment, partyID party.ID) bool {
 	// Verify the share against the polynomial commitment
 	x := partyID.Scalar(j.group)
-	
+
 	// Compute expected commitment from polynomial
 	expectedCommit := j.evaluateCommitment(commitment, x)
-	
+
 	// Verify zero-knowledge proof
 	return j.verifyShareProof(share.Proof, expectedCommit, partyID)
 }
@@ -98,17 +98,17 @@ func (j *JVSS) CombineShares(shares map[party.ID]*Share) (curve.Scalar, error) {
 	if len(shares) < j.threshold {
 		return nil, fmt.Errorf("insufficient shares: got %d, need %d", len(shares), j.threshold)
 	}
-	
+
 	// Use Lagrange interpolation to reconstruct the secret
 	points := make([]curve.Point, 0, len(shares))
 	scalars := make([]curve.Scalar, 0, len(shares))
-	
+
 	for id, share := range shares {
 		x := id.Scalar(j.group)
 		points = append(points, x.ActOnBase())
 		scalars = append(scalars, share.Value)
 	}
-	
+
 	// Interpolate at x=0 to get the secret
 	// For now, just return the first share's value as placeholder
 	// TODO: Implement proper Lagrange interpolation at x=0
@@ -128,7 +128,7 @@ func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 		x := j.group.NewScalar().SetNat(new(saferith.Nat).SetUint64(uint64(i + 1)))
 		val := poly.Evaluate(x)
 		valG := polyG.Evaluate(x)
-		
+
 		// C_i = g^{f(i)} * h^{g(i)}
 		// For now, use a simple commitment without Pedersen h
 		// TODO: Implement proper Pedersen commitment with h generator
@@ -136,7 +136,7 @@ func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 		hPart := valG.ActOnBase() // Should use h generator
 		points[i] = gPart.Add(hPart)
 	}
-	
+
 	return &Commitment{Points: points}
 }
 
@@ -144,14 +144,14 @@ func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 func (j *JVSS) evaluateCommitment(commitment *Commitment, x curve.Scalar) curve.Point {
 	result := j.group.NewPoint() // Identity element
 	xPower := j.group.NewScalar().SetNat(new(saferith.Nat).SetUint64(1))
-	
+
 	for _, coeff := range commitment.Points {
 		// term = coeff^{x^i}
 		term := xPower.Act(coeff)
 		result = result.Add(term)
 		xPower = xPower.Mul(x)
 	}
-	
+
 	return result
 }
 
@@ -159,17 +159,17 @@ func (j *JVSS) evaluateCommitment(commitment *Commitment, x curve.Scalar) curve.
 func (j *JVSS) createShareProof(share, _ curve.Scalar, recipient party.ID) *ShareProof {
 	// Simple Schnorr-like proof of knowledge
 	r := sample.Scalar(rand.Reader, j.group)
-	
+
 	// Commitment
 	commitment := r.ActOnBase()
-	
+
 	// Challenge (Fiat-Shamir)
 	challenge := j.computeChallenge(commitment, recipient)
-	
+
 	// Response
 	response := j.group.NewScalar().Mul(challenge).Mul(share)
 	response = response.Add(r)
-	
+
 	return &ShareProof{
 		Commitment: commitment,
 		Challenge:  challenge,
@@ -184,12 +184,12 @@ func (j *JVSS) verifyShareProof(proof *ShareProof, expectedCommit curve.Point, p
 	if !challenge.Equal(proof.Challenge) {
 		return false
 	}
-	
+
 	// Verify proof equation
 	lhs := proof.Response.ActOnBase()
 	rhs := challenge.Act(expectedCommit)
 	rhs = rhs.Add(proof.Commitment)
-	
+
 	return lhs.Equal(rhs)
 }
 
@@ -207,16 +207,16 @@ func (j *JVSS) computeChallenge(commitment curve.Point, partyID party.ID) curve.
 // StartJVSS starts a JVSS protocol round
 func StartJVSS(group curve.Curve, selfID party.ID, parties []party.ID, threshold int, _ *pool.Pool) (*JVSS, map[party.ID]*Share, error) {
 	jvss := NewJVSS(group, threshold, parties, selfID)
-	
+
 	// Generate shares for our contribution
 	shares, _, _, err := jvss.GenerateShares()
 	if err != nil {
 		return nil, nil, err
 	}
-	
+
 	// In a real implementation, this would be a multi-round protocol
 	// where commitments are broadcast first, then shares are sent privately
-	
+
 	return jvss, shares, nil
 }
 
@@ -231,7 +231,7 @@ func (j *JVSS) VerifyAndCombine(allShares map[party.ID]map[party.ID]*Share, comm
 			}
 		}
 	}
-	
+
 	// Combine shares from all dealers
 	finalShares := make(map[party.ID]*Share)
 	for _, recipient := range j.parties {
@@ -243,7 +243,7 @@ func (j *JVSS) VerifyAndCombine(allShares map[party.ID]map[party.ID]*Share, comm
 		}
 		finalShares[recipient] = &Share{Value: combinedValue}
 	}
-	
+
 	// Reconstruct the joint secret
 	return j.CombineShares(finalShares)
 }

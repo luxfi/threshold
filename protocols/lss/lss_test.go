@@ -6,20 +6,20 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestLSSKeygen tests the initial key generation protocol
 func TestLSSKeygen(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
-	
+
 	testCases := []struct {
 		name      string
 		n         int
@@ -48,14 +48,11 @@ func TestLSSKeygen(t *testing.T) {
 				i := i
 				go func(id party.ID) {
 					defer wg.Done()
-					
-					// For now, skip the test as the implementation is incomplete
-					t.Skip("LSS protocol implementation is incomplete")
-					
+
 					h, err := protocol.NewMultiHandler(Keygen(tc.curve, id, partyIDs, tc.threshold, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(id, h, network)
-					
+
 					r, err := h.Result()
 					require.NoError(t, err)
 					configs[i] = r.(*Config)
@@ -83,7 +80,7 @@ func TestLSSKeygen(t *testing.T) {
 // TestLSSReshare tests the dynamic re-sharing protocol
 func TestLSSReshare(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -99,9 +96,9 @@ func TestLSSReshare(t *testing.T) {
 
 	// Test cases for re-sharing
 	testCases := []struct {
-		name         string
-		newThreshold int
-		addParties   int
+		name          string
+		newThreshold  int
+		addParties    int
 		removeParties []int // indices to remove
 	}{
 		{"Increase threshold 3->4", 4, 0, nil},
@@ -159,7 +156,7 @@ func TestLSSReshare(t *testing.T) {
 					h, err := protocol.NewMultiHandler(Reshare(c, tc.newThreshold, newParties, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(c.ID, h, reshareNetwork)
-					
+
 					r, err := h.Result()
 					require.NoError(t, err)
 					require.IsType(t, &Config{}, r)
@@ -184,7 +181,7 @@ func TestLSSReshare(t *testing.T) {
 					h, err := protocol.NewMultiHandler(Reshare(emptyConfig, tc.newThreshold, newParties, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(id, h, reshareNetwork)
-					
+
 					r, err := h.Result()
 					require.NoError(t, err)
 					require.IsType(t, &Config{}, r)
@@ -216,7 +213,7 @@ func TestLSSReshare(t *testing.T) {
 // TestLSSSign tests the signing protocol
 func TestLSSSign(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -272,7 +269,7 @@ func TestLSSSign(t *testing.T) {
 					h, err := protocol.NewMultiHandler(Sign(c, signers, messageHash, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(c.ID, h, network)
-					
+
 					r, err := h.Result()
 					if tc.shouldPass {
 						require.NoError(t, err)
@@ -304,7 +301,7 @@ func TestLSSSign(t *testing.T) {
 // TestLSSSignWithBlinding tests the signing protocol with multiplicative blinding
 func TestLSSSignWithBlinding(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -344,7 +341,7 @@ func TestLSSSignWithBlinding(t *testing.T) {
 					h, err := protocol.NewMultiHandler(SignWithBlinding(c, signers, messageHash, p.protocol, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(c.ID, h, network)
-					
+
 					r, err := h.Result()
 					require.NoError(t, err)
 					require.IsType(t, &ecdsa.Signature{}, r)
@@ -507,7 +504,7 @@ func runKeygen(t *testing.T, partyIDs []party.ID, threshold int, group curve.Cur
 			h, err := protocol.NewMultiHandler(Keygen(group, id, partyIDs, threshold, pl), nil)
 			require.NoError(t, err)
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			require.NoError(t, err)
 			require.IsType(t, &Config{}, r)
@@ -522,7 +519,7 @@ func runKeygen(t *testing.T, partyIDs []party.ID, threshold int, group curve.Cur
 // TestLSSConcurrentOperations tests concurrent signing operations
 func TestLSSConcurrentOperations(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -541,16 +538,16 @@ func TestLSSConcurrentOperations(t *testing.T) {
 	for op := 0; op < numOperations; op++ {
 		go func(op int) {
 			defer wg.Done()
-			
+
 			messageHash := make([]byte, 32)
 			_, err := rand.Read(messageHash)
 			require.NoError(t, err)
 
 			signers := partyIDs[:threshold]
-			
+
 			var sigWg sync.WaitGroup
 			sigWg.Add(threshold)
-			
+
 			for i := 0; i < threshold; i++ {
 				i := i
 				go func() {
@@ -558,14 +555,14 @@ func TestLSSConcurrentOperations(t *testing.T) {
 					h, err := protocol.NewMultiHandler(Sign(configs[i], signers, messageHash, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(configs[i].ID, h, network)
-					
+
 					r, err := h.Result()
 					require.NoError(t, err)
 					sig := r.(*ecdsa.Signature)
 					assert.True(t, sig.Verify(configs[0].PublicKey, messageHash))
 				}()
 			}
-			
+
 			sigWg.Wait()
 		}(op)
 	}
@@ -576,7 +573,7 @@ func TestLSSConcurrentOperations(t *testing.T) {
 // TestLSSTimeout tests timeout handling
 func TestLSSTimeout(t *testing.T) {
 	t.Skip("Timeout test requires network delay simulation")
-	
+
 	// This test would require a modified network that can simulate delays
 	// and dropped messages to test timeout and recovery behavior
 }
@@ -584,7 +581,7 @@ func TestLSSTimeout(t *testing.T) {
 // TestLSSMaliciousParty tests handling of malicious parties
 func TestLSSMaliciousParty(t *testing.T) {
 	t.Skip("Malicious party test requires protocol modification")
-	
+
 	// This test would require ability to inject malicious behavior
 	// into the protocol to test fault tolerance
 }

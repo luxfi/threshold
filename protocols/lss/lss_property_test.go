@@ -9,14 +9,14 @@ import (
 	"testing/quick"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("LSS Property-Based Tests", func() {
@@ -38,24 +38,24 @@ var _ = Describe("LSS Property-Based Tests", func() {
 		It("should maintain threshold property for any valid configuration", func() {
 			property := func(nRaw, tRaw uint8) bool {
 				// Convert to valid ranges
-				n := int(nRaw%20) + 2  // n in [2, 21]
-				t := int(tRaw%uint8(n)) + 1  // t in [1, n]
-				
+				n := int(nRaw%20) + 2       // n in [2, 21]
+				t := int(tRaw%uint8(n)) + 1 // t in [1, n]
+
 				if t > n || t < 1 || n < 2 {
 					return true // Skip invalid configurations
 				}
 
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
-				
+
 				// Run keygen
 				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
-				
+
 				// Test: Any t parties can sign
 				messageHash := randomHash()
 				signers := partyIDs[:t]
 				signatures := runSign(configs[:t], signers, messageHash, pl, network)
-				
+
 				// Verify signature
 				return signatures[0].Verify(configs[0].PublicKey, messageHash)
 			}
@@ -68,45 +68,45 @@ var _ = Describe("LSS Property-Based Tests", func() {
 		It("should handle arbitrary membership changes", func() {
 			property := func(initialN, initialT, addCount, removeCount uint8) bool {
 				// Normalize inputs
-				n := int(initialN%10) + 5  // n in [5, 14]
-				t := int(initialT%uint8(n-2)) + 2  // t in [2, n-1]
-				add := int(addCount % 5)  // add up to 5
-				remove := int(removeCount % uint8(n-t))  // ensure we keep at least t parties
-				
+				n := int(initialN%10) + 5               // n in [5, 14]
+				t := int(initialT%uint8(n-2)) + 2       // t in [2, n-1]
+				add := int(addCount % 5)                // add up to 5
+				remove := int(removeCount % uint8(n-t)) // ensure we keep at least t parties
+
 				if t > n || t < 2 || n < 3 {
 					return true
 				}
 
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
-				
+
 				// Initial keygen
 				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
 				publicKey := configs[0].PublicKey
-				
+
 				// Add parties
 				newParties := make([]party.ID, add)
 				for i := 0; i < add; i++ {
 					newParties[i] = party.ID(fmt.Sprintf("new-%d", i))
 				}
-				
+
 				// Remove parties (keep at least t)
 				remainingConfigs := configs
 				if remove > 0 && len(configs)-remove >= t {
 					remainingConfigs = configs[:len(configs)-remove]
 				}
-				
+
 				// Perform reshare if there are changes
 				if add > 0 || remove > 0 {
 					allParties := append(remainingConfigs[0].PartyIDs, newParties...)
 					network = test.NewNetwork(allParties)
 					newConfigs := runReshare(remainingConfigs, t, newParties, pl, network)
-					
+
 					// Verify new configuration
 					return newConfigs[0].PublicKey.Equal(publicKey) &&
 						len(newConfigs) == len(remainingConfigs)+add
 				}
-				
+
 				return true
 			}
 
@@ -118,24 +118,24 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			property := func(seed int64) bool {
 				n := 5
 				t := 3
-				
+
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
-				
+
 				// Use seed to generate deterministic message
 				messageHash := make([]byte, 32)
 				for i := 0; i < 32; i++ {
 					messageHash[i] = byte(seed >> (i % 8))
 				}
-				
+
 				signers := partyIDs[:t]
-				
+
 				// Sign twice with same message
 				sig1 := runSign(configs[:t], signers, messageHash, pl, network)[0]
 				sig2 := runSign(configs[:t], signers, messageHash, pl, network)[0]
-				
+
 				// Both should be valid
 				return sig1.Verify(configs[0].PublicKey, messageHash) &&
 					sig2.Verify(configs[0].PublicKey, messageHash)
@@ -148,31 +148,31 @@ var _ = Describe("LSS Property-Based Tests", func() {
 		It("should maintain security across threshold changes", func() {
 			property := func(oldT, newT uint8) bool {
 				n := 7
-				oldThreshold := int(oldT%5) + 2  // [2, 6]
-				newThreshold := int(newT%5) + 2  // [2, 6]
-				
+				oldThreshold := int(oldT%5) + 2 // [2, 6]
+				newThreshold := int(newT%5) + 2 // [2, 6]
+
 				if oldThreshold > n || newThreshold > n {
 					return true
 				}
 
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
-				
+
 				// Initial setup with oldThreshold
 				configs := runKeygenGinkgo(partyIDs, oldThreshold, group, pl, network)
 				publicKey := configs[0].PublicKey
-				
+
 				// Reshare with new threshold
 				newConfigs := runReshare(configs, newThreshold, nil, pl, network)
-				
+
 				// Test: exactly newThreshold parties needed
 				messageHash := randomHash()
 				signers := partyIDs[:newThreshold]
 				signatures := runSign(newConfigs[:newThreshold], signers, messageHash, pl, network)
-				
+
 				// Verify signature works with new threshold
 				validSig := signatures[0].Verify(publicKey, messageHash)
-				
+
 				// Test: newThreshold-1 parties cannot sign (if possible)
 				cannotSignWithLess := true
 				if newThreshold > 1 {
@@ -184,7 +184,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 					}()
 					runSign(newConfigs[:newThreshold-1], signers[:newThreshold-1], messageHash, pl, network)
 				}
-				
+
 				return validSig && cannotSignWithLess
 			}
 
@@ -202,23 +202,23 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			n := 5
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
-			
+
 			// Create a fuzzing network
 			fuzzNetwork := &FuzzingNetwork{
 				Network:  test.NewNetwork(partyIDs),
 				FuzzRate: 0.1, // 10% of messages will be fuzzed
 			}
-			
+
 			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, fuzzNetwork.Network)
-			
+
 			// Try signing with fuzzy network
 			successCount := 0
 			attempts := 10
-			
+
 			for i := 0; i < attempts; i++ {
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
-				
+
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -226,14 +226,14 @@ var _ = Describe("LSS Property-Based Tests", func() {
 							return
 						}
 					}()
-					
+
 					signatures := runSign(configs[:threshold], signers, messageHash, pl, fuzzNetwork.Network)
 					if signatures[0] != nil && signatures[0].Verify(configs[0].PublicKey, messageHash) {
 						successCount++
 					}
 				}()
 			}
-			
+
 			// Should succeed at least sometimes despite fuzzing
 			Expect(successCount).To(BeNumerically(">", 0))
 		})
@@ -242,25 +242,25 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			property := func(dropoutPattern uint32) bool {
 				n := 9
 				threshold := 5
-				
+
 				partyIDs := test.PartyIDs(n)
 				network := test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
-				
+
 				// Create dropout network based on pattern
 				dropoutNetwork := &DropoutNetwork{
-					Network: network,
+					Network:        network,
 					DropoutPattern: dropoutPattern,
-					MaxDropouts: n - threshold - 1, // Keep at least threshold+1
+					MaxDropouts:    n - threshold - 1, // Keep at least threshold+1
 				}
-				
+
 				messageHash := randomHash()
 				signers := partyIDs
-				
+
 				// Should still work with some dropouts
 				signatures := runSignWithTimeout(configs, signers, messageHash, pl, dropoutNetwork.Network, 5*time.Second)
-				
+
 				// Count successful signatures
 				successCount := 0
 				for _, sig := range signatures {
@@ -268,7 +268,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 						successCount++
 					}
 				}
-				
+
 				return successCount >= threshold
 			}
 
@@ -280,22 +280,22 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			n := 5
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
-			
+
 			// Network with random delays
 			delayNetwork := &DelayNetwork{
-				Network: test.NewNetwork(partyIDs),
+				Network:  test.NewNetwork(partyIDs),
 				MinDelay: 0,
 				MaxDelay: 500 * time.Millisecond,
 			}
-			
+
 			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, delayNetwork.Network)
-			
+
 			messageHash := randomHash()
 			signers := partyIDs[:threshold]
-			
+
 			// Should complete despite delays
 			signatures := runSignWithTimeout(configs[:threshold], signers, messageHash, pl, delayNetwork.Network, 30*time.Second)
-			
+
 			Expect(signatures[0]).NotTo(BeNil())
 			Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
 		})
@@ -310,17 +310,17 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			// Test with larger group
 			n := 21
 			threshold := 15
-			
+
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
-			
+
 			messageHash := randomHash()
 			signers := partyIDs[:threshold]
-			
+
 			signatures := runSign(configs[:threshold], signers, messageHash, pl, network)
-			
+
 			Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
 		})
 
@@ -329,13 +329,13 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
 			network := test.NewNetwork(partyIDs)
-			
+
 			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
-			
+
 			// Rapid fire signing
 			numOps := 20
 			results := make(chan bool, numOps)
-			
+
 			for i := 0; i < numOps; i++ {
 				go func() {
 					messageHash := randomHash()
@@ -344,7 +344,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 					results <- signatures[0].Verify(configs[0].PublicKey, messageHash)
 				}()
 			}
-			
+
 			// All should succeed
 			for i := 0; i < numOps; i++ {
 				Expect(<-results).To(BeTrue())
@@ -365,17 +365,17 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 			for _, tc := range testCases {
 				By(tc.name)
-				
+
 				partyIDs := test.PartyIDs(tc.n)
 				network := test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygenGinkgo(partyIDs, tc.threshold, group, pl, network)
-				
+
 				messageHash := randomHash()
 				signers := partyIDs[:tc.threshold]
-				
+
 				signatures := runSign(configs[:tc.threshold], signers, messageHash, pl, network)
-				
+
 				Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
 			}
 		})
@@ -437,7 +437,7 @@ func FuzzLSSProtocol(f *testing.F) {
 	f.Add(uint8(5), uint8(3), []byte("test message"))
 	f.Add(uint8(7), uint8(4), []byte("another test"))
 	f.Add(uint8(3), uint8(2), []byte("minimum threshold"))
-	
+
 	f.Fuzz(func(t *testing.T, n, threshold uint8, message []byte) {
 		// Normalize inputs
 		if n < 2 || n > 21 {
@@ -449,22 +449,22 @@ func FuzzLSSProtocol(f *testing.F) {
 		if len(message) == 0 {
 			t.Skip("Empty message")
 		}
-		
+
 		// Create hash from message
 		messageHash := make([]byte, 32)
 		copy(messageHash, message)
-		
+
 		// Run protocol
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
-		
+
 		partyIDs := test.PartyIDs(int(n))
 		network := test.NewNetwork(partyIDs)
-		
+
 		configs := make([]*Config, n)
 		var wg sync.WaitGroup
 		wg.Add(int(n))
-		
+
 		for i, id := range partyIDs {
 			i := i
 			go func(id party.ID) {
@@ -474,7 +474,7 @@ func FuzzLSSProtocol(f *testing.F) {
 					t.Fatal(err)
 				}
 				test.HandlerLoop(id, h, network)
-				
+
 				r, err := h.Result()
 				if err != nil {
 					t.Fatal(err)
@@ -482,13 +482,13 @@ func FuzzLSSProtocol(f *testing.F) {
 				configs[i] = r.(*Config)
 			}(id)
 		}
-		
+
 		wg.Wait()
-		
+
 		// Sign
 		signers := partyIDs[:threshold]
 		signatures := make([]*ecdsa.Signature, threshold)
-		
+
 		wg.Add(int(threshold))
 		for i := 0; i < int(threshold); i++ {
 			i := i
@@ -499,7 +499,7 @@ func FuzzLSSProtocol(f *testing.F) {
 					t.Fatal(err)
 				}
 				test.HandlerLoop(configs[i].ID, h, network)
-				
+
 				r, err := h.Result()
 				if err != nil {
 					t.Fatal(err)
@@ -507,9 +507,9 @@ func FuzzLSSProtocol(f *testing.F) {
 				signatures[i] = r.(*ecdsa.Signature)
 			}()
 		}
-		
+
 		wg.Wait()
-		
+
 		// Verify
 		if !signatures[0].Verify(configs[0].PublicKey, messageHash) {
 			t.Fatal("Invalid signature")
@@ -531,7 +531,7 @@ func runKeygenGinkgo(partyIDs []party.ID, threshold int, group curve.Curve, pl *
 			h, err := protocol.NewMultiHandler(Keygen(group, id, partyIDs, threshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			configs[i] = r.(*Config)
@@ -554,7 +554,7 @@ func runSign(configs []*Config, signers []party.ID, messageHash []byte, pl *pool
 			h, err := protocol.NewMultiHandler(Sign(config, signers, messageHash, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(config.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*ecdsa.Signature)
@@ -568,12 +568,12 @@ func runSign(configs []*Config, signers []party.ID, messageHash []byte, pl *pool
 func runSignWithTimeout(configs []*Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network, timeout time.Duration) []*ecdsa.Signature {
 	done := make(chan struct{})
 	var signatures []*ecdsa.Signature
-	
+
 	go func() {
 		signatures = runSign(configs, signers, messageHash, pl, network)
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return signatures
@@ -586,10 +586,10 @@ func runSignWithTimeout(configs []*Config, signers []party.ID, messageHash []byt
 func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, pl *pool.Pool, network *test.Network) []*Config {
 	allParties := append(oldConfigs[0].PartyIDs, newParties...)
 	newConfigs := make([]*Config, len(allParties))
-	
+
 	var wg sync.WaitGroup
 	wg.Add(len(oldConfigs) + len(newParties))
-	
+
 	// Existing parties reshare
 	for i, config := range oldConfigs {
 		i := i
@@ -598,13 +598,13 @@ func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, p
 			h, err := protocol.NewMultiHandler(Reshare(c, newThreshold, newParties, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			newConfigs[i] = r.(*Config)
 		}(config)
 	}
-	
+
 	// New parties join
 	for i, newID := range newParties {
 		idx := len(oldConfigs) + i
@@ -621,13 +621,13 @@ func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, p
 			h, err := protocol.NewMultiHandler(Reshare(emptyConfig, newThreshold, newParties, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			newConfigs[idx] = r.(*Config)
 		}(newID, idx)
 	}
-	
+
 	wg.Wait()
 	return newConfigs
 }
