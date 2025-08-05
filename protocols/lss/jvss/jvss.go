@@ -156,7 +156,7 @@ func (j *JVSS) evaluateCommitment(commitment *Commitment, x curve.Scalar) curve.
 }
 
 // createShareProof creates a zero-knowledge proof for a share
-func (j *JVSS) createShareProof(share, shareG curve.Scalar, recipient party.ID) *ShareProof {
+func (j *JVSS) createShareProof(share, _ curve.Scalar, recipient party.ID) *ShareProof {
 	// Simple Schnorr-like proof of knowledge
 	r := sample.Scalar(rand.Reader, j.group)
 	
@@ -205,7 +205,7 @@ func (j *JVSS) computeChallenge(commitment curve.Point, partyID party.ID) curve.
 }
 
 // StartJVSS starts a JVSS protocol round
-func StartJVSS(group curve.Curve, selfID party.ID, parties []party.ID, threshold int, pl *pool.Pool) (*JVSS, map[party.ID]*Share, error) {
+func StartJVSS(group curve.Curve, selfID party.ID, parties []party.ID, threshold int, _ *pool.Pool) (*JVSS, map[party.ID]*Share, error) {
 	jvss := NewJVSS(group, threshold, parties, selfID)
 	
 	// Generate shares for our contribution
