@@ -52,8 +52,9 @@ func Keygen(group curve.Curve, selfID party.ID, participants []party.ID, thresho
 			Group:            group,
 		}
 		
-		// Import the keygen package
-		return keygen.Start(info, pl, nil)
+		// Get the start function and execute it
+		startFunc := keygen.Start(info, pl, nil)
+		return startFunc(sessionID)
 	}
 }
 
@@ -92,7 +93,21 @@ func Reshare(config *Config, newThreshold int, newParticipants []party.ID, pl *p
 			Group:            config.Group,
 		}
 		
-		return reshare.Start(info, pl, config, newParticipants)
+		// Convert to reshare.Config
+		reshareConfig := &reshare.Config{
+			ID:           config.ID,
+			Group:        config.Group,
+			Threshold:    config.Threshold,
+			Generation:   config.Generation,
+			SecretShare:  config.SecretShare,
+			PublicKey:    config.PublicKey,
+			PublicShares: config.PublicShares,
+			PartyIDs:     config.PartyIDs,
+		}
+		
+		// Get the start function and execute it
+		startFunc := reshare.Start(info, pl, reshareConfig, newParticipants)
+		return startFunc(sessionID)
 	}
 }
 
@@ -117,7 +132,23 @@ func Sign(config *Config, signers []party.ID, messageHash []byte, pl *pool.Pool)
 			Group:            config.Group,
 		}
 		
-		return sign.StartSign(info, pl, config, messageHash)
+		// Convert to sign.Config
+		signConfig := &sign.Config{
+			ID:           config.ID,
+			Group:        config.Group,
+			Threshold:    config.Threshold,
+			Generation:   config.Generation,
+			SecretShare:  config.SecretShare,
+			PublicKey:    config.PublicKey,
+			PublicShares: config.PublicShares,
+			PartyIDs:     config.PartyIDs,
+		}
+		
+		// Get the start function
+		startFunc := sign.StartSign(info, pl, signConfig, messageHash)
+		
+		// Execute it to get the session
+		return startFunc(sessionID)
 	}
 }
 
@@ -224,3 +255,4 @@ func GetSignatureType(config *Config) string {
 		return "Unknown"
 	}
 }
+
