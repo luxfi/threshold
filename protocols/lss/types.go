@@ -57,14 +57,14 @@ const (
 	ReshareTypeJVSSCommitment ReshareMessageType = iota
 	ReshareTypeJVSSShare
 	ReshareTypeJVSSComplaint
-	
+
 	// Phase 2: Blinded secret computation
 	ReshareTypeBlindedShare
-	
+
 	// Phase 3: Inverse computation
 	ReshareTypeBlindedProduct
 	ReshareTypeInverseShare
-	
+
 	// Phase 4: Final share distribution
 	ReshareTypeFinalShare
 	ReshareTypeVerification
@@ -87,10 +87,10 @@ type PartialSignature struct {
 type DealerRole interface {
 	// InitiateReshare starts a new re-sharing protocol
 	InitiateReshare(oldThreshold, newThreshold int, addParties, removeParties []party.ID) error
-	
+
 	// HandleReshareMessage processes incoming re-share protocol messages
 	HandleReshareMessage(from party.ID, msg *ReshareMessage) error
-	
+
 	// GetCurrentGeneration returns the current shard generation
 	GetCurrentGeneration() uint64
 }
@@ -99,10 +99,10 @@ type DealerRole interface {
 type CoordinatorRole interface {
 	// RequestSignature initiates a signing protocol
 	RequestSignature(req *SignatureRequest) ([]byte, error)
-	
+
 	// HandlePartialSignature processes a partial signature from a party
 	HandlePartialSignature(sig *PartialSignature) error
-	
+
 	// TriggerRollback requests a state rollback due to signing failure
 	TriggerRollback(failedParties []party.ID) error
 }
@@ -111,16 +111,16 @@ type CoordinatorRole interface {
 type PartyRole interface {
 	// GetConfig returns the party's current configuration
 	GetConfig() *Config
-	
+
 	// UpdateShare updates the party's secret share after re-sharing
 	UpdateShare(newShare curve.Scalar, newGeneration uint64, newParties []party.ID) error
-	
+
 	// SaveGeneration persists a shard generation for potential rollback
 	SaveGeneration(gen *ShardGeneration) error
-	
+
 	// RollbackToGeneration reverts to a previous shard generation
 	RollbackToGeneration(generation uint64) error
-	
+
 	// GeneratePartialSignature creates this party's signature share
 	GeneratePartialSignature(messageHash []byte, nonce curve.Scalar) (*PartialSignature, error)
 }

@@ -142,7 +142,7 @@ func BenchmarkLSSReshare(b *testing.B) {
 				// Prepare new party set
 				newParties := test.PartyIDs(bm.addParties)
 				remainingConfigs := configs[:len(configs)-bm.removeParties]
-				
+
 				allParties := append(remainingConfigs[0].PartyIDs, newParties...)
 				reshareNetwork := test.NewNetwork(allParties)
 				b.StartTimer()
@@ -259,7 +259,8 @@ func BenchmarkLSSParallelSigning(b *testing.B) {
 						messageHash := make([]byte, 32)
 						_, err := rand.Read(messageHash)
 						if err != nil {
-							b.Fatal(err)
+							// Cannot call b.Fatal from goroutine
+							panic(err)
 						}
 
 						var wg sync.WaitGroup
@@ -298,7 +299,7 @@ func runKeygenBench(tb testing.TB, partyIDs []party.ID, threshold int, group cur
 				tb.Fatal(err)
 			}
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			if err != nil {
 				tb.Fatal(err)

@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/cronokirby/saferith"
-	"github.com/stretchr/testify/assert"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLagrange(t *testing.T) {

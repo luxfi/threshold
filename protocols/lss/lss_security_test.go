@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -15,6 +13,8 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("LSS Protocol Security Properties", func() {
@@ -47,19 +47,19 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 
 				for _, tc := range testCases {
 					By(fmt.Sprintf("Testing %d-of-%d threshold", tc.threshold, tc.n))
-					
+
 					partyIDs := test.PartyIDs(tc.n)
 					network = test.NewNetwork(partyIDs)
-					
+
 					// Run keygen
 					configs := runKeygen(partyIDs, tc.threshold, group, pl, network)
-					
+
 					// Test signing with exactly threshold parties
 					messageHash := randomHash()
 					signers := partyIDs[:tc.threshold]
-					
+
 					signatures := runSign(configs[:tc.threshold], signers, messageHash, pl, network)
-					
+
 					// Verify all signatures are identical and valid
 					Expect(signatures).To(HaveLen(tc.threshold))
 					for _, sig := range signatures {
@@ -83,17 +83,17 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 
 				for _, tc := range edgeCases {
 					By(tc.name)
-					
+
 					partyIDs := test.PartyIDs(tc.n)
 					network = test.NewNetwork(partyIDs)
-					
+
 					configs := runKeygen(partyIDs, tc.threshold, group, pl, network)
-					
+
 					messageHash := randomHash()
 					signers := partyIDs[:tc.threshold]
-					
+
 					signatures := runSign(configs[:tc.threshold], signers, messageHash, pl, network)
-					
+
 					Expect(signatures).To(HaveLen(tc.threshold))
 					Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
 				}
@@ -107,29 +107,29 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				initialThreshold := 3
 				initialPartyIDs := test.PartyIDs(initialN)
 				network = test.NewNetwork(initialPartyIDs)
-				
+
 				configs := runKeygen(initialPartyIDs, initialThreshold, group, pl, network)
 				publicKey := configs[0].PublicKey
-				
+
 				// Add 2 new parties to make 3-of-7
 				newParties := []party.ID{"new-1", "new-2"}
 				allParties := append(initialPartyIDs, newParties...)
 				network = test.NewNetwork(allParties)
-				
+
 				newConfigs := runReshare(configs, initialThreshold, newParties, publicKey, pl, network)
-				
+
 				// Verify new configuration
 				Expect(newConfigs).To(HaveLen(7))
 				for _, config := range newConfigs {
 					Expect(config.PublicKey.Equal(publicKey)).To(BeTrue())
 					Expect(config.Generation).To(Equal(uint64(2)))
 				}
-				
+
 				// Test signing with new group
 				messageHash := randomHash()
 				signers := allParties[:initialThreshold]
 				signatures := runSign(newConfigs[:initialThreshold], signers, messageHash, pl, network)
-				
+
 				Expect(signatures[0].Verify(publicKey, messageHash)).To(BeTrue())
 			})
 
@@ -139,23 +139,23 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				initialThreshold := 3
 				initialPartyIDs := test.PartyIDs(initialN)
 				network = test.NewNetwork(initialPartyIDs)
-				
+
 				configs := runKeygen(initialPartyIDs, initialThreshold, group, pl, network)
 				publicKey := configs[0].PublicKey
-				
+
 				// Remove 2 parties to make 2-of-3
 				remainingConfigs := configs[:3]
 				remainingPartyIDs := initialPartyIDs[:3]
 				newThreshold := 2
-				
+
 				network = test.NewNetwork(remainingPartyIDs)
 				newConfigs := runReshare(remainingConfigs, newThreshold, nil, publicKey, pl, network)
-				
+
 				// Verify removed parties cannot participate
 				messageHash := randomHash()
 				signers := remainingPartyIDs[:newThreshold]
 				signatures := runSign(newConfigs[:newThreshold], signers, messageHash, pl, network)
-				
+
 				Expect(signatures[0].Verify(publicKey, messageHash)).To(BeTrue())
 			})
 
@@ -165,10 +165,10 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 4
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
 				publicKey := configs[0].PublicKey
-				
+
 				// Start concurrent signing operations
 				done := make(chan bool)
 				go func() {
@@ -184,21 +184,21 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 						}
 					}
 				}()
-				
+
 				// Perform resharing while signing continues
 				newParties := []party.ID{"new-1"}
 				allParties := append(partyIDs, newParties...)
 				network = test.NewNetwork(allParties)
-				
+
 				newConfigs := runReshare(configs, threshold, newParties, publicKey, pl, network)
-				
+
 				close(done)
-				
+
 				// Verify new configuration works
 				messageHash := randomHash()
 				signers := allParties[:threshold]
 				signatures := runSign(newConfigs[:threshold], signers, messageHash, pl, network)
-				
+
 				Expect(signatures[0].Verify(publicKey, messageHash)).To(BeTrue())
 			})
 		})
@@ -209,13 +209,13 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Try with T-1 participants
 				messageHash := randomHash()
 				insufficientSigners := partyIDs[:threshold-1]
-				
+
 				// This should fail at the protocol level
 				Expect(func() {
 					runSign(configs[:threshold-1], insufficientSigners, messageHash, pl, network)
@@ -227,20 +227,20 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 4
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Simulate network issues for some parties
 				// Note: SetFilter not available in test.Network, skipping fault simulation
 				// faultyNetwork := test.NewNetwork(partyIDs)
 				// faultyNetwork.SetFilter(...)
-				
+
 				// Should still work with remaining parties
 				messageHash := randomHash()
 				signers := partyIDs[:threshold+1] // Include one extra in case of drops
-				
+
 				signatures := runSignWithTimeout(configs[:threshold+1], signers, messageHash, pl, network, 10*time.Second)
-				
+
 				// At least threshold parties should succeed
 				successCount := 0
 				for _, sig := range signatures {
@@ -259,9 +259,9 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Simulate saving state
 				savedConfigs := make([]*lss.Config, len(configs))
 				for i, config := range configs {
@@ -277,15 +277,15 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 						PartyIDs:     config.PartyIDs,
 					}
 				}
-				
+
 				// "Crash" and recover
 				pl = pool.NewPool(0)
-				
+
 				// Use saved configs to sign
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
 				signatures := runSign(savedConfigs[:threshold], signers, messageHash, pl, network)
-				
+
 				Expect(signatures[0].Verify(savedConfigs[0].PublicKey, messageHash)).To(BeTrue())
 			})
 
@@ -295,26 +295,26 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
 				gen1Configs := copyConfigs(configs)
-				
+
 				// Generation 2: Add a party
 				newParties := []party.ID{"new-1"}
 				allParties := append(partyIDs, newParties...)
 				network = test.NewNetwork(allParties)
-				
+
 				gen2Configs := runReshare(configs, threshold, newParties, configs[0].PublicKey, pl, network)
-				
+
 				// Generation 3: Remove a party (not used in this test)
 				// gen3Configs := runReshare(gen2Configs[:n], threshold, nil, configs[0].PublicKey, pl, network)
 				_ = gen2Configs // Mark as used
-				
+
 				// Simulate rollback to generation 1
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
 				signatures := runSign(gen1Configs[:threshold], signers, messageHash, pl, network)
-				
+
 				Expect(signatures[0].Verify(gen1Configs[0].PublicKey, messageHash)).To(BeTrue())
 			})
 		})
@@ -325,9 +325,9 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				testCases := []struct {
 					name        string
 					messageHash []byte
@@ -346,17 +346,17 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 					{
 						name:        "Standard ECDSA",
 						messageHash: randomHash(),
-						verify:      func(sig *ecdsa.Signature, pk curve.Point, hash []byte) bool {
+						verify: func(sig *ecdsa.Signature, pk curve.Point, hash []byte) bool {
 							return sig.Verify(pk, hash)
 						},
 					},
 				}
-				
+
 				for _, tc := range testCases {
 					By(tc.name)
 					signers := partyIDs[:threshold]
 					signatures := runSign(configs[:threshold], signers, tc.messageHash, pl, network)
-					
+
 					Expect(tc.verify(signatures[0], configs[0].PublicKey, tc.messageHash)).To(BeTrue())
 				}
 			})
@@ -370,12 +370,12 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 4
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Attempt to reconstruct private key with T-1 shares
 				corruptShares := configs[:threshold-1]
-				
+
 				// This should be cryptographically impossible
 				// Verify by attempting various combinations
 				reconstructed := attemptKeyReconstruction(corruptShares)
@@ -387,16 +387,16 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Malicious coalition of T-1 parties
 				maliciousParties := configs[:threshold-1]
 				targetMessage := []byte("unauthorized transfer")
-				
+
 				// Attempt forgery
 				forgedSig := attemptSignatureForgery(maliciousParties, targetMessage)
-				
+
 				if forgedSig != nil {
 					Expect(forgedSig.Verify(configs[0].PublicKey, targetMessage)).To(BeFalse())
 				}
@@ -409,21 +409,21 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Sign same message multiple times
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
-				
+
 				signatures := make([]*ecdsa.Signature, 5)
 				nonces := make([]curve.Scalar, 5)
-				
+
 				for i := 0; i < 5; i++ {
 					sigs := runSignWithNonceCapture(configs[:threshold], signers, messageHash, pl, network, &nonces[i])
 					signatures[i] = sigs[0]
 				}
-				
+
 				// All signatures should be valid but use different nonces
 				for i, sig := range signatures {
 					Expect(sig.Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
@@ -440,20 +440,20 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Test both blinding protocols
 				protocols := []int{1, 2}
-				
+
 				for _, protocolVersion := range protocols {
 					By(fmt.Sprintf("Testing blinding protocol %d", protocolVersion))
-					
+
 					messageHash := randomHash()
 					signers := partyIDs[:threshold]
-					
+
 					signatures := runSignWithBlinding(configs[:threshold], signers, messageHash, protocolVersion, pl, network)
-					
+
 					Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
 				}
 			})
@@ -465,21 +465,21 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Create a malicious network that injects fake messages
 				maliciousNetwork := &MaliciousNetwork{
-					Network: network,
+					Network:    network,
 					InjectRate: 0.1, // 10% message injection
 				}
-				
+
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
-				
+
 				// Protocol should still succeed despite attacks
 				signatures := runSign(configs[:threshold], signers, messageHash, pl, maliciousNetwork.Network)
-				
+
 				Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
 			})
 
@@ -488,24 +488,24 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Record messages from first signing
 				recordingNetwork := &RecordingNetwork{Network: network}
-				
+
 				messageHash1 := randomHash()
 				signers := partyIDs[:threshold]
 				runSign(configs[:threshold], signers, messageHash1, pl, recordingNetwork.Network)
-				
+
 				// Attempt to replay messages for different signing
 				replayNetwork := &ReplayNetwork{
-					Network: network,
+					Network:          network,
 					RecordedMessages: recordingNetwork.Messages,
 				}
-				
+
 				messageHash2 := randomHash()
-				
+
 				// This should fail or produce invalid signature
 				Expect(func() {
 					runSign(configs[:threshold], signers, messageHash2, pl, replayNetwork.Network)
@@ -519,16 +519,16 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 4
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Make one party malicious
 				maliciousIdx := 2
 				maliciousWrapper := &MaliciousPartyWrapper{
-					Config: configs[maliciousIdx],
+					Config:        configs[maliciousIdx],
 					MaliciousType: "invalid_shares",
 				}
-				
+
 				// Create wrapped configs for fault tolerance test
 				wrappedConfigs := make([]*lss.Config, threshold+1)
 				for i := 0; i < threshold+1; i++ {
@@ -540,14 +540,14 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 					}
 				}
 				_ = maliciousWrapper // Mark as used
-				
+
 				messageHash := randomHash()
 				// Include extra parties to compensate for malicious one
 				signers := partyIDs[:threshold+1]
-				
+
 				// Should still produce valid signature with honest parties
 				signatures := runSignWithFaultTolerance(wrappedConfigs, signers, messageHash, pl, network)
-				
+
 				validCount := 0
 				for _, sig := range signatures {
 					if sig != nil && sig.Verify(configs[0].PublicKey, messageHash) {
@@ -562,16 +562,16 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Create Byzantine party that deviates from protocol
 				byzantineIdx := 1
 				byzantineWrapper := &ByzantinePartyWrapper{
-					Config: configs[byzantineIdx],
+					Config:        configs[byzantineIdx],
 					DeviationType: "wrong_protocol_flow",
 				}
-				
+
 				// Create wrapped configs for Byzantine test
 				wrappedConfigs := make([]*lss.Config, threshold+1)
 				for i := 0; i < threshold+1; i++ {
@@ -583,13 +583,13 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 					}
 				}
 				_ = byzantineWrapper // Mark as used
-				
+
 				messageHash := randomHash()
 				signers := partyIDs[:threshold+1] // Extra party for fault tolerance
-				
+
 				// Protocol should detect and handle deviation
 				signatures := runSignWithByzantineDetection(wrappedConfigs, signers, messageHash, pl, network)
-				
+
 				// Should succeed with honest parties
 				Expect(len(signatures)).To(BeNumerically(">=", threshold))
 			})
@@ -601,27 +601,27 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 				threshold := 3
 				partyIDs := test.PartyIDs(n)
 				network = test.NewNetwork(partyIDs)
-				
+
 				// Generation 1
 				gen1Configs := runKeygen(partyIDs, threshold, group, pl, network)
-				
+
 				// Generation 2 after resharing
 				newParties := []party.ID{"new-1"}
 				allParties := append(partyIDs, newParties...)
 				network = test.NewNetwork(allParties)
-				
+
 				gen2Configs := runReshare(gen1Configs, threshold, newParties, gen1Configs[0].PublicKey, pl, network)
-				
+
 				// Attempt to use old generation shares with new generation
 				messageHash := randomHash()
-				
+
 				// Mix old and new configs (should fail)
 				mixedConfigs := make([]*lss.Config, threshold)
 				mixedConfigs[0] = gen1Configs[0] // Old generation
 				for i := 1; i < threshold; i++ {
 					mixedConfigs[i] = gen2Configs[i] // New generation
 				}
-				
+
 				// This should fail due to generation mismatch
 				Expect(func() {
 					runSign(mixedConfigs, partyIDs[:threshold], messageHash, pl, network)
@@ -636,38 +636,38 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 			threshold := 3
 			partyIDs := test.PartyIDs(n)
 			network = test.NewNetwork(partyIDs)
-			
+
 			// Setup with information tracking
 			trackingConfigs := make([]*InformationTrackingWrapper, n)
-			
+
 			// Run keygen with tracking
 			configs := runKeygen(partyIDs, threshold, group, pl, network)
 			for i, config := range configs {
 				trackingConfigs[i] = &InformationTrackingWrapper{
-					Config: config,
+					Config:       config,
 					ObservedData: make(map[string]interface{}),
 				}
 			}
-			
+
 			// Run several signing operations
 			for i := 0; i < 10; i++ {
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
 				runSignWithTracking(trackingConfigs[:threshold], signers, messageHash, pl, network)
 			}
-			
+
 			// Verify no party learned more than their share
 			for i, wrapper := range trackingConfigs[:threshold] {
 				// Each party should only know:
 				// - Their own secret share
 				// - Public keys and shares
 				// - Protocol messages they received
-				
+
 				// They should NOT know:
 				// - Other parties' secret shares
 				// - The master private key
 				// - Other parties' random nonces
-				
+
 				Expect(wrapper.LearnedOtherSecrets()).To(BeFalse(),
 					fmt.Sprintf("Party %d learned unauthorized information", i))
 			}
@@ -689,7 +689,7 @@ func runKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.P
 			h, err := protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			configs[i] = r.(*lss.Config)
@@ -712,7 +712,7 @@ func runSign(configs []*lss.Config, signers []party.ID, messageHash []byte, pl *
 			h, err := protocol.NewMultiHandler(lss.Sign(c, signers, messageHash, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*ecdsa.Signature)
@@ -726,7 +726,7 @@ func runSign(configs []*lss.Config, signers []party.ID, messageHash []byte, pl *
 func runSignWithTimeout(configs []*lss.Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network, timeout time.Duration) []*ecdsa.Signature {
 	signatures := make([]*ecdsa.Signature, len(configs))
 	done := make(chan bool)
-	
+
 	go func() {
 		var wg sync.WaitGroup
 		wg.Add(len(configs))
@@ -740,7 +740,7 @@ func runSignWithTimeout(configs []*lss.Config, signers []party.ID, messageHash [
 					return
 				}
 				test.HandlerLoop(c.ID, h, network)
-				
+
 				r, err := h.Result()
 				if err == nil {
 					signatures[i] = r.(*ecdsa.Signature)
@@ -751,7 +751,7 @@ func runSignWithTimeout(configs []*lss.Config, signers []party.ID, messageHash [
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return signatures
@@ -775,7 +775,7 @@ func runReshare(configs []*lss.Config, newThreshold int, newParties []party.ID, 
 			h, err := protocol.NewMultiHandler(lss.Reshare(c, newThreshold, newParties, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			newConfigs[idx] = r.(*lss.Config)
@@ -798,7 +798,7 @@ func runReshare(configs []*lss.Config, newThreshold int, newParties []party.ID, 
 			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newThreshold, newParties, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			newConfigs[idx] = r.(*lss.Config)
@@ -821,7 +821,7 @@ func runSignWithBlinding(configs []*lss.Config, signers []party.ID, messageHash 
 			h, err := protocol.NewMultiHandler(lss.SignWithBlinding(c, signers, messageHash, protocolVersion, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
-			
+
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
 			signatures[i] = r.(*ecdsa.Signature)

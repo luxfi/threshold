@@ -50,7 +50,7 @@ func runLSSKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, thres
 func runLSSSign(config *lss.Config, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) (*ecdsa.Signature, error) {
 	// Hash the message
 	hash := sha256.Sum256(message)
-	
+
 	h, err := protocol.NewMultiHandler(lss.Sign(config, signers, hash[:], pl), nil)
 	if err != nil {
 		return nil, err
@@ -325,7 +325,7 @@ func exportFROSTConfig(config *frost.Config, format string) ([]byte, error) {
 
 func importLSSConfig(data []byte, format string) (*lss.Config, error) {
 	var config lss.Config
-	
+
 	switch format {
 	case "json":
 		if err := json.Unmarshal(data, &config); err != nil {
@@ -342,13 +342,13 @@ func importLSSConfig(data []byte, format string) (*lss.Config, error) {
 	default:
 		return nil, fmt.Errorf("unsupported import format: %s", format)
 	}
-	
+
 	return &config, nil
 }
 
 func importCMPConfig(data []byte, format string) (*cmp.Config, error) {
 	var config cmp.Config
-	
+
 	switch format {
 	case "json":
 		if err := json.Unmarshal(data, &config); err != nil {
@@ -365,13 +365,13 @@ func importCMPConfig(data []byte, format string) (*cmp.Config, error) {
 	default:
 		return nil, fmt.Errorf("unsupported import format: %s", format)
 	}
-	
+
 	return &config, nil
 }
 
 func importFROSTConfig(data []byte, format string) (*frost.Config, error) {
 	var config frost.Config
-	
+
 	switch format {
 	case "json":
 		if err := json.Unmarshal(data, &config); err != nil {
@@ -388,7 +388,7 @@ func importFROSTConfig(data []byte, format string) (*frost.Config, error) {
 	default:
 		return nil, fmt.Errorf("unsupported import format: %s", format)
 	}
-	
+
 	return &config, nil
 }
 
@@ -401,11 +401,11 @@ func exportToPEM(keyType string, config interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	pem := fmt.Sprintf("-----BEGIN %s-----\n", keyType)
 	pem += hex.EncodeToString(data)
 	pem += fmt.Sprintf("\n-----END %s-----\n", keyType)
-	
+
 	return []byte(pem), nil
 }
 
@@ -422,13 +422,13 @@ func importFromPEM(data []byte, config interface{}) error {
 	start := strings.Index(str, "-----") + 5
 	start = strings.Index(str[start:], "\n") + start + 1
 	end := strings.LastIndex(str, "-----")
-	
+
 	hexData := strings.TrimSpace(str[start:end])
 	jsonData, err := hex.DecodeString(hexData)
 	if err != nil {
 		return err
 	}
-	
+
 	return json.Unmarshal(jsonData, config)
 }
 

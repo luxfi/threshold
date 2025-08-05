@@ -6,9 +6,9 @@ import (
 	"testing/quick"
 
 	"github.com/cronokirby/saferith"
-	"github.com/stretchr/testify/assert"
 	"github.com/luxfi/threshold/pkg/math/sample"
 	"github.com/luxfi/threshold/pkg/pool"
+	"github.com/stretchr/testify/assert"
 )
 
 var (

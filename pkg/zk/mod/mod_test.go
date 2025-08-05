@@ -7,14 +7,14 @@ import (
 
 	"github.com/cronokirby/saferith"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/arith"
 	"github.com/luxfi/threshold/pkg/math/sample"
 	"github.com/luxfi/threshold/pkg/paillier"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/zk"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMod(t *testing.T) {

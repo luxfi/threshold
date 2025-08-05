@@ -103,7 +103,7 @@ func (d *dynamicReshareSession) GetRound() round.Round {
 	// TODO: round.Session doesn't have GetRound method
 	// r := d.Session.GetRound()
 	var r round.Round
-	
+
 	// Check if this is the final round that produces the config
 	if r.Number() == keygen.Rounds {
 		// We need to ensure only new parties are in the final config
@@ -114,7 +114,7 @@ func (d *dynamicReshareSession) GetRound() round.Round {
 			isInNewSet:  d.isInNewSet,
 		}
 	}
-	
+
 	return r
 }
 
@@ -133,8 +133,8 @@ func GenerateShares(config *Config, newParties []party.ID, threshold int) (map[p
 	// This would implement the joint secret sharing for auxiliary values
 	// Used in the 4-step resharing protocol from the LSS paper
 	shares := make(map[party.ID]interface{})
-	
+
 	// Implementation would go here...
-	
+
 	return shares, nil
 }

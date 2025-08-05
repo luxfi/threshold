@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -17,22 +16,23 @@ import (
 	"github.com/luxfi/threshold/protocols/cmp"
 	"github.com/luxfi/threshold/protocols/frost"
 	"github.com/luxfi/threshold/protocols/lss"
+	"github.com/spf13/cobra"
 )
 
 var (
 	// Global flags
-	configDir     string
-	protocolName  string
-	curveType     string
-	networkAddr   string
-	verbose       bool
+	configDir    string
+	protocolName string
+	curveType    string
+	networkAddr  string
+	verbose      bool
 
 	// Protocol options
-	threshold   int
-	parties     int
-	partyID     string
-	outputFile  string
-	inputFile   string
+	threshold  int
+	parties    int
+	partyID    string
+	outputFile string
+	inputFile  string
 
 	// Root command
 	rootCmd = &cobra.Command{
@@ -182,7 +182,7 @@ func init() {
 	importCmd.MarkFlagRequired("input")
 
 	// Add subcommands
-	rootCmd.AddCommand(keygenCmd, signCmd, reshareCmd, verifyCmd, benchCmd, 
+	rootCmd.AddCommand(keygenCmd, signCmd, reshareCmd, verifyCmd, benchCmd,
 		testCmd, simulateCmd, exportCmd, importCmd, infoCmd)
 }
 
@@ -241,7 +241,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 	defer pl.TearDown()
 
 	var config interface{}
-	
+
 	switch protocolName {
 	case "lss":
 		config, err = runLSSKeygen(group, partyIDs[ourIndex], partyIDs, threshold, pl, network)
@@ -272,7 +272,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Key generation complete. Config saved to: %s\n", outputFile)
-	
+
 	// Display public key
 	switch c := config.(type) {
 	case *lss.Config:
@@ -336,35 +336,35 @@ func runSign(cmd *cobra.Command, args []string) error {
 	defer pl.TearDown()
 
 	var signature interface{}
-	
+
 	switch protocolName {
 	case "lss":
 		var config lss.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal LSS config: %w", err)
 		}
-		
+
 		network := test.NewNetwork(signers)
 		signature, err = runLSSSign(&config, signers, message, pl, network)
-		
+
 	case "cmp":
 		var config cmp.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal CMP config: %w", err)
 		}
-		
+
 		network := test.NewNetwork(signers)
 		signature, err = runCMPSign(&config, signers, message, pl, network)
-		
+
 	case "frost":
 		var config frost.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal FROST config: %w", err)
 		}
-		
+
 		network := test.NewNetwork(signers)
 		signature, err = runFROSTSign(&config, signers, message, pl, network)
-		
+
 	default:
 		return fmt.Errorf("unknown protocol: %s", protocolName)
 	}
@@ -401,7 +401,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	// Get parameters
 	addParties, _ := cmd.Flags().GetStringSlice("add-parties")
 	removeParties, _ := cmd.Flags().GetStringSlice("remove-parties")
-	
+
 	if threshold == 0 && len(addParties) == 0 && len(removeParties) == 0 {
 		return fmt.Errorf("must specify new threshold, parties to add, or parties to remove")
 	}
@@ -452,7 +452,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Resharing complete. New config saved to: %s\n", outputFile)
 	fmt.Printf("New threshold: %d, Total parties: %d\n", newConfig.Threshold, len(newConfig.PartyIDs))
-	
+
 	return nil
 }
 
@@ -520,7 +520,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Running %s benchmarks for %s protocol...\n", operation, protocolName)
 	fmt.Printf("Iterations: %d\n", iterations)
-	
+
 	if enableProfile {
 		// Setup CPU profiling
 		fmt.Println("CPU profiling enabled")
@@ -623,7 +623,7 @@ func runSimulation(cmd *cobra.Command, args []string) error {
 
 func runExport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
-	
+
 	// Load config
 	configData, err := ioutil.ReadFile(inputFile)
 	if err != nil {
@@ -631,7 +631,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 	}
 
 	var exported []byte
-	
+
 	switch protocolName {
 	case "lss":
 		var config lss.Config
@@ -674,7 +674,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 
 func runImport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
-	
+
 	// Read input file
 	data, err := ioutil.ReadFile(inputFile)
 	if err != nil {
@@ -682,7 +682,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	var config interface{}
-	
+
 	switch protocolName {
 	case "lss":
 		config, err = importLSSConfig(data, format)
@@ -718,17 +718,17 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 func runInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Threshold Signature CLI v1.0.0\n\n")
-	
+
 	fmt.Printf("Supported Protocols:\n")
 	fmt.Printf("  - LSS (Lindell-Shamir-Shmalo): Dynamic resharing, ECDSA signatures\n")
 	fmt.Printf("  - CMP (CGG21): State-of-the-art ECDSA threshold signatures\n")
 	fmt.Printf("  - FROST: Flexible Round-Optimized Schnorr Threshold signatures\n\n")
-	
+
 	fmt.Printf("Supported Curves:\n")
 	fmt.Printf("  - secp256k1: Bitcoin/Ethereum compatible\n")
 	fmt.Printf("  - p256: NIST P-256\n")
 	fmt.Printf("  - ed25519: EdDSA signatures (FROST only)\n\n")
-	
+
 	fmt.Printf("Features:\n")
 	fmt.Printf("  - Key generation with configurable threshold\n")
 	fmt.Printf("  - Threshold signing\n")
@@ -738,13 +738,13 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  - Comprehensive testing\n")
 	fmt.Printf("  - Protocol simulation\n")
 	fmt.Printf("  - Key import/export\n\n")
-	
+
 	if verbose {
 		fmt.Printf("Configuration Directory: %s\n", configDir)
 		fmt.Printf("Current Protocol: %s\n", protocolName)
 		fmt.Printf("Current Curve: %s\n", curveType)
 	}
-	
+
 	return nil
 }
 
