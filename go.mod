@@ -1,8 +1,6 @@
 module github.com/luxfi/threshold
 
-go 1.23.0
-
-toolchain go1.24.5
+go 1.24.5
 
 require (
 	github.com/cronokirby/saferith v0.33.0
