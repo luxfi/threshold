@@ -1,12 +1,9 @@
 package zk
 
 import (
-	"fmt"
-
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/pkg/paillier"
 	"github.com/luxfi/threshold/pkg/pedersen"
-	"github.com/luxfi/threshold/pkg/pool"
 )
 
 var (
@@ -16,27 +13,6 @@ var (
 	VerifierPaillierSecret *paillier.SecretKey
 	Pedersen               *pedersen.Parameters
 )
-
-func generate() {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
-
-	sk1 := paillier.NewSecretKey(pl)
-	sk2 := paillier.NewSecretKey(pl)
-	fmt.Printf("p1, _ := new(saferith.Nat).SetHex(\"%s\")\n", sk1.P().Hex())
-	fmt.Printf("q1, _ := new(saferith.Nat).SetHex(\"%s\")\n", sk1.Q().Hex())
-	fmt.Printf("p2, _ := new(saferith.Nat).SetHex(\"%s\")\n", sk2.P().Hex())
-	fmt.Printf("q2, _ := new(saferith.Nat).SetHex(\"%s\")\n", sk2.Q().Hex())
-
-	fmt.Println("ProverPaillierSecret = paillier.NewSecretKeyFromPrimes(p1, q1)")
-	fmt.Println("VerifierPaillierSecret = paillier.NewSecretKeyFromPrimes(p2, q2)")
-	fmt.Println("ProverPaillierPublic = ProverPaillierSecret.PublicKey")
-	fmt.Println("VerifierPaillierPublic = VerifierPaillierSecret.PublicKey")
-	ped, _ := sk2.GeneratePedersen()
-	fmt.Printf("s, _ := new(saferith.Nat).SetHex(\"%s\")\n", ped.S().Hex())
-	fmt.Printf("t, _ := new(saferith.Nat).SetHex(\"%s\")\n", ped.T().Hex())
-	fmt.Println("Pedersen, _ = pedersen.New(VerifierPaillierPublic.N(), s, t)")
-}
 
 func init() {
 	p1, _ := new(saferith.Nat).SetHex("F6BECB15713344353E6457D6E787478B249D49AE7843CC883028611F3AAD341342E189995C060115AD2CF1B16D06254755CF6BD79E9C965B425307A2749BC7E1271FE2486327D94376E5EB25F713C61E2E5C8145C55368522EF7B67F095CE9D256430773B3179B3F3C53FDD5DA24AC84D0B38B8C42C13C020A6177FFA400FAB3")

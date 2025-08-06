@@ -86,7 +86,7 @@ const SignatureLen = 64
 type Signature []byte
 
 // signatureCounter is an atomic counter used to add some fault
-// resistance in case we don't use a source of randomness for Sign
+// resistance in case we don't use a source of randomness for Sign.
 var signatureCounter uint64
 
 // Sign uses a secret key to create a new signature.

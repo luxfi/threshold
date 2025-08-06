@@ -82,10 +82,7 @@ func (p *Proof) Verify(hash *hash.Hash, public Public) bool {
 	lhs := NSquared.Exp(p.Z, public.N.N().Nat())
 	rhs := NSquared.ExpI(public.R, e)
 	rhs.ModMul(rhs, p.A, NSquared.Modulus)
-	if lhs.Eq(rhs) != 1 {
-		return false
-	}
-	return true
+	return lhs.Eq(rhs) == 1
 }
 
 func challenge(hash *hash.Hash, public Public, commitment Commitment) (e *saferith.Int, err error) {
