@@ -7,18 +7,19 @@ import (
 	"sync/atomic"
 )
 
-// searchAlone runs f, which may return nil, until count elements are found
+// searchAlone runs f, which may return nil, until count elements are found.
 func searchAlone(f func() interface{}, count int) []interface{} {
 	results := make([]interface{}, count)
 	for i := 0; i < len(results); i++ {
 		results[i] = nil
-		for ; results[i] == nil; results[i] = f() {
+		for results[i] == nil {
+			results[i] = f()
 		}
 	}
 	return results
 }
 
-// parallelizeAlone calculates the result of f count times
+// parallelizeAlone calculates the result of f count times.
 func parallelizeAlone(f func(int) interface{}, count int) []interface{} {
 	results := make([]interface{}, count)
 	for i := 0; i < len(results); i++ {
@@ -66,7 +67,7 @@ func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int)
 	}
 }
 
-// worker starts up a new worker, listening to commands, and producing results
+// worker starts up a new worker, listening to commands, and producing results.
 func worker(commands <-chan command) {
 	for c := range commands {
 		if c.search {
@@ -145,7 +146,7 @@ func (p *Pool) Search(count int, f func() interface{}) []interface{} {
 		search:     true,
 		ctr:        &ctr,
 		ctrChanged: ctrChanged,
-		f:          func(i int) interface{} { return f() },
+		f:          func(_ int) interface{} { return f() },
 		results:    results,
 		mu:         mu,
 	}
