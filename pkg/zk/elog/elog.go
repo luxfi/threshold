@@ -53,7 +53,7 @@ type Proof struct {
 	U curve.Scalar
 }
 
-func (p *Proof) IsValid(public Public) bool {
+func (p *Proof) IsValid(_ Public) bool {
 	if p == nil {
 		return false
 	}

@@ -194,13 +194,13 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round
-func (r *round2) VerifyMessage(msg round.Message) error {
+func (r *round2) VerifyMessage(_ round.Message) error {
 	// Verify in StoreMessage
 	return nil
 }
 
 // StoreMessage implements round.Round
-func (r *round2) StoreMessage(msg round.Message) error {
+func (r *round2) StoreMessage(_ round.Message) error {
 	// P2P messages received in round 3
 	return nil
 }

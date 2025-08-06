@@ -72,7 +72,7 @@ func (abort2) VerifyMessage(round.Message) error { return nil }
 // StoreMessage implements round.Round.
 func (abort2) StoreMessage(round.Message) error { return nil }
 
-// Finalize implements round.Round
+// Finalize implements round.Round.
 func (r *abort2) Finalize(chan<- *round.Message) (round.Session, error) {
 	var culprits []party.ID
 	for _, j := range r.OtherPartyIDs() {

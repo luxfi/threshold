@@ -37,8 +37,8 @@ type round3 struct {
 
 type broadcast3 struct {
 	round.NormalBroadcastContent
-	// Z_i is the response scalar computed by the sender of this message.
-	Z_i curve.Scalar
+	// ZI is the response scalar computed by the sender of this message.
+	ZI curve.Scalar
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound.
@@ -50,7 +50,7 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 	}
 
 	// check nil
-	if body.Z_i == nil {
+	if body.ZI == nil {
 		return round.ErrNilFields
 	}
 
@@ -68,13 +68,13 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 
 	expected := r.c.Act(r.Lambda[from].Act(r.YShares[from])).Add(r.RShares[from])
 
-	actual := body.Z_i.ActOnBase()
+	actual := body.ZI.ActOnBase()
 
 	if !actual.Equal(expected) {
 		return fmt.Errorf("failed to verify response from %v", from)
 	}
 
-	r.z[from] = body.Z_i
+	r.z[from] = body.ZI
 
 	return nil
 }
@@ -135,7 +135,7 @@ func (broadcast3) RoundNumber() round.Number { return 3 }
 // BroadcastContent implements round.BroadcastRound.
 func (r *round3) BroadcastContent() round.BroadcastContent {
 	return &broadcast3{
-		Z_i: r.Group().NewScalar(),
+		ZI: r.Group().NewScalar(),
 	}
 }
 

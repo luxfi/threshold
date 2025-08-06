@@ -24,14 +24,14 @@ type round3 struct {
 }
 
 type message3 struct {
-	// F_li is the secret share sent from party l to this party.
-	F_li curve.Scalar
+	// FLi is the secret share sent from party l to this party.
+	FLi curve.Scalar
 }
 
 type broadcast3 struct {
 	round.NormalBroadcastContent
-	// C_l is contribution to the chaining key for this party.
-	C_l types.RID
+	// CL is contribution to the chaining key for this party.
+	CL types.RID
 	// Decommitment = uᵢ decommitment bytes
 	Decommitment hash.Decommitment
 }
@@ -44,16 +44,16 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 		return round.ErrInvalidContent
 	}
 
-	if err := body.C_l.Validate(); err != nil {
+	if err := body.CL.Validate(); err != nil {
 		return err
 	}
 
 	// Verify that the commitment to the chain key contribution matches, and then xor
 	// it into the accumulated chain key so far.
-	if !r.HashForID(from).Decommit(r.ChainKeyCommitments[from], body.Decommitment, body.C_l) {
+	if !r.HashForID(from).Decommit(r.ChainKeyCommitments[from], body.Decommitment, body.CL) {
 		return fmt.Errorf("failed to verify chain key commitment")
 	}
-	r.ChainKeys[from] = body.C_l
+	r.ChainKeys[from] = body.CL
 	return nil
 }
 
@@ -65,7 +65,7 @@ func (r *round3) VerifyMessage(msg round.Message) error {
 	}
 
 	// check nil
-	if body.F_li == nil {
+	if body.FLi == nil {
 		return round.ErrNilFields
 	}
 
@@ -85,13 +85,13 @@ func (r *round3) StoreMessage(msg round.Message) error {
 	//   fₗ(i) * G =? ∑ₖ₌₀ᵗ (iᵏ mod q) * ϕₗₖ
 	//
 	// aborting if the check fails."
-	expected := body.F_li.ActOnBase()
+	expected := body.FLi.ActOnBase()
 	actual := r.Phi[from].Evaluate(r.SelfID().Scalar(r.Group()))
 	if !expected.Equal(actual) {
 		return fmt.Errorf("VSS failed to validate")
 	}
 
-	r.shareFrom[from] = body.F_li
+	r.shareFrom[from] = body.FLi
 
 	return nil
 }
@@ -108,8 +108,8 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	// 3. "Each P_i calculates their long-lived private signing share by computing
 	// sᵢ = ∑ₗ₌₁ⁿ fₗ(i), stores s_i securely, and deletes each fₗ(i)"
 
-	for l, f_li := range r.shareFrom {
-		r.privateShare.Add(f_li)
+	for l, fLi := range r.shareFrom {
+		r.privateShare.Add(fLi)
 		// TODO: Maybe actually clear this in a better way
 		delete(r.shareFrom, l)
 	}
@@ -120,15 +120,15 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	//
 	// Yᵢ = ∑ⱼ₌₁ⁿ ∑ₖ₌₀ᵗ (iᵏ mod q) * ϕⱼₖ."
 
-	for _, phi_j := range r.Phi {
-		r.publicKey = r.publicKey.Add(phi_j.Constant())
+	for _, phiJ := range r.Phi {
+		r.publicKey = r.publicKey.Add(phiJ.Constant())
 	}
 
 	// This accomplishes the same sum as in the paper, by first summing
 	// together the exponent coefficients, and then evaluating.
 	exponents := make([]*polynomial.Exponent, 0, r.PartyIDs().Len())
-	for _, phi_j := range r.Phi {
-		exponents = append(exponents, phi_j)
+	for _, phiJ := range r.Phi {
+		exponents = append(exponents, phiJ)
 	}
 	verificationExponent, err := polynomial.Sum(exponents)
 	if err != nil {
@@ -150,8 +150,8 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		YSecp := r.publicKey.(*curve.Secp256k1Point)
 		if !YSecp.HasEvenY() {
 			r.privateShare.Negate()
-			for i, y_i := range r.verificationShares {
-				r.verificationShares[i] = y_i.Negate()
+			for i, yI := range r.verificationShares {
+				r.verificationShares[i] = yI.Negate()
 			}
 		}
 		secpVerificationShares := make(map[party.ID]*curve.Secp256k1Point)
@@ -182,7 +182,7 @@ func (message3) RoundNumber() round.Number { return 3 }
 // MessageContent implements round.Round.
 func (r *round3) MessageContent() round.Content {
 	return &message3{
-		F_li: r.Group().NewScalar(),
+		FLi: r.Group().NewScalar(),
 	}
 }
 
