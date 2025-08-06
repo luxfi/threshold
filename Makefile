@@ -29,7 +29,10 @@ PACKAGES=$(shell go list ./... | grep -v /vendor/)
 INTEGRATION_PACKAGES=./protocols/...
 
 # Default target
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := default
+
+## default: Build and run tests
+default: build test
 
 ## help: Show this help message
 help:
