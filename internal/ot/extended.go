@@ -96,7 +96,7 @@ func ExtendedOTSend(ctxHash *hash.Hash, setup *CorreOTSendSetup, batchSize int, 
 	}
 
 	for i := 0; i < params.OTParam; i++ {
-		ctxHash.WriteAny(correResult._U[i])
+		_ = ctxHash.WriteAny(correResult._U[i])
 	}
 
 	chi := make([][params.OTBytes]byte, inflatedBatchSize)
@@ -124,17 +124,17 @@ func ExtendedOTSend(ctxHash *hash.Hash, setup *CorreOTSendSetup, batchSize int, 
 		binary.BigEndian.PutUint32(ctr, uint32(i))
 
 		hasher.Reset()
-		hasher.Write(ctr)
-		hasher.Write(correResult._Q[i][:])
-		hasher.Digest().Read(V0[i][:])
+		_, _ = hasher.Write(ctr)
+		_, _ = hasher.Write(correResult._Q[i][:])
+		_, _ = hasher.Digest().Read(V0[i][:])
 
 		for j := 0; j < params.OTBytes; j++ {
 			correResult._Q[i][j] ^= setup._Delta[j]
 		}
 		hasher.Reset()
-		hasher.Write(ctr)
-		hasher.Write(correResult._Q[i][:])
-		hasher.Digest().Read(V1[i][:])
+		_, _ = hasher.Write(ctr)
+		_, _ = hasher.Write(correResult._Q[i][:])
+		_, _ = hasher.Digest().Read(V1[i][:])
 	}
 
 	return &ExtendedOTSendResult{_V0: V0, _V1: V1}, nil
@@ -171,7 +171,7 @@ func ExtendedOTReceive(ctxHash *hash.Hash, setup *CorreOTReceiveSetup, choices [
 	correMsg, correResult := CorreOTReceive(ctxHash, setup, extraChoices)
 
 	for i := 0; i < params.OTParam; i++ {
-		ctxHash.WriteAny(correMsg.U[i])
+		_ = ctxHash.WriteAny(correMsg.U[i])
 	}
 	outMsg := new(ExtendedOTReceiveMessage)
 	outMsg.CorreMsg = correMsg

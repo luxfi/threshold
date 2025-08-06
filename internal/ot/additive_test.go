@@ -78,6 +78,6 @@ func BenchmarkAdditiveOT(b *testing.B) {
 	_, _ = rand.Read(choices)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		runAdditiveOT(hash.New(), choices, alpha, sendSetup, receiveSetup)
+		_, _ = runAdditiveOT(hash.New(), choices, alpha, sendSetup, receiveSetup)
 	}
 }
