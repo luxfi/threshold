@@ -147,6 +147,9 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// RID = ⊕ⱼ RIDⱼ
 	rid := types.EmptyRID()
 	for _, j := range r.PartyIDs() {
+		if r.RIDs[j] == nil {
+			return r, fmt.Errorf("missing RID for party %s", j)
+		}
 		rid.XOR(r.RIDs[j])
 	}
 
