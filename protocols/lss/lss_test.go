@@ -459,8 +459,11 @@ func TestLSSConfigVerification(t *testing.T) {
 // TestLSSCompatibility tests config compatibility checking
 func TestLSSCompatibility(t *testing.T) {
 	group := curve.Secp256k1{}
-	pk1 := group.NewPoint()
-	pk2 := group.NewPoint()
+	// Create distinct public keys
+	scalar1 := sample.Scalar(rand.Reader, group)
+	pk1 := scalar1.ActOnBase()
+	scalar2 := sample.Scalar(rand.Reader, group)
+	pk2 := scalar2.ActOnBase()
 
 	config1 := &Config{
 		PublicKey:  pk1,

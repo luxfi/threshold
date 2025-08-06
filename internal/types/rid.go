@@ -12,7 +12,7 @@ import (
 // It can be easily XOR'ed with other RID. An empty slice is considered invalid.
 type RID []byte
 
-// EmptyRID returns a zeroed-out RID with
+// EmptyRID returns a zeroed-out RID with the security parameter size.
 func EmptyRID() RID {
 	return make(RID, params.SecBytes)
 }
