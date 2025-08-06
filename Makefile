@@ -21,7 +21,8 @@ LDFLAGS=-ldflags "-s -w"
 BUILDFLAGS=-v
 
 # Test flags
-TESTFLAGS=-v -race -coverprofile=coverage.out -covermode=atomic
+TESTFLAGS=-v -coverprofile=coverage.out -covermode=atomic -timeout=60s
+TESTFLAGS_RACE=-v -race -coverprofile=coverage.out -covermode=atomic -timeout=120s
 BENCHFLAGS=-bench=. -benchmem -benchtime=10s
 
 # Package lists
@@ -83,6 +84,10 @@ test:
 ## test-short: Run short tests
 test-short:
 	$(GOTEST) -short $(PACKAGES)
+
+## test-race: Run tests with race detection (may timeout on some tests)
+test-race:
+	$(GOTEST) $(TESTFLAGS_RACE) $(PACKAGES)
 
 ## test-unit: Run unit tests only
 test-unit:
