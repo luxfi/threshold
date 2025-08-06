@@ -13,7 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/protocol"
 )
 
-// Config represents the configuration for an LSS party
+// Config represents the configuration for an LSS party.
 type Config struct {
 	ID           party.ID
 	Group        curve.Curve
@@ -25,7 +25,7 @@ type Config struct {
 	PartyIDs     []party.ID
 }
 
-// Start initiates the resharing protocol
+// Start initiates the resharing protocol.
 func Start(info round.Info, pl *pool.Pool, oldConfig *Config, newParties []party.ID) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
 		helper, err := round.NewSession(info, sessionID, pl)
@@ -54,7 +54,7 @@ func Start(info round.Info, pl *pool.Pool, oldConfig *Config, newParties []party
 	}
 }
 
-// round1 initiates resharing
+// round1 initiates resharing.
 type round1 struct {
 	*round.Helper
 
@@ -211,13 +211,13 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round
-func (r *round2) VerifyMessage(msg round.Message) error {
+func (r *round2) VerifyMessage(_ round.Message) error {
 	// Verify in StoreMessage
 	return nil
 }
 
 // StoreMessage implements round.Round
-func (r *round2) StoreMessage(msg round.Message) error {
+func (r *round2) StoreMessage(_ round.Message) error {
 	// P2P messages received in round 3
 	return nil
 }
@@ -280,7 +280,7 @@ func (r *round3) BroadcastContent() round.BroadcastContent {
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound
-func (r *round3) StoreBroadcastMessage(msg round.Message) error {
+func (r *round3) StoreBroadcastMessage(_ round.Message) error {
 	// No broadcast messages in round 3
 	return nil
 }
