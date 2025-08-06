@@ -169,11 +169,7 @@ func (p *Proof) Verify(hash *hash.Hash, public Public) bool {
 		}
 	}
 
-	if !public.Aux.Verify(p.Z1, p.Z3, e, p.T, p.S) {
-		return false
-	}
-
-	return true
+	return public.Aux.Verify(p.Z1, p.Z3, e, p.T, p.S)
 }
 
 func challenge(hash *hash.Hash, group curve.Curve, public Public, commitment *Commitment) (e *saferith.Int, err error) {

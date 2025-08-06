@@ -49,16 +49,16 @@ func TestCorreOTSetup(t *testing.T) {
 		}
 		for i := 0; i < params.OTParam; i++ {
 			// This should only fail with negligeable probability normally
-			if bytes.Equal(receiveSetup._K_0[i][:], receiveSetup._K_1[i][:]) {
+			if bytes.Equal(receiveSetup._K0[i][:], receiveSetup._K1[i][:]) {
 				t.Error("K_0[i] == K_1[i]")
 			}
-			choice := bitAt(i, sendSetup._Delta[:]) == 1
-			array := receiveSetup._K_0[i][:]
+			choice := bitAt(i, sendSetup.Delta[:]) == 1
+			array := receiveSetup._K0[i][:]
 			if choice {
-				array = receiveSetup._K_1[i][:]
+				array = receiveSetup._K1[i][:]
 			}
-			if !bytes.Equal(sendSetup._K_Delta[i][:], array) {
-				t.Error("K_Delta doesn't match")
+			if !bytes.Equal(sendSetup._KDelta[i][:], array) {
+				t.Error("KDelta doesn't match")
 			}
 		}
 	}
@@ -96,7 +96,7 @@ func TestCorreOT(t *testing.T) {
 			copy(expected, receiveResult._T[i][:])
 			if choice {
 				for j := 0; j < params.OTBytes; j++ {
-					expected[j] ^= sendSetup._Delta[j]
+					expected[j] ^= sendSetup.Delta[j]
 				}
 			}
 			actual := sendResult._Q[i][:]

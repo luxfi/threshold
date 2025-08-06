@@ -33,7 +33,7 @@ func (r *sign1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		Sigma: SigmaShare,
 	})
 	if err != nil {
-		return r, err.(error)
+		return r, err
 	}
 
 	return &sign2{

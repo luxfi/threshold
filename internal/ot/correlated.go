@@ -15,10 +15,10 @@ import (
 // CorreOTSendSetup contains the results of the Sender's setup of a Correlated OT.
 type CorreOTSendSetup struct {
 	// The choice bits of the correlation.
-	_Delta [params.OTBytes]byte
+	Delta [params.OTBytes]byte
 	// Each column of this matrix is taken from one of the Receiver's corresponding
 	// columns, based on the corresponding bit of Delta.
-	_K_Delta [params.OTParam][params.OTBytes]byte
+	_KDelta [params.OTParam][params.OTBytes]byte
 }
 
 // CorreOTSetupSender contains all of the state to run the Sender's setup of a Correlated OT.
@@ -32,7 +32,7 @@ type CorreOTSetupSender struct {
 	// The setup which can be used for the different Random OTs.
 	setup *RandomOTReceiveSetup
 	// The correlation vector, sampled at random.
-	_Delta [params.OTBytes]byte
+	Delta [params.OTBytes]byte
 	// We do multiple Random OTs, and each of them needs a receiver.
 	randomOTReceivers [params.OTParam]RandomOTReceiever
 }
@@ -58,14 +58,14 @@ func (r *CorreOTSetupSender) Round1(msg *CorreOTSetupReceiveRound1Message) (*Cor
 		return nil, err
 	}
 
-	_, _ = rand.Read(r._Delta[:])
+	_, _ = rand.Read(r.Delta[:])
 
 	randomOTNonces := r.hash.Fork(&hash.BytesWithDomain{
 		TheDomain: "CorreOT Random OT Nonces",
 		Bytes:     nil,
 	}).Digest()
 	for i := 0; i < params.OTParam; i++ {
-		choice := saferith.Choice(bitAt(i, r._Delta[:]))
+		choice := saferith.Choice(bitAt(i, r.Delta[:]))
 		nonce := make([]byte, 32)
 		_, _ = randomOTNonces.Read(nonce)
 		r.randomOTReceivers[i] = NewRandomOTReceiver(nonce, r.setup, choice)
@@ -103,10 +103,10 @@ func (r *CorreOTSetupSender) Round2(msg *CorreOTSetupReceiveRound2Message) *Corr
 // Round2 executes the Sender's final round of the Correlated OT setup.
 func (r *CorreOTSetupSender) Round3(msg *CorreOTSetupReceiveRound3Message) (*CorreOTSendSetup, error) {
 	setup := new(CorreOTSendSetup)
-	setup._Delta = r._Delta
+	setup.Delta = r.Delta
 	var err error
 	for i := 0; i < params.OTParam; i++ {
-		setup._K_Delta[i], err = r.randomOTReceivers[i].Round3(&msg.Msgs[i])
+		setup._KDelta[i], err = r.randomOTReceivers[i].Round3(&msg.Msgs[i])
 		if err != nil {
 			return nil, err
 		}
@@ -119,8 +119,8 @@ func (r *CorreOTSetupSender) Round3(msg *CorreOTSetupReceiveRound3Message) (*Cor
 // The Receiver gets two random matrices, and they know that the Sender has a
 // striping of their columns, based on their correlation vector.
 type CorreOTReceiveSetup struct {
-	_K_0 [params.OTParam][params.OTBytes]byte
-	_K_1 [params.OTParam][params.OTBytes]byte
+	_K0 [params.OTParam][params.OTBytes]byte
+	_K1 [params.OTParam][params.OTBytes]byte
 }
 
 // CorreOTSetupReceiver holds the Receiver's state on a Correlated OT Setup.
@@ -210,8 +210,8 @@ func (r *CorreOTSetupReceiver) Round3(msg *CorreOTSetupSendRound2Message) (*Corr
 			return nil, nil, err
 		}
 		outMsg.Msgs[i] = msgsi
-		setup._K_0[i] = resultsi.Rand0
-		setup._K_1[i] = resultsi.Rand1
+		setup._K0[i] = resultsi.Rand0
+		setup._K1[i] = resultsi.Rand1
 	}
 	return outMsg, setup, nil
 }
@@ -264,11 +264,11 @@ func CorreOTSend(ctxHash *hash.Hash, setup *CorreOTSendSetup, batchSize int, msg
 
 		// Set Q to TDelta initially
 		prg.Reset()
-		_, _ = prg.Write(setup._K_Delta[i][:])
+		_, _ = prg.Write(setup._KDelta[i][:])
 		Q[i] = make([]byte, batchSizeBytes)
 		_, _ = prg.Digest().Read(Q[i])
 
-		mask := -bitAt(i, setup._Delta[:])
+		mask := -bitAt(i, setup.Delta[:])
 		for j := 0; j < batchSizeBytes; j++ {
 			Q[i][j] ^= mask & msg.U[i][j]
 		}
@@ -310,12 +310,12 @@ func CorreOTReceive(ctxHash *hash.Hash, setup *CorreOTReceiveSetup, choices []by
 	var T0, T1 [params.OTParam][]byte
 	for i := 0; i < params.OTParam; i++ {
 		prg.Reset()
-		_, _ = prg.Write(setup._K_0[i][:])
+		_, _ = prg.Write(setup._K0[i][:])
 		T0[i] = make([]byte, batchSizeBytes)
 		_, _ = prg.Digest().Read(T0[i])
 
 		prg.Reset()
-		_, _ = prg.Write(setup._K_1[i][:])
+		_, _ = prg.Write(setup._K1[i][:])
 		T1[i] = make([]byte, batchSizeBytes)
 		_, _ = prg.Digest().Read(T1[i])
 

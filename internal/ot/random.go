@@ -91,7 +91,7 @@ type RandomOTReceiever struct {
 	// The challenge sent to use by the sender.
 	receivedChallenge [params.OTBytes]byte
 	// H(H(randChoice)), used to avoid redundant calculations.
-	hh_randChoice [params.OTBytes]byte
+	hhRandChoice [params.OTBytes]byte
 }
 
 // NewRandomOTReceiver sets up the receiver's state for a single Random OT.
@@ -169,7 +169,7 @@ func (r *RandomOTReceiever) Round2(msg *RandomOTSendRound1Message) (outMsg Rando
 	_, _ = r.hash.Write(outMsg.Response[:])
 	_, _ = r.hash.Digest().Read(outMsg.Response[:])
 
-	copy(r.hh_randChoice[:], outMsg.Response[:])
+	copy(r.hhRandChoice[:], outMsg.Response[:])
 
 	mask := -byte(r.choice)
 	for i := 0; i < len(msg.Challenge); i++ {
@@ -183,17 +183,17 @@ func (r *RandomOTReceiever) Round2(msg *RandomOTSendRound1Message) (outMsg Rando
 //
 // The random choice is returned as the first argument, upon success.
 func (r *RandomOTReceiever) Round3(msg *RandomOTSendRound2Message) ([params.OTBytes]byte, error) {
-	var actualChallenge, h_decommit0, h_decommit1 [params.OTBytes]byte
+	var actualChallenge, hDecommit0, hDecommit1 [params.OTBytes]byte
 	r.hash.Reset()
 	_, _ = r.hash.Write(msg.Decommit0[:])
-	_, _ = r.hash.Digest().Read(h_decommit0[:])
+	_, _ = r.hash.Digest().Read(hDecommit0[:])
 
 	r.hash.Reset()
 	_, _ = r.hash.Write(msg.Decommit1[:])
-	_, _ = r.hash.Digest().Read(h_decommit1[:])
+	_, _ = r.hash.Digest().Read(hDecommit1[:])
 
 	for i := 0; i < params.OTBytes; i++ {
-		actualChallenge[i] = h_decommit0[i] ^ h_decommit1[i]
+		actualChallenge[i] = hDecommit0[i] ^ hDecommit1[i]
 	}
 
 	if subtle.ConstantTimeCompare(r.receivedChallenge[:], actualChallenge[:]) != 1 {
@@ -201,12 +201,12 @@ func (r *RandomOTReceiever) Round3(msg *RandomOTSendRound2Message) ([params.OTBy
 	}
 
 	// Assign the decommitment hash to the one matching our own choice
-	h_decommitChoice := h_decommit0
+	hDecommitChoice := hDecommit0
 	mask := -byte(r.choice)
 	for i := 0; i < params.OTBytes; i++ {
-		h_decommitChoice[i] ^= mask & (h_decommitChoice[i] ^ h_decommit1[i])
+		hDecommitChoice[i] ^= mask & (hDecommitChoice[i] ^ hDecommit1[i])
 	}
-	if subtle.ConstantTimeCompare(h_decommitChoice[:], r.hh_randChoice[:]) != 1 {
+	if subtle.ConstantTimeCompare(hDecommitChoice[:], r.hhRandChoice[:]) != 1 {
 		return r.randChoice, fmt.Errorf("RandomOTReceive Round 3: incorrect decommitment")
 	}
 
@@ -230,7 +230,7 @@ type RandomOTSender struct {
 	decommit0 [params.OTBytes]byte
 	decommit1 [params.OTBytes]byte
 
-	h_decommit0 [params.OTBytes]byte
+	hDecommit0 [params.OTBytes]byte
 }
 
 // NewRandomOTSender sets up the receiver's state for a single Random OT.
@@ -295,14 +295,14 @@ func (r *RandomOTSender) Round1(msg *RandomOTReceiveRound1Message) (outMsg Rando
 
 	r.hash.Reset()
 	_, _ = r.hash.Write(r.decommit0[:])
-	_, _ = r.hash.Digest().Read(r.h_decommit0[:])
+	_, _ = r.hash.Digest().Read(r.hDecommit0[:])
 
 	r.hash.Reset()
 	_, _ = r.hash.Write(r.decommit1[:])
 	_, _ = r.hash.Digest().Read(outMsg.Challenge[:])
 
 	for i := 0; i < params.OTBytes; i++ {
-		outMsg.Challenge[i] ^= r.h_decommit0[i]
+		outMsg.Challenge[i] ^= r.hDecommit0[i]
 	}
 
 	return
@@ -326,7 +326,7 @@ type RandomOTSendResult struct {
 
 // Round2 executes the sender's side of round 2 in a Random OT.
 func (r *RandomOTSender) Round2(msg *RandomOTReceiveRound2Message) (outMsg RandomOTSendRound2Message, res RandomOTSendResult, err error) {
-	if subtle.ConstantTimeCompare(msg.Response[:], r.h_decommit0[:]) != 1 {
+	if subtle.ConstantTimeCompare(msg.Response[:], r.hDecommit0[:]) != 1 {
 		return outMsg, res, fmt.Errorf("RandomOTSender Round2: invalid response")
 	}
 

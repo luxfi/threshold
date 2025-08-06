@@ -62,7 +62,7 @@ func TestRoundFail(t *testing.T) {
 						r.DeltaShares[r.SelfID()] = r.Group().NewScalar().Set(r.DeltaShares[r.SelfID()]).Sub(oneScalar)
 					}
 				},
-				BeforeSend: func(rNext round.Session, to party.ID, content round.Content) {
+				BeforeSend: func(rNext round.Session, _ party.ID, content round.Content) {
 					r, okR := rNext.(*presign4)
 					c, okC := content.(*broadcast4)
 					if okR || okC {

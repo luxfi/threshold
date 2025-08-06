@@ -54,7 +54,7 @@ func TestDynamicReshare_AddParties(t *testing.T) {
 
 	// Verify new parties can participate in signing
 	messageHash := make([]byte, 32)
-	rand.Read(messageHash)
+	_, _ = rand.Read(messageHash)
 
 	// Select signers including new parties
 	signers := []party.ID{initialParties[0], initialParties[1], newParties[0]}
@@ -99,7 +99,7 @@ func TestDynamicReshare_RemoveParties(t *testing.T) {
 
 	// Verify remaining parties can still sign
 	messageHash := make([]byte, 32)
-	rand.Read(messageHash)
+	_, _ = rand.Read(messageHash)
 
 	signature := runSign(t, resharedConfigs, remainingParties[:newThreshold], messageHash)
 	assert.True(t, signature.Verify(publicKey, messageHash))
@@ -159,7 +159,7 @@ func TestDynamicReshare_ChangeThreshold(t *testing.T) {
 
 	// Verify new threshold is enforced (need 3 parties to sign)
 	messageHash := make([]byte, 32)
-	rand.Read(messageHash)
+	_, _ = rand.Read(messageHash)
 
 	// Try with 2 parties (should fail in real implementation)
 	// Try with 3 parties (should succeed)
@@ -204,7 +204,7 @@ func TestDynamicReshare_MigrateParties(t *testing.T) {
 
 	// Verify mixed old and new parties can sign together
 	messageHash := make([]byte, 32)
-	rand.Read(messageHash)
+	_, _ = rand.Read(messageHash)
 
 	// Mix of old and new parties
 	signers := []party.ID{remainingParties[0], newParties[0], newParties[1]}
