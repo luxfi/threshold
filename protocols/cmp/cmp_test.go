@@ -69,7 +69,7 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 
 func TestCMP(t *testing.T) {
 	// Temporarily skip this test due to timeout issues
-	t.Skip("CMP test temporarily disabled due to timeout issues")
+	// t.Skip("CMP test temporarily disabled due to timeout issues")
 
 	N := 3
 	T := N - 1

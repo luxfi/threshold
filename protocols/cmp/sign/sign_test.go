@@ -15,7 +15,7 @@ import (
 )
 
 func TestRound(t *testing.T) {
-	t.Skip("Temporarily skipping CMP sign test due to data race in saferith library")
+	// t.Skip("Temporarily skipping CMP sign test due to data race in saferith library")
 
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
