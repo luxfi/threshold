@@ -125,6 +125,6 @@ func BenchmarkCorreOT(b *testing.B) {
 	_, _ = rand.Read(choices)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = runCorreOT(hash.New(), choices, sendSetup, receiveSetup)
+		_, _, _ = runCorreOT(hash.New(), choices, sendSetup, receiveSetup)
 	}
 }
