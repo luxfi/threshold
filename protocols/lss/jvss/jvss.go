@@ -100,18 +100,11 @@ func (j *JVSS) CombineShares(shares map[party.ID]*Share) (curve.Scalar, error) {
 	}
 
 	// Use Lagrange interpolation to reconstruct the secret
-	points := make([]curve.Point, 0, len(shares))
-	scalars := make([]curve.Scalar, 0, len(shares))
-
-	for id, share := range shares {
-		x := id.Scalar(j.group)
-		points = append(points, x.ActOnBase())
-		scalars = append(scalars, share.Value)
-	}
-
-	// Interpolate at x=0 to get the secret
 	// For now, just return the first share's value as placeholder
 	// TODO: Implement proper Lagrange interpolation at x=0
+	// When implementing, will need to:
+	// - Collect x values and share values from shares
+	// - Perform Lagrange interpolation at x=0
 	for _, share := range shares {
 		return share.Value, nil
 	}

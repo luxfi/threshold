@@ -11,7 +11,7 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 )
 
-// primes generates an array containing all the odd prime numbers < below
+// primes generates an array containing all the odd prime numbers < below.
 func primes(below uint32) []uint32 {
 	sieve := make([]bool, below)
 	// Initially, all numbers starting from 2 are considered prime

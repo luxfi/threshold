@@ -112,7 +112,7 @@ func BenchmarkCorreOTSetup(b *testing.B) {
 	defer pl.TearDown()
 
 	for i := 0; i < b.N; i++ {
-		runCorreOTSetup(pl, hash.New())
+		_, _, _ = runCorreOTSetup(pl, hash.New())
 	}
 }
 
@@ -125,6 +125,6 @@ func BenchmarkCorreOT(b *testing.B) {
 	_, _ = rand.Read(choices)
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		runCorreOT(hash.New(), choices, sendSetup, receiveSetup)
+		_, _ = runCorreOT(hash.New(), choices, sendSetup, receiveSetup)
 	}
 }
