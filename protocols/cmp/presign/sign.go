@@ -70,7 +70,8 @@ func StartPresign(c *config.Config, signers []party.ID, message []byte, pl *pool
 			// scale public key share
 			ECDSA[j] = lagrange[j].Act(public.ECDSA)
 			ElGamal[j] = public.ElGamal
-			Paillier[j] = public.Paillier
+			// Clone the Paillier public key to avoid race conditions
+			Paillier[j] = public.Paillier.Clone()
 			Pedersen[j] = public.Pedersen
 			PublicKey = PublicKey.Add(ECDSA[j])
 		}
