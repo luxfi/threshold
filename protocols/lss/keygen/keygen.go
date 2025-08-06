@@ -15,7 +15,7 @@ import (
 	"github.com/luxfi/threshold/pkg/protocol"
 )
 
-// Config represents the configuration for an LSS party
+// Config represents the configuration for an LSS party.
 type Config struct {
 	ID           party.ID
 	Group        curve.Curve
@@ -27,7 +27,7 @@ type Config struct {
 	PartyIDs     []party.ID
 }
 
-// Start initiates the LSS key generation protocol
+// Start initiates the LSS key generation protocol.
 func Start(info round.Info, pl *pool.Pool, source []byte) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
 		helper, err := round.NewSession(info, sessionID, pl)
@@ -93,19 +93,19 @@ func (r *round1) Number() round.Number {
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound
-func (r *round1) StoreBroadcastMessage(msg round.Message) error {
+func (r *round1) StoreBroadcastMessage(_ round.Message) error {
 	// No messages to store in round 1
 	return nil
 }
 
 // VerifyMessage implements round.Round
-func (r *round1) VerifyMessage(msg round.Message) error {
+func (r *round1) VerifyMessage(_ round.Message) error {
 	// No P2P messages in round 1
 	return nil
 }
 
 // StoreMessage implements round.Round
-func (r *round1) StoreMessage(msg round.Message) error {
+func (r *round1) StoreMessage(_ round.Message) error {
 	// No P2P messages in round 1
 	return nil
 }
