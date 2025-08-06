@@ -63,7 +63,8 @@ func StartSign(config *config.Config, signers []party.ID, message []byte, pl *po
 			public := config.Public[j]
 			// scale public key share
 			ECDSA[j] = lagrange[j].Act(public.ECDSA)
-			Paillier[j] = public.Paillier
+			// Clone the Paillier public key to avoid race conditions
+			Paillier[j] = public.Paillier.Clone()
 			Pedersen[j] = public.Pedersen
 			PublicKey = PublicKey.Add(ECDSA[j])
 		}
