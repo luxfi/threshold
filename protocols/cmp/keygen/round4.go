@@ -41,7 +41,7 @@ type broadcast4 struct {
 
 // StoreBroadcastMessage implements round.BroadcastRound.
 //
-// - verify Mod, Prm proof for N
+// - verify Mod, Prm proof for N.
 func (r *round4) StoreBroadcastMessage(msg round.Message) error {
 	from := msg.From
 	body, ok := msg.Content.(*broadcast4)

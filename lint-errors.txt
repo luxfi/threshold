@@ -1,0 +1,587 @@
+protocols/integration_test.go:384: 384-418 lines are duplicate of `protocols/integration_test.go:420-453` (dupl)
+func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*lss.Config {
+	var wg sync.WaitGroup
+	wg.Add(len(partyIDs))
+
+	configs := make([]*lss.Config, len(partyIDs))
+	done := make(chan struct{})
+
+	for i, id := range partyIDs {
+		i := i
+		go func(id party.ID) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(id, h, network)
+
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			configs[i] = r.(*lss.Config)
+		}(id)
+	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Success
+	case <-time.After(30 * time.Second):
+		Fail("LSS keygen timed out after 30 seconds")
+	}
+
+	return configs
+}
+protocols/integration_test.go:420: 420-453 lines are duplicate of `protocols/integration_test.go:384-418` (dupl)
+func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*cmp.Config {
+	var wg sync.WaitGroup
+	wg.Add(len(partyIDs))
+
+	configs := make([]*cmp.Config, len(partyIDs))
+	done := make(chan struct{})
+
+	for i, id := range partyIDs {
+		i := i
+		go func(id party.ID) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(id, h, network)
+
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			configs[i] = r.(*cmp.Config)
+		}(id)
+	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Success
+	case <-time.After(30 * time.Second):
+		Fail("CMP keygen timed out after 30 seconds")
+	}
+	return configs
+}
+protocols/integration_test.go:491: 491-512 lines are duplicate of `protocols/integration_test.go:514-535` (dupl)
+func runLSSSign(configs []*lss.Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network) []*ecdsa.Signature {
+	var wg sync.WaitGroup
+	wg.Add(len(configs))
+
+	signatures := make([]*ecdsa.Signature, len(configs))
+	for i, config := range configs {
+		i := i
+		go func(c *lss.Config) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(lss.Sign(c, signers, messageHash, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(c.ID, h, network)
+
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			signatures[i] = r.(*ecdsa.Signature)
+		}(config)
+	}
+
+	wg.Wait()
+	return signatures
+}
+protocols/integration_test.go:514: 514-535 lines are duplicate of `protocols/integration_test.go:491-512` (dupl)
+func runCMPSign(configs []*cmp.Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network) []*ecdsa.Signature {
+	var wg sync.WaitGroup
+	wg.Add(len(configs))
+
+	signatures := make([]*ecdsa.Signature, len(configs))
+	for i, config := range configs {
+		i := i
+		go func(c *cmp.Config) {
+			defer wg.Done()
+			h, err := protocol.NewMultiHandler(cmp.Sign(c, signers, messageHash, pl), nil)
+			Expect(err).NotTo(HaveOccurred())
+			test.HandlerLoop(c.ID, h, network)
+
+			r, err := h.Result()
+			Expect(err).NotTo(HaveOccurred())
+			signatures[i] = r.(*ecdsa.Signature)
+		}(config)
+	}
+
+	wg.Wait()
+	return signatures
+}
+cmd/threshold-cli/tests.go:62: 62-109 lines are duplicate of `cmd/threshold-cli/tests.go:111-158` (dupl)
+func runFunctionalTests(protocolName string) error {
+	fmt.Printf("\n=== Functional Tests for %s ===\n", protocolName)
+
+	tests := []struct {
+		name string
+		test func() error
+	}{
+		{"Basic Signature Generation", func() error {
+			return testBasicSignature(protocolName)
+		}},
+		{"Threshold Properties", func() error {
+			return testThresholdProperties(protocolName)
+		}},
+		{"Edge Cases", func() error {
+			return testEdgeCases(protocolName)
+		}},
+	}
+
+	passed := 0
+	failed := 0
+
+	for _, t := range tests {
+		fmt.Printf("\nRunning: %s\n", t.name)
+
+		start := time.Now()
+		err := t.test()
+		elapsed := time.Since(start)
+
+		if err != nil {
+			fmt.Printf("  ✗ FAILED: %v (%.2fs)\n", err, elapsed.Seconds())
+			failed++
+		} else {
+			fmt.Printf("  ✓ PASSED (%.2fs)\n", elapsed.Seconds())
+			passed++
+		}
+	}
+
+	fmt.Printf("\n=== Summary ===\n")
+	fmt.Printf("Passed: %d\n", passed)
+	fmt.Printf("Failed: %d\n", failed)
+	fmt.Printf("Total:  %d\n", passed+failed)
+
+	if failed > 0 {
+		return fmt.Errorf("%d tests failed", failed)
+	}
+
+	return nil
+}
+cmd/threshold-cli/tests.go:111: 111-158 lines are duplicate of `cmd/threshold-cli/tests.go:62-109` (dupl)
+func runSecurityTests(protocolName string) error {
+	fmt.Printf("\n=== Security Tests for %s ===\n", protocolName)
+
+	tests := []struct {
+		name string
+		test func() error
+	}{
+		{"Threshold Security", func() error {
+			return testThresholdSecurity(protocolName)
+		}},
+		{"Nonce Uniqueness", func() error {
+			return testNonceUniqueness(protocolName)
+		}},
+		{"Message Authentication", func() error {
+			return testMessageAuthentication(protocolName)
+		}},
+	}
+
+	passed := 0
+	failed := 0
+
+	for _, t := range tests {
+		fmt.Printf("\nRunning: %s\n", t.name)
+
+		start := time.Now()
+		err := t.test()
+		elapsed := time.Since(start)
+
+		if err != nil {
+			fmt.Printf("  ✗ FAILED: %v (%.2fs)\n", err, elapsed.Seconds())
+			failed++
+		} else {
+			fmt.Printf("  ✓ PASSED (%.2fs)\n", elapsed.Seconds())
+			passed++
+		}
+	}
+
+	fmt.Printf("\n=== Summary ===\n")
+	fmt.Printf("Passed: %d\n", passed)
+	fmt.Printf("Failed: %d\n", failed)
+	fmt.Printf("Total:  %d\n", passed+failed)
+
+	if failed > 0 {
+		return fmt.Errorf("%d tests failed", failed)
+	}
+
+	return nil
+}
+internal/ot/extended_test.go:64:16: Error return value is not checked (errcheck)
+		runExtendedOT(hash.New(), choices, sendSetup, receiveSetup)
+		             ^
+internal/ot/multiply_test.go:63:14: Error return value is not checked (errcheck)
+		runMultiply(hash.New(), sendSetup, receiveSetup, alpha, beta)
+		           ^
+internal/ot/random_test.go:77:14: Error return value is not checked (errcheck)
+		runRandomOT(true, hash.New())
+		           ^
+cmd/threshold-cli/benchmarks.go:101:13: Error return value of `rand.Read` is not checked (errcheck)
+			rand.Read(message)
+			         ^
+cmd/threshold-cli/main.go:130:28: Error return value of `keygenCmd.MarkFlagRequired` is not checked (errcheck)
+	keygenCmd.MarkFlagRequired("threshold")
+	                          ^
+cmd/threshold-cli/main.go:131:28: Error return value of `keygenCmd.MarkFlagRequired` is not checked (errcheck)
+	keygenCmd.MarkFlagRequired("parties")
+	                          ^
+cmd/threshold-cli/main.go:132:28: Error return value of `keygenCmd.MarkFlagRequired` is not checked (errcheck)
+	keygenCmd.MarkFlagRequired("id")
+	                          ^
+cmd/threshold-cli/main.go:140:26: Error return value of `signCmd.MarkFlagRequired` is not checked (errcheck)
+	signCmd.MarkFlagRequired("input")
+	                        ^
+cmd/threshold-cli/main.go:148:29: Error return value of `reshareCmd.MarkFlagRequired` is not checked (errcheck)
+	reshareCmd.MarkFlagRequired("input")
+	                           ^
+cmd/threshold-cli/main.go:155:28: Error return value of `verifyCmd.MarkFlagRequired` is not checked (errcheck)
+	verifyCmd.MarkFlagRequired("signature")
+	                          ^
+cmd/threshold-cli/main.go:156:28: Error return value of `verifyCmd.MarkFlagRequired` is not checked (errcheck)
+	verifyCmd.MarkFlagRequired("public-key")
+	                          ^
+cmd/threshold-cli/main.go:177:28: Error return value of `exportCmd.MarkFlagRequired` is not checked (errcheck)
+	exportCmd.MarkFlagRequired("input")
+	                          ^
+cmd/threshold-cli/main.go:182:28: Error return value of `importCmd.MarkFlagRequired` is not checked (errcheck)
+	importCmd.MarkFlagRequired("input")
+	                          ^
+cmd/threshold-cli/simulations.go:170:15: Error return value of `rand.Read` is not checked (errcheck)
+					rand.Read(message)
+					         ^
+cmd/threshold-cli/simulations.go:290:11: Error return value of `rand.Read` is not checked (errcheck)
+	rand.Read(message)
+	         ^
+internal/test/round.go:25:1: cognitive complexity 70 of func `Rounds` is high (> 30) (gocognit)
+func Rounds(rounds []round.Session, rule Rule) (error, bool) {
+^
+protocols/lss/reshare/reshare.go:342:1: cognitive complexity 33 of func `(*round3).Finalize` is high (> 30) (gocognit)
+func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
+^
+protocols/cmp/presign/abort_test.go:48:1: cognitive complexity 32 of func `TestRoundFail` is high (> 30) (gocognit)
+func TestRoundFail(t *testing.T) {
+^
+cmd/threshold-cli/benchmarks.go:221:9: string `lss` has 19 occurrences, make it a constant (goconst)
+			case "lss":
+			     ^
+cmd/threshold-cli/protocols.go:285:7: string `json` has 6 occurrences, make it a constant (goconst)
+	case "json":
+	     ^
+cmd/threshold-cli/benchmarks.go:223:9: string `cmp` has 16 occurrences, make it a constant (goconst)
+			case "cmp":
+			     ^
+cmd/threshold-cli/protocols.go:290:7: string `der` has 6 occurrences, make it a constant (goconst)
+	case "der":
+	     ^
+cmd/threshold-cli/benchmarks.go:225:9: string `frost` has 16 occurrences, make it a constant (goconst)
+			case "frost":
+			     ^
+cmd/threshold-cli/protocols.go:287:7: string `pem` has 6 occurrences, make it a constant (goconst)
+	case "pem":
+	     ^
+cmd/threshold-cli/simulations.go:111:8: string `failure` has 3 occurrences, make it a constant (goconst)
+		case "failure":
+		     ^
+pkg/math/polynomial/exponent.go:187:1: receiver-naming: receiver name e should be consistent with previous receiver name p for Exponent (revive)
+func (e *Exponent) UnmarshalBinary(data []byte) error {
+	if e == nil || e.group == nil {
+		return errors.New("can't unmarshal Exponent with no group")
+	}
+	group := e.group
+	size := binary.BigEndian.Uint32(data)
+	e.coefficients = make([]curve.Point, int(size))
+	for i := 0; i < len(e.coefficients); i++ {
+		e.coefficients[i] = group.NewPoint()
+	}
+	rawExponent := rawExponentData{Coefficients: e.coefficients}
+	if err := cbor.Unmarshal(data[4:], &rawExponent); err != nil {
+		return err
+	}
+	e.group = group
+	e.coefficients = rawExponent.Coefficients
+	e.IsConstant = rawExponent.IsConstant
+	return nil
+}
+pkg/math/polynomial/exponent.go:207:1: receiver-naming: receiver name e should be consistent with previous receiver name p for Exponent (revive)
+func (e *Exponent) MarshalBinary() ([]byte, error) {
+	data, err := cbor.Marshal(rawExponentData{
+		IsConstant:   e.IsConstant,
+		Coefficients: e.coefficients,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]byte, 4+len(data))
+	size := len(e.coefficients)
+	binary.BigEndian.PutUint32(out, uint32(size))
+	copy(out[4:], data)
+	return out, nil
+}
+internal/ot/random_test.go:63:9: indent-error-flow: if block ends with a return statement, so drop this else and outdent its block (revive)
+	} else {
+		return bytes.Equal(result.Rand0[:], randChoice)
+	}
+internal/ot/correlated.go:21:2: var-naming: don't use underscores in Go names; struct field _K_Delta should be _KDelta (revive)
+	_K_Delta [params.OTParam][params.OTBytes]byte
+	^
+internal/ot/correlated.go:122:2: var-naming: don't use underscores in Go names; struct field _K_0 should be _K0 (revive)
+	_K_0 [params.OTParam][params.OTBytes]byte
+	^
+internal/ot/correlated.go:123:2: var-naming: don't use underscores in Go names; struct field _K_1 should be _K1 (revive)
+	_K_1 [params.OTParam][params.OTBytes]byte
+	^
+internal/ot/random.go:94:2: var-naming: don't use underscores in Go names; struct field hh_randChoice should be hhRandChoice (revive)
+	hh_randChoice [params.OTBytes]byte
+	^
+internal/ot/random.go:186:23: var-naming: don't use underscores in Go names; var h_decommit0 should be hDecommit0 (revive)
+	var actualChallenge, h_decommit0, h_decommit1 [params.OTBytes]byte
+	                     ^
+internal/ot/random.go:204:2: var-naming: don't use underscores in Go names; var h_decommitChoice should be hDecommitChoice (revive)
+	h_decommitChoice := h_decommit0
+	^
+internal/ot/random.go:233:2: var-naming: don't use underscores in Go names; struct field h_decommit0 should be hDecommit0 (revive)
+	h_decommit0 [params.OTBytes]byte
+	^
+pkg/zk/elog/elog.go:56:25: unused-parameter: parameter 'public' seems to be unused, consider removing or renaming it as _ (revive)
+func (p *Proof) IsValid(public Public) bool {
+                        ^
+protocols/lss/reshare/reshare.go:214:32: unused-parameter: parameter 'msg' seems to be unused, consider removing or renaming it as _ (revive)
+func (r *round2) VerifyMessage(msg round.Message) error {
+                               ^
+protocols/lss/reshare/reshare.go:220:31: unused-parameter: parameter 'msg' seems to be unused, consider removing or renaming it as _ (revive)
+func (r *round2) StoreMessage(msg round.Message) error {
+                              ^
+protocols/lss/reshare/reshare.go:283:40: unused-parameter: parameter 'msg' seems to be unused, consider removing or renaming it as _ (revive)
+func (r *round3) StoreBroadcastMessage(msg round.Message) error {
+                                       ^
+protocols/doerner/keygen/round3S.go:31:28: unused-parameter: parameter 'out' seems to be unused, consider removing or renaming it as _ (revive)
+func (r *round3S) Finalize(out chan<- *round.Message) (round.Session, error) {
+                           ^
+protocols/cmp/reshare/dynamic.go:231:27: unused-parameter: parameter 'out' seems to be unused, consider removing or renaming it as _ (revive)
+func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
+                          ^
+protocols/frost/keygen/round1.go:74:2: var-naming: don't use underscores in Go names; var a_i0 should be aI0 (revive)
+	a_i0 := group.NewScalar()
+	^
+protocols/frost/keygen/round1.go:75:2: var-naming: don't use underscores in Go names; var a_i0_times_G should be aI0TimesG (revive)
+	a_i0_times_G := group.NewPoint()
+	^
+protocols/frost/keygen/round1.go:80:2: var-naming: don't use underscores in Go names; var f_i should be fI (revive)
+	f_i := polynomial.NewPolynomial(r.Group(), r.threshold, a_i0)
+	^
+protocols/frost/keygen/round2.go:22:2: var-naming: don't use underscores in Go names; struct field f_i should be fI (revive)
+	f_i *polynomial.Polynomial
+	^
+protocols/frost/keygen/round3.go:28:2: var-naming: don't use underscores in Go names; struct field F_li should be FLi (revive)
+	F_li curve.Scalar
+	^
+protocols/frost/keygen/round2.go:41:2: var-naming: don't use underscores in Go names; struct field Phi_i should be PhiI (revive)
+	Phi_i *polynomial.Exponent
+	^
+protocols/frost/keygen/round1.go:98:6: var-naming: don't use underscores in Go names; var Sigma_i should be SigmaI (revive)
+	var Sigma_i *zksch.Proof
+	    ^
+protocols/frost/keygen/round2.go:43:2: var-naming: don't use underscores in Go names; struct field Sigma_i should be SigmaI (revive)
+	Sigma_i *sch.Proof
+	^
+protocols/frost/keygen/round3.go:34:2: var-naming: don't use underscores in Go names; struct field C_l should be CL (revive)
+	C_l types.RID
+	^
+protocols/frost/keygen/round1.go:112:2: var-naming: don't use underscores in Go names; var Phi_i should be PhiI (revive)
+	Phi_i := polynomial.NewPolynomialExponent(f_i)
+	^
+protocols/frost/keygen/round1.go:115:2: var-naming: don't use underscores in Go names; var c_i should be cI (revive)
+	c_i, err := types.NewRID(rand.Reader)
+	^
+protocols/frost/keygen/round3.go:111:9: var-naming: don't use underscores in Go names; range var f_li should be fLi (revive)
+	for l, f_li := range r.shareFrom {
+	       ^
+protocols/frost/keygen/round3.go:123:9: var-naming: don't use underscores in Go names; range var phi_j should be phiJ (revive)
+	for _, phi_j := range r.Phi {
+	       ^
+protocols/frost/keygen/round3.go:130:9: var-naming: don't use underscores in Go names; range var phi_j should be phiJ (revive)
+	for _, phi_j := range r.Phi {
+	       ^
+protocols/frost/keygen/round3.go:153:11: var-naming: don't use underscores in Go names; range var y_i should be yI (revive)
+			for i, y_i := range r.verificationShares {
+			       ^
+protocols/lss/lss_property_test.go:18:2: dot-imports: should not use dot imports (revive)
+	. "github.com/onsi/ginkgo/v2"
+	^
+protocols/lss/lss_property_test.go:19:2: dot-imports: should not use dot imports (revive)
+	. "github.com/onsi/gomega"
+	^
+protocols/lss/lss_test.go:543:11: unused-parameter: parameter 'op' seems to be unused, consider removing or renaming it as _ (revive)
+		go func(op int) {
+		        ^
+protocols/lss/lss_property_test.go:394:37: empty-block: this block is empty, you can remove it (revive)
+	if mathrand.Float64() < f.FuzzRate {
+		// Corrupt the message somehow
+		// In real implementation, this would modify message bytes
+	}
+protocols/doerner/sign/round2S.go:33:28: unused-parameter: parameter 'out' seems to be unused, consider removing or renaming it as _ (revive)
+func (r *round2S) Finalize(out chan<- *round.Message) (round.Session, error) {
+                           ^
+protocols/doerner/sign/sign.go:19:94: unused-parameter: parameter 'pl' seems to be unused, consider removing or renaming it as _ (revive)
+func StartSignReceiver(config *keygen.ConfigReceiver, selfID, otherID party.ID, hash []byte, pl *pool.Pool) protocol.StartFunc {
+                                                                                             ^
+protocols/doerner/sign/sign.go:45:90: unused-parameter: parameter 'pl' seems to be unused, consider removing or renaming it as _ (revive)
+func StartSignSender(config *keygen.ConfigSender, selfID, otherID party.ID, hash []byte, pl *pool.Pool) protocol.StartFunc {
+                                                                                         ^
+protocols/cmp/presign/abort_test.go:65:43: unused-parameter: parameter 'to' seems to be unused, consider removing or renaming it as _ (revive)
+				BeforeSend: func(rNext round.Session, to party.ID, content round.Content) {
+				                                      ^
+protocols/frost/sign/round3.go:41:2: var-naming: don't use underscores in Go names; struct field Z_i should be ZI (revive)
+	Z_i curve.Scalar
+	^
+protocols/frost/sign/round3.go:94:9: var-naming: don't use underscores in Go names; range var z_l should be zL (revive)
+	for _, z_l := range r.z {
+	       ^
+protocols/frost/sign/round2.go:30:2: var-naming: don't use underscores in Go names; struct field d_i should be dI (revive)
+	d_i curve.Scalar
+	^
+protocols/frost/sign/round3.go:115:9: indent-error-flow: if block ends with a return statement, so drop this else and outdent its block (revive)
+	} else {
+		sig := Signature{
+			R: r.R,
+			z: z,
+		}
+
+		if !sig.Verify(r.Y, r.M) {
+			return r.AbortRound(fmt.Errorf("generated signature failed to verify")), nil
+		}
+
+		return r.ResultRound(sig), nil
+	}
+protocols/frost/sign/round1.go:45:2: var-naming: don't use underscores in Go names; struct field s_i should be sI (revive)
+	s_i curve.Scalar
+	^
+protocols/frost/sign/round2.go:32:2: var-naming: don't use underscores in Go names; struct field e_i should be eI (revive)
+	e_i curve.Scalar
+	^
+protocols/frost/sign/round1.go:68:2: var-naming: don't use underscores in Go names; var s_iBytes should be sIBytes (revive)
+	s_iBytes, err := r.s_i.MarshalBinary()
+	^
+protocols/frost/sign/round1.go:83:2: var-naming: don't use underscores in Go names; var d_i should be dI (revive)
+	d_i := sample.ScalarUnit(nonceDigest, r.Group())
+	^
+protocols/frost/sign/round2.go:42:2: var-naming: don't use underscores in Go names; struct field D_i should be DI (revive)
+	D_i curve.Point
+	^
+protocols/frost/sign/round2.go:44:2: var-naming: don't use underscores in Go names; struct field E_i should be EI (revive)
+	E_i curve.Point
+	^
+protocols/frost/sign/round1.go:84:2: var-naming: don't use underscores in Go names; var e_i should be eI (revive)
+	e_i := sample.ScalarUnit(nonceDigest, r.Group())
+	^
+pkg/zk/default.go:20:6: func `generate` is unused (unused)
+func generate() {
+     ^
+protocols/cmp/reshare.go:95:6: type `dynamicReshareSession` is unused (unused)
+type dynamicReshareSession struct {
+     ^
+protocols/cmp/reshare.go:102:33: func `(*dynamicReshareSession).GetRound` is unused (unused)
+func (d *dynamicReshareSession) GetRound() round.Round {
+                                ^
+protocols/cmp/reshare.go:122:6: type `finalRoundWrapper` is unused (unused)
+type finalRoundWrapper struct {
+     ^
+internal/round/session.go:24:1: Comment should end in a period (godot)
+// Session represents the current execution of a round-based protocol.
+^
+pkg/protocol/message.go:65:1: Comment should end in a period (godot)
+// marshallableMessage is a copy of message for the purpose of cbor marshalling.
+^
+protocols/lss/keygen/keygen.go:69:1: Comment should end in a period (godot)
+// round1 is the first round of key generation
+^
+protocols/lss/jvss/jvss.go:104:3: protocols/lss/jvss/jvss.go:104: Line contains TODO/BUG/FIXME: "TODO: Implement proper Lagrange interpol..." (godox)
+	// TODO: Implement proper Lagrange interpolation at x=0
+	 ^
+protocols/lss/jvss/jvss.go:117:3: protocols/lss/jvss/jvss.go:117: Line contains TODO/BUG/FIXME: "TODO: Implement proper Pedersen commitme..." (godox)
+	// TODO: Implement proper Pedersen commitment access to polynomial coefficients
+	 ^
+protocols/lss/jvss/jvss.go:127:4: protocols/lss/jvss/jvss.go:127: Line contains TODO/BUG/FIXME: "TODO: Implement proper Pedersen commitme..." (godox)
+		// TODO: Implement proper Pedersen commitment with h generator
+		 ^
+internal/ot/correlated.go:223:3: internal/ot/correlated.go:223: Line contains TODO/BUG/FIXME: "TODO: Make this faster" (godox)
+	// TODO: Make this faster
+	 ^
+pkg/math/polynomial/exponent.go:183:3: pkg/math/polynomial/exponent.go:183: Line contains TODO/BUG/FIXME: "TODO create custom marshaller" (godox)
+	// TODO create custom marshaller
+	 ^
+pkg/math/sample/sample.go:84:3: pkg/math/sample/sample.go:84: Line contains TODO/BUG/FIXME: "TODO SPEED" (godox)
+	// TODO SPEED
+	 ^
+pkg/paillier/secret.go:67:3: pkg/paillier/secret.go:67: Line contains TODO/BUG/FIXME: "TODO maybe we could take the reader as a..." (godox)
+	// TODO maybe we could take the reader as argument?
+	 ^
+protocols/cmp/reshare.go:103:3: protocols/cmp/reshare.go:103: Line contains TODO/BUG/FIXME: "TODO: round.Session doesn't have GetRoun..." (godox)
+	// TODO: round.Session doesn't have GetRound method
+	 ^
+protocols/frost/keygen/round3.go:113:4: protocols/frost/keygen/round3.go:113: Line contains TODO/BUG/FIXME: "TODO: Maybe actually clear this in a bet..." (godox)
+		// TODO: Maybe actually clear this in a better way
+		 ^
+protocols/frost/sign/round2.go:158:3: protocols/frost/sign/round2.go:158: Line contains TODO/BUG/FIXME: "TODO: Securely delete the nonces." (godox)
+	// TODO: Securely delete the nonces.
+	 ^
+protocols/lss/lss.go:158:3: protocols/lss/lss.go:158: Line contains TODO/BUG/FIXME: "TODO: Implement sign.StartSignWithBlindi..." (godox)
+	// TODO: Implement sign.StartSignWithBlinding
+	 ^
+protocols/lss/lss.go:166:3: protocols/lss/lss.go:166: Line contains TODO/BUG/FIXME: "TODO: Implement dealer.NewBootstrapDeale..." (godox)
+	// TODO: Implement dealer.NewBootstrapDealer
+	 ^
+protocols/lss/lss.go:172:3: protocols/lss/lss.go:172: Line contains TODO/BUG/FIXME: "TODO: Implement sign.NewCoordinator" (godox)
+	// TODO: Implement sign.NewCoordinator
+	 ^
+protocols/lss/lss.go:179:3: protocols/lss/lss.go:179: Line contains TODO/BUG/FIXME: "TODO: Implement rollback functionality" (godox)
+	// TODO: Implement rollback functionality
+	 ^
+protocols/lss/lss.go:227:3: protocols/lss/lss.go:227: Line contains TODO/BUG/FIXME: "TODO: Implement when Edwards25519 curve ..." (godox)
+	// TODO: Implement when Edwards25519 curve is available
+	 ^
+cmd/threshold-cli/simulations.go:11:1: File is not properly formatted (goimports)
+
+^
+protocols/cmp/cmp_test.go:73:1: File is not properly formatted (goimports)
+	
+^
+protocols/cmp/dynamic_reshare_test.go:22:1: File is not properly formatted (goimports)
+	
+^
+pkg/zk/encelg/encelg.go:172:2: S1008: should use 'return public.Aux.Verify(p.Z1, p.Z3, e, p.T, p.S)' instead of 'if !public.Aux.Verify(p.Z1, p.Z3, e, p.T, p.S) { return false }; return true' (gosimple)
+	if !public.Aux.Verify(p.Z1, p.Z3, e, p.T, p.S) {
+	^
+pkg/zk/nth/nth.go:85:2: S1008: should use 'return lhs.Eq(rhs) == 1' instead of 'if lhs.Eq(rhs) != 1 { return false }; return true' (gosimple)
+	if lhs.Eq(rhs) != 1 {
+	^
+protocols/cmp/presign/presign6.go:142:13: S1040: type assertion to the same type: err already has type error (gosimple)
+		return r, err.(error)
+		          ^
+protocols/cmp/presign/sign1.go:36:13: S1040: type assertion to the same type: err already has type error (gosimple)
+		return r, err.(error)
+		          ^
+cmd/threshold-cli/main.go:7:2: SA1019: "io/ioutil" has been deprecated since Go 1.19: As of Go 1.16, the same functionality is now provided by package [io] or package [os], and those implementations should be preferred in new code. See the specific function documentation for details. (staticcheck)
+	"io/ioutil"
+	^
+protocols/lss/lss_property_test.go:470:4: SA2002: the goroutine calls T.Fatal, which must be called in the same goroutine as the test (staticcheck)
+			go func(id party.ID) {
+			^
+protocols/lss/lss_property_test.go:474:6: SA2002(related information): call to T.Fatal (staticcheck)
+					t.Fatal(err)
+					^
+protocols/lss/lss_property_test.go:495:4: SA2002: the goroutine calls T.Fatal, which must be called in the same goroutine as the test (staticcheck)
+			go func() {
+			^
+protocols/lss/lss_property_test.go:499:6: SA2002(related information): call to T.Fatal (staticcheck)
+					t.Fatal(err)
+					^
+internal/test/round.go:35:5: SA4006: this value of `roundType` is never used (staticcheck)
+	if roundType, err = checkAllRoundsSame(rounds); err != nil {
+	   ^

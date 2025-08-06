@@ -41,8 +41,8 @@ type round1 struct {
 	//
 	// YShares[i] corresponds with Yᵢ in the Frost paper.
 	YShares map[party.ID]curve.Point
-	// s_i = sᵢ is our private secret share
-	s_i curve.Scalar
+	// sI = sᵢ is our private secret share
+	sI curve.Scalar
 }
 
 // VerifyMessage implements round.Round.
@@ -57,21 +57,21 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// to generate two nonces (dᵢ, eᵢ) in Z/(q)ˣ, then two commitments
 	// Dᵢ = dᵢ * G, Eᵢ = eᵢ * G, and then broadcast them.
 
-	// We use a hedged deterministic process, instead of simply sampling (d_i, e_i):
+	// We use a hedged deterministic process, instead of simply sampling (dI, eI):
 	//
 	//   a = random()
-	//   hk = KDF(s_i)
-	//   (d_i, e_i) = H_hk(ctx, m, a)
+	//   hk = KDF(sI)
+	//   (dI, eI) = H_hk(ctx, m, a)
 	//
 	// This protects against bad randomness, since a constant value for a is still unpredictable,
 	// and fault attacks against the hash function, because of the randomness.
-	s_iBytes, err := r.s_i.MarshalBinary()
+	sIBytes, err := r.sI.MarshalBinary()
 	if err != nil {
 		return r, err
 	}
 
 	hashKey := make([]byte, 32)
-	blake3.DeriveKey(deriveHashKeyContext, s_iBytes[:], hashKey)
+	blake3.DeriveKey(deriveHashKeyContext, sIBytes[:], hashKey)
 	nonceHasher, _ := blake3.NewKeyed(hashKey)
 	_, _ = nonceHasher.Write(r.Hash().Sum())
 	_, _ = nonceHasher.Write(r.M)
@@ -80,23 +80,23 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	_, _ = nonceHasher.Write(a)
 	nonceDigest := nonceHasher.Digest()
 
-	d_i := sample.ScalarUnit(nonceDigest, r.Group())
-	e_i := sample.ScalarUnit(nonceDigest, r.Group())
+	dI := sample.ScalarUnit(nonceDigest, r.Group())
+	eI := sample.ScalarUnit(nonceDigest, r.Group())
 
-	D_i := d_i.ActOnBase()
-	E_i := e_i.ActOnBase()
+	DI := dI.ActOnBase()
+	EI := eI.ActOnBase()
 
 	// Broadcast the commitments
-	err = r.BroadcastMessage(out, &broadcast2{D_i: D_i, E_i: E_i})
+	err = r.BroadcastMessage(out, &broadcast2{D_i: DI, E_i: EI})
 	if err != nil {
 		return r, err
 	}
 	return &round2{
 		round1: r,
-		d_i:    d_i,
-		e_i:    e_i,
-		D:      map[party.ID]curve.Point{r.SelfID(): D_i},
-		E:      map[party.ID]curve.Point{r.SelfID(): E_i},
+		d_i:    dI,
+		e_i:    eI,
+		D:      map[party.ID]curve.Point{r.SelfID(): DI},
+		E:      map[party.ID]curve.Point{r.SelfID(): EI},
 	}, nil
 }
 

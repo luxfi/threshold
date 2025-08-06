@@ -71,13 +71,13 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// that t + 1 participants are needed to create a signature.
 
 	// Refresh: Instead of creating a new secret, instead use 0, so that our result doesn't change.
-	a_i0 := group.NewScalar()
-	a_i0_times_G := group.NewPoint()
+	aI0 := group.NewScalar()
+	aI0TimesG := group.NewPoint()
 	if !r.refresh {
-		a_i0 = sample.Scalar(rand.Reader, r.Group())
-		a_i0_times_G = a_i0.ActOnBase()
+		aI0 = sample.Scalar(rand.Reader, r.Group())
+		aI0TimesG = aI0.ActOnBase()
 	}
-	f_i := polynomial.NewPolynomial(r.Group(), r.threshold, a_i0)
+	fI := polynomial.NewPolynomial(r.Group(), r.threshold, aI0)
 
 	// 2. "Every Pᵢ computes a proof of knowledge to the corresponding secret aᵢ₀
 	// by calculating σᵢ = (Rᵢ, μᵢ), such that:
@@ -95,9 +95,9 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// add in our own ID, and then we're good to go.
 
 	// Refresh: Don't create a proof.
-	var Sigma_i *zksch.Proof
+	var SigmaI *zksch.Proof
 	if !r.refresh {
-		Sigma_i = zksch.NewProof(r.Helper.HashForID(r.SelfID()), a_i0_times_G, a_i0, nil)
+		SigmaI = zksch.NewProof(r.Helper.HashForID(r.SelfID()), aI0TimesG, aI0, nil)
 	}
 
 	// 3. "Every participant Pᵢ computes a public comment Φᵢ = <ϕᵢ₀, ..., ϕᵢₜ>
@@ -108,23 +108,23 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// for each individual commitment.
 
 	// This method conveniently calculates all of that for us
-	// Phi_i = Φᵢ
-	Phi_i := polynomial.NewPolynomialExponent(f_i)
+	// PhiI = Φᵢ
+	PhiI := polynomial.NewPolynomialExponent(fI)
 
-	// c_i is our contribution to the chaining key
-	c_i, err := types.NewRID(rand.Reader)
+	// cI is our contribution to the chaining key
+	cI, err := types.NewRID(rand.Reader)
 	if err != nil {
 		return r, fmt.Errorf("failed to sample ChainKey")
 	}
-	commitment, decommitment, err := r.HashForID(r.SelfID()).Commit(c_i)
+	commitment, decommitment, err := r.HashForID(r.SelfID()).Commit(cI)
 	if err != nil {
 		return r, fmt.Errorf("failed to commit to chain key")
 	}
 
 	// 4. "Every Pᵢ broadcasts Φᵢ, σᵢ to all other participants
 	err = r.BroadcastMessage(out, &broadcast2{
-		Phi_i:      Phi_i,
-		Sigma_i:    Sigma_i,
+		PhiI:       PhiI,
+		SigmaI:     SigmaI,
 		Commitment: commitment,
 	})
 	if err != nil {
@@ -133,9 +133,9 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	return &round2{
 		round1:               r,
-		f_i:                  f_i,
-		Phi:                  map[party.ID]*polynomial.Exponent{r.SelfID(): Phi_i},
-		ChainKeys:            map[party.ID]types.RID{r.SelfID(): c_i},
+		fI:                   fI,
+		Phi:                  map[party.ID]*polynomial.Exponent{r.SelfID(): PhiI},
+		ChainKeys:            map[party.ID]types.RID{r.SelfID(): cI},
 		ChainKeyDecommitment: decommitment,
 		ChainKeyCommitments:  make(map[party.ID]hash.Commitment),
 	}, nil

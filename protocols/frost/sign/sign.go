@@ -42,7 +42,7 @@ func StartSignCommon(taproot bool, result *keygen.Config, signers []party.ID, me
 			M:       messageHash,
 			Y:       result.PublicKey,
 			YShares: result.VerificationShares.Points,
-			s_i:     result.PrivateShare,
+			sI:      result.PrivateShare,
 		}, nil
 	}
 }

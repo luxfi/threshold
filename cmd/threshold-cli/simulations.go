@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"runtime"
+
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -17,7 +19,6 @@ import (
 	"github.com/luxfi/threshold/protocols/cmp"
 	"github.com/luxfi/threshold/protocols/frost"
 	"github.com/luxfi/threshold/protocols/lss"
-	"runtime"
 )
 
 func simulateByzantine(protocolName string, rounds int, failureRate float64) error {

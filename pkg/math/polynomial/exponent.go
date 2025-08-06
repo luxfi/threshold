@@ -184,36 +184,36 @@ func EmptyExponent(group curve.Curve) *Exponent {
 	return &Exponent{group: group}
 }
 
-func (e *Exponent) UnmarshalBinary(data []byte) error {
-	if e == nil || e.group == nil {
+func (p *Exponent) UnmarshalBinary(data []byte) error {
+	if p == nil || p.group == nil {
 		return errors.New("can't unmarshal Exponent with no group")
 	}
-	group := e.group
+	group := p.group
 	size := binary.BigEndian.Uint32(data)
-	e.coefficients = make([]curve.Point, int(size))
-	for i := 0; i < len(e.coefficients); i++ {
-		e.coefficients[i] = group.NewPoint()
+	p.coefficients = make([]curve.Point, int(size))
+	for i := 0; i < len(p.coefficients); i++ {
+		p.coefficients[i] = group.NewPoint()
 	}
-	rawExponent := rawExponentData{Coefficients: e.coefficients}
+	rawExponent := rawExponentData{Coefficients: p.coefficients}
 	if err := cbor.Unmarshal(data[4:], &rawExponent); err != nil {
 		return err
 	}
-	e.group = group
-	e.coefficients = rawExponent.Coefficients
-	e.IsConstant = rawExponent.IsConstant
+	p.group = group
+	p.coefficients = rawExponent.Coefficients
+	p.IsConstant = rawExponent.IsConstant
 	return nil
 }
 
-func (e *Exponent) MarshalBinary() ([]byte, error) {
+func (p *Exponent) MarshalBinary() ([]byte, error) {
 	data, err := cbor.Marshal(rawExponentData{
-		IsConstant:   e.IsConstant,
-		Coefficients: e.coefficients,
+		IsConstant:   p.IsConstant,
+		Coefficients: p.coefficients,
 	})
 	if err != nil {
 		return nil, err
 	}
 	out := make([]byte, 4+len(data))
-	size := len(e.coefficients)
+	size := len(p.coefficients)
 	binary.BigEndian.PutUint32(out, uint32(size))
 	copy(out[4:], data)
 	return out, nil

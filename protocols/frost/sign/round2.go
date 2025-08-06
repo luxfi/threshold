@@ -145,10 +145,10 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// 5. "Each Pᵢ computes their response using their long-lived secret share sᵢ
 	// by computing zᵢ = dᵢ + (eᵢ ρᵢ) + λᵢ sᵢ c, using S to determine
 	// the ith lagrange coefficient λᵢ"
-	z_i := r.Group().NewScalar().Set(Lambdas[r.SelfID()]).Mul(r.s_i).Mul(c)
-	z_i.Add(r.d_i)
+	zI := r.Group().NewScalar().Set(Lambdas[r.SelfID()]).Mul(r.sI).Mul(c)
+	zI.Add(r.d_i)
 	ed := r.Group().NewScalar().Set(rho[r.SelfID()]).Mul(r.e_i)
-	z_i.Add(ed)
+	zI.Add(ed)
 
 	// 6. "Each Pᵢ securely deletes ((dᵢ, Dᵢ), (eᵢ, Eᵢ)) from their local storage,
 	// and returns zᵢ to SA."
@@ -158,7 +158,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// TODO: Securely delete the nonces.
 
 	// Broadcast our response
-	err := r.BroadcastMessage(out, &broadcast3{Z_i: z_i})
+	err := r.BroadcastMessage(out, &broadcast3{ZI: zI})
 	if err != nil {
 		return r, err
 	}
@@ -168,7 +168,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		R:       R,
 		RShares: RShares,
 		c:       c,
-		z:       map[party.ID]curve.Scalar{r.SelfID(): z_i},
+		z:       map[party.ID]curve.Scalar{r.SelfID(): zI},
 		Lambda:  Lambdas,
 	}, nil
 }

@@ -127,9 +127,9 @@ func init() {
 	keygenCmd.Flags().IntVarP(&parties, "parties", "N", 0, "Total number of parties (required)")
 	keygenCmd.Flags().StringVarP(&partyID, "id", "i", "", "Party ID (required)")
 	keygenCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file for config")
-	keygenCmd.MarkFlagRequired("threshold")
-	keygenCmd.MarkFlagRequired("parties")
-	keygenCmd.MarkFlagRequired("id")
+	_ = keygenCmd.MarkFlagRequired("threshold")
+	_ = keygenCmd.MarkFlagRequired("parties")
+	_ = keygenCmd.MarkFlagRequired("id")
 
 	// Sign flags
 	signCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input config file (required)")
@@ -137,7 +137,7 @@ func init() {
 	signCmd.Flags().StringSliceP("signers", "s", nil, "List of signer IDs")
 	signCmd.Flags().String("message", "", "Message to sign (hex encoded)")
 	signCmd.Flags().String("message-file", "", "File containing message to sign")
-	signCmd.MarkFlagRequired("input")
+	_ = signCmd.MarkFlagRequired("input")
 
 	// Reshare flags
 	reshareCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input config file (required)")

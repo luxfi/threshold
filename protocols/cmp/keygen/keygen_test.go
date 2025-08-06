@@ -89,7 +89,7 @@ func TestKeygen(t *testing.T) {
 func TestRefresh(t *testing.T) {
 	// Temporarily skip this test due to timeout issues
 	t.Skip("Refresh test temporarily disabled due to timeout issues")
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 

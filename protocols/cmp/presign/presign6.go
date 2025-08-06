@@ -60,7 +60,7 @@ func (r *presign6) StoreBroadcastMessage(msg round.Message) error {
 func (presign6) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
-func (r *presign6) StoreMessage(msg round.Message) error { return nil }
+func (r *presign6) StoreMessage(_ round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -139,7 +139,7 @@ func (r *presign6) Finalize(out chan<- *round.Message) (round.Session, error) {
 		PresignatureID: r.PresignatureID[r.SelfID()],
 	})
 	if err != nil {
-		return r, err.(error)
+		return r, err
 	}
 
 	return &presign7{

@@ -70,7 +70,7 @@ func (abort1) VerifyMessage(round.Message) error { return nil }
 // StoreMessage implements round.Round.
 func (abort1) StoreMessage(round.Message) error { return nil }
 
-// Finalize implements round.Round
+// Finalize implements round.Round.
 func (r *abort1) Finalize(chan<- *round.Message) (round.Session, error) {
 	var (
 		culprits   []party.ID
@@ -108,7 +108,7 @@ func (r *abort1) BroadcastContent() round.BroadcastContent { return &broadcastAb
 // Number implements round.Round.
 func (abort1) Number() round.Number { return 7 }
 
-// abortNth for a given ciphertext c = end(m,r) contains
+// abortNth for a given ciphertext c = end(m,r) contains:
 // - the message m,
 // - the "hidden" nonce r^N % N^2, equal to enc(0,r)
 // - a proof of knowledge of r
@@ -118,7 +118,7 @@ type abortNth struct {
 	Proof     *zknth.Proof
 }
 
-// proveNth decypts the message and the nonce contained in the ciphertext c, using the private key.
+// proveNth decrypts the message and the nonce contained in the ciphertext c, using the private key.
 // Returns an abortNth proving knowledge of the nonce
 func proveNth(hash *hash.Hash, paillierSecret *paillier.SecretKey, c *paillier.Ciphertext) *abortNth {
 	NSquared := paillierSecret.ModulusSquared()

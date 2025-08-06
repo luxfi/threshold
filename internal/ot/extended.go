@@ -110,7 +110,7 @@ func ExtendedOTSend(ctxHash *hash.Hash, setup *CorreOTSendSetup, batchSize int, 
 		q.accumulate(&correResult._Q[i], &chi[i])
 	}
 
-	q.accumulate(&msg.X, &setup._Delta)
+	q.accumulate(&msg.X, &setup.Delta)
 
 	if !q.eq(&msg.T) {
 		return nil, fmt.Errorf("ExtendedOTSend: monochrome check failed")
@@ -129,7 +129,7 @@ func ExtendedOTSend(ctxHash *hash.Hash, setup *CorreOTSendSetup, batchSize int, 
 		_, _ = hasher.Digest().Read(V0[i][:])
 
 		for j := 0; j < params.OTBytes; j++ {
-			correResult._Q[i][j] ^= setup._Delta[j]
+			correResult._Q[i][j] ^= setup.Delta[j]
 		}
 		hasher.Reset()
 		_, _ = hasher.Write(ctr)

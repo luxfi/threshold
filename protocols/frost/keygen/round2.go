@@ -17,9 +17,9 @@ import (
 //	https://eprint.iacr.org/2020/852.pdf
 type round2 struct {
 	*round1
-	// f_i is the polynomial this participant uses to share their contribution to
+	// fI is the polynomial this participant uses to share their contribution to
 	// the secret
-	f_i *polynomial.Polynomial
+	fI *polynomial.Polynomial
 	// Phi contains the polynomial commitment for each participant, ourselves included.
 	//
 	// Phi[l][k] corresponds to ϕₗₖ in the Frost paper.
@@ -37,10 +37,10 @@ type round2 struct {
 
 type broadcast2 struct {
 	round.ReliableBroadcastContent
-	// Phi_i is the commitment to the polynomial that this participant generated.
-	Phi_i *polynomial.Exponent
-	// Sigma_i is the Schnorr proof of knowledge of the participant's secret
-	Sigma_i *sch.Proof
+	// PhiI is the commitment to the polynomial that this participant generated.
+	PhiI *polynomial.Exponent
+	// SigmaI is the Schnorr proof of knowledge of the participant's secret
+	SigmaI *sch.Proof
 	// Commitment = H(cᵢ, uᵢ)
 	Commitment hash.Commitment
 }
@@ -54,7 +54,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	}
 
 	// check nil
-	if (!r.refresh && !body.Sigma_i.IsValid()) || body.Phi_i == nil {
+	if (!r.refresh && !body.SigmaI.IsValid()) || body.PhiI == nil {
 		return round.ErrNilFields
 	}
 
@@ -79,16 +79,16 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 
 	// Refresh: There's no proof to verify, but instead check that the constant is identity
 	if r.refresh {
-		if !body.Phi_i.Constant().IsIdentity() {
+		if !body.PhiI.Constant().IsIdentity() {
 			return fmt.Errorf("party %s sent a non-zero constant while refreshing", from)
 		}
 	} else {
-		if !body.Sigma_i.Verify(r.Helper.HashForID(from), body.Phi_i.Constant(), nil) {
+		if !body.SigmaI.Verify(r.Helper.HashForID(from), body.PhiI.Constant(), nil) {
 			return fmt.Errorf("failed to verify Schnorr proof for party %s", from)
 		}
 	}
 
-	r.Phi[from] = body.Phi_i
+	r.Phi[from] = body.PhiI
 	r.ChainKeyCommitments[from] = body.Commitment
 	return nil
 }
@@ -107,7 +107,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// which they keep for themselves."
 
 	if err := r.BroadcastMessage(out, &broadcast3{
-		C_l:          r.ChainKeys[r.SelfID()],
+		CL:           r.ChainKeys[r.SelfID()],
 		Decommitment: r.ChainKeyDecommitment,
 	}); err != nil {
 		return r, err
@@ -115,13 +115,13 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	for _, l := range r.OtherPartyIDs() {
 		if err := r.SendMessage(out, &message3{
-			F_li: r.f_i.Evaluate(l.Scalar(r.Group())),
+			FLi: r.fI.Evaluate(l.Scalar(r.Group())),
 		}, l); err != nil {
 			return r, err
 		}
 	}
 
-	selfShare := r.f_i.Evaluate(r.SelfID().Scalar(r.Group()))
+	selfShare := r.fI.Evaluate(r.SelfID().Scalar(r.Group()))
 	return &round3{
 		round2:    r,
 		shareFrom: map[party.ID]curve.Scalar{r.SelfID(): selfShare},
@@ -137,8 +137,8 @@ func (broadcast2) RoundNumber() round.Number { return 2 }
 // BroadcastContent implements round.BroadcastRound.
 func (r *round2) BroadcastContent() round.BroadcastContent {
 	return &broadcast2{
-		Phi_i:   polynomial.EmptyExponent(r.Group()),
-		Sigma_i: sch.EmptyProof(r.Group()),
+		PhiI:   polynomial.EmptyExponent(r.Group()),
+		SigmaI: sch.EmptyProof(r.Group()),
 	}
 }
 
