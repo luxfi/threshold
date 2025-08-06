@@ -540,7 +540,7 @@ func TestLSSConcurrentOperations(t *testing.T) {
 	wg.Add(numOperations)
 
 	for op := 0; op < numOperations; op++ {
-		go func(op int) {
+		go func(_ int) {
 			defer wg.Done()
 
 			messageHash := make([]byte, 32)
