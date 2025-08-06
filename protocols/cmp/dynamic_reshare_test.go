@@ -17,8 +17,10 @@ import (
 )
 
 func TestDynamicReshare_AddParties(t *testing.T) {
-	// Temporarily skip this test due to timeout issues
-	t.Skip("Dynamic reshare test temporarily disabled due to timeout issues")
+	// Skip: Dynamic reshare with new parties requires proper RID initialization
+	// The current implementation doesn't properly handle new parties joining
+	// They need to be initialized with RIDs before participating in keygen round3
+	t.Skip("Dynamic reshare with new parties not fully implemented - missing RID initialization")
 
 	group := curve.Secp256k1{}
 
