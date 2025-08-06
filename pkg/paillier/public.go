@@ -112,6 +112,16 @@ func (pk PublicKey) Equal(other *PublicKey) bool {
 	return eq == 1
 }
 
+// Clone creates a deep copy of the PublicKey with independent internal state.
+// This is useful to avoid race conditions when the key is accessed concurrently.
+func (pk *PublicKey) Clone() *PublicKey {
+	if pk == nil {
+		return nil
+	}
+	// Create new instances of the underlying modulus to avoid sharing internal state
+	return NewPublicKey(pk.n.Modulus)
+}
+
 // ValidateCiphertexts checks if all ciphertexts are in the correct range and coprime to N²
 // ct ∈ [1, …, N²-1] AND GCD(ct,N²) = 1.
 func (pk PublicKey) ValidateCiphertexts(cts ...*Ciphertext) bool {
