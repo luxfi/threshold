@@ -101,10 +101,10 @@ var signatureCounter uint64
 //
 // Errors will be returned if the source of randomness produces an error,
 // or if the secret key is invalid.
-func (sk SecretKey) Sign(rand io.Reader, m []byte) (Signature, error) {
+func (s SecretKey) Sign(rand io.Reader, m []byte) (Signature, error) {
 	// See: https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#default-signing
 	d := new(curve.Secp256k1Scalar)
-	if err := d.UnmarshalBinary(sk); err != nil || d.IsZero() {
+	if err := d.UnmarshalBinary(s); err != nil || d.IsZero() {
 		return nil, fmt.Errorf("invalid secret key")
 	}
 
