@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -267,7 +266,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := ioutil.WriteFile(outputFile, data, 0600); err != nil {
+	if err := os.WriteFile(outputFile, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
@@ -303,7 +302,7 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 
 func runSign(cmd *cobra.Command, args []string) error {
 	// Load config
-	configData, err := ioutil.ReadFile(inputFile)
+	configData, err := os.ReadFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %w", err)
 	}
@@ -311,7 +310,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 	// Get message
 	var message []byte
 	if msgFile, _ := cmd.Flags().GetString("message-file"); msgFile != "" {
-		message, err = ioutil.ReadFile(msgFile)
+		message, err = os.ReadFile(msgFile)
 		if err != nil {
 			return fmt.Errorf("failed to read message file: %w", err)
 		}
@@ -383,7 +382,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal signature: %w", err)
 	}
 
-	if err := ioutil.WriteFile(outputFile, sigData, 0644); err != nil {
+	if err := os.WriteFile(outputFile, sigData, 0644); err != nil {
 		return fmt.Errorf("failed to write signature: %w", err)
 	}
 
@@ -393,7 +392,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 
 func runReshare(cmd *cobra.Command, args []string) error {
 	// Load current config
-	configData, err := ioutil.ReadFile(inputFile)
+	configData, err := os.ReadFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %w", err)
 	}
@@ -446,7 +445,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := ioutil.WriteFile(outputFile, data, 0600); err != nil {
+	if err := os.WriteFile(outputFile, data, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
@@ -459,14 +458,14 @@ func runReshare(cmd *cobra.Command, args []string) error {
 func runVerify(cmd *cobra.Command, args []string) error {
 	// Load signature
 	sigFile, _ := cmd.Flags().GetString("signature")
-	sigData, err := ioutil.ReadFile(sigFile)
+	sigData, err := os.ReadFile(sigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read signature: %w", err)
 	}
 
 	// Load public key
 	pkFile, _ := cmd.Flags().GetString("public-key")
-	pkData, err := ioutil.ReadFile(pkFile)
+	pkData, err := os.ReadFile(pkFile)
 	if err != nil {
 		return fmt.Errorf("failed to read public key: %w", err)
 	}
@@ -474,7 +473,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	// Get message
 	var message []byte
 	if msgFile, _ := cmd.Flags().GetString("message-file"); msgFile != "" {
-		message, err = ioutil.ReadFile(msgFile)
+		message, err = os.ReadFile(msgFile)
 		if err != nil {
 			return fmt.Errorf("failed to read message file: %w", err)
 		}
@@ -625,7 +624,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Load config
-	configData, err := ioutil.ReadFile(inputFile)
+	configData, err := os.ReadFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %w", err)
 	}
@@ -664,7 +663,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 		outputFile = fmt.Sprintf("exported.%s", format)
 	}
 
-	if err := ioutil.WriteFile(outputFile, exported, 0644); err != nil {
+	if err := os.WriteFile(outputFile, exported, 0644); err != nil {
 		return fmt.Errorf("failed to write exported data: %w", err)
 	}
 
@@ -676,7 +675,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 
 	// Read input file
-	data, err := ioutil.ReadFile(inputFile)
+	data, err := os.ReadFile(inputFile)
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
@@ -708,7 +707,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := ioutil.WriteFile(outputFile, configData, 0600); err != nil {
+	if err := os.WriteFile(outputFile, configData, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
