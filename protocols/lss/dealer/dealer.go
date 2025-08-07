@@ -1,17 +1,14 @@
 package dealer
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/protocols/lss"
-	"github.com/luxfi/threshold/protocols/lss/jvss"
 )
 
 // BootstrapDealer implements the dealer role for LSS dynamic re-sharing
