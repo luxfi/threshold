@@ -42,7 +42,7 @@ Lux implementation of multi-party threshold signing for:
 
 ## Usage
 
-`multi-party-sig` was designed with the goal of supporting multiple threshold signature schemes.
+`threshold` was designed with the goal of supporting multiple threshold signature schemes.
 Each protocol can be invoked using one of the following functions:
 
 | Protocol Initialization                                                                                                              | Returns                                                    | Description                                                                                 |
@@ -238,7 +238,7 @@ refreshedConfig := r.(\*keygen.Config)
 
 The [`sign`](/protocols/cmp/sign) protocol implements the "3 Round" signing protocol from CGGMP21, without pre-signing or identifiable aborts.
 
-Both these features may be implemented in a future version of `multi-party-sig`.
+Both these features may be implemented in a future version of `threshold`.
 
 The resulting signature is a valid ECDSA key.
 
@@ -301,7 +301,7 @@ if signingFails {
 
 On standard hardware (Apple M1/Intel i7):
 - Key generation (5-of-9): ~28 ms
-- Signing (5 parties): ~15 ms  
+- Signing (5 parties): ~15 ms
 - Dynamic resharing (add 2 parties): ~35 ms
 - Rollback operations: ~50,000 ops/sec
 
