@@ -107,3 +107,16 @@ func (round1) MessageContent() round.Content { return nil }
 
 // Number implements round.Round.
 func (round1) Number() round.Number { return 1 }
+
+// BroadcastContent implements round.BroadcastRound.
+// Note: round1 sends broadcast2 messages in Finalize but must implement 
+// BroadcastContent to avoid the handler thinking no broadcasts are expected
+// and finalizing immediately (handler.go line 364-365).
+func (round1) BroadcastContent() round.BroadcastContent { return &broadcast2{} }
+
+// StoreBroadcastMessage implements round.BroadcastRound.
+// round1 doesn't receive broadcasts, but must implement this to satisfy the interface.
+func (r *round1) StoreBroadcastMessage(msg round.Message) error {
+	// round1 doesn't receive broadcasts
+	return nil
+}

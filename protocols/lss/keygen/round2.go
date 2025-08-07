@@ -30,7 +30,7 @@ type message2 struct {
 
 // BroadcastContent implements round.BroadcastRound
 func (r *round2) BroadcastContent() round.BroadcastContent {
-	return nil // No broadcast in round 2
+	return nil // Round2 doesn't broadcast
 }
 
 // Number implements round.Round
@@ -112,21 +112,6 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}, nil
 }
 
-// StoreBroadcastMessage implements round.BroadcastRound
-func (r *round2) StoreBroadcastMessage(msg round.Message) error {
-	from := msg.From
-	body, ok := msg.Content.(*broadcast1)
-	if !ok || body == nil {
-		return round.ErrInvalidContent
-	}
-
-	// Verify we have commitments for all parties
-	if len(body.Commitments) != r.N() {
-		return errors.New("wrong number of commitments")
-	}
-
-	r.commitments[from] = body.Commitments
-	r.chainKeys[from] = body.ChainKey
-
-	return nil
-}
+// Note: Round2 processes the broadcasts that were sent in round1.
+// The broadcasts are already stored in the handler and passed to round2
+// when it's created.

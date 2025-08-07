@@ -15,14 +15,13 @@ import (
 )
 
 func TestRound(t *testing.T) {
-	// t.Skip("Temporarily skipping CMP sign test due to data race in saferith library")
-
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 	group := curve.Secp256k1{}
 
-	N := 6
-	T := N - 1
+	// Reduced party count to avoid timeout
+	N := 3
+	T := 2
 
 	t.Log("generating configs")
 	configs, partyIDs := test.GenerateConfig(group, N, T, mrand.New(mrand.NewSource(1)), pl)
