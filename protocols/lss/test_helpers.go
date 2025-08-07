@@ -101,18 +101,11 @@ func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.
 	k := sample.Scalar(rand.Reader, group)
 	R := k.ActOnBase()
 
-	// Extract r from R (x-coordinate)
-	rBytes, err := R.MarshalBinary()
-	require.NoError(t, err)
-	
-	rScalar := group.NewScalar()
-	rNat := new(saferith.Nat).SetBytes(rBytes[:32])
-	rScalar.SetNat(rNat.Mod(rNat, group.Order()))
+	// Get r from R using XScalar() - this is the x-coordinate as a scalar
+	r := R.XScalar()
 
-	// Convert message hash to scalar
-	mScalar := group.NewScalar()
-	mNat := new(saferith.Nat).SetBytes(messageHash)
-	mScalar.SetNat(mNat.Mod(mNat, group.Order()))
+	// Convert message hash using curve.FromHash (same as Verify does)
+	m := curve.FromHash(group, messageHash)
 
 	// Compute s using threshold signatures
 	// s = k^{-1} * (m + r * x)
@@ -128,11 +121,8 @@ func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.
 	privateKey := reconstructPrivateKey(group, signerConfigs)
 	
 	// Compute s = k^{-1} * (m + r * privateKey)
-	s := group.NewScalar()
-	s = s.Set(rScalar)
-	s = s.Mul(privateKey)
-	s = s.Add(mScalar)
-	
+	rx := group.NewScalar().Set(r).Mul(privateKey)
+	s := group.NewScalar().Set(m).Add(rx)
 	kInv := group.NewScalar().Set(k).Invert()
 	s = s.Mul(kInv)
 
@@ -255,6 +245,8 @@ func VerifySignature(sig *ecdsa.Signature, publicKey curve.Point, messageHash []
 	if sig == nil || publicKey == nil {
 		return false
 	}
+	// The Verify method expects the message hash directly
+	// It will convert the hash to a scalar internally using curve.FromHash
 	return sig.Verify(publicKey, messageHash)
 }
 
