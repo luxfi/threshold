@@ -431,7 +431,7 @@ func runSignWithFaults(t *testing.T, configs map[party.ID]*config.Config, signer
 	return runSign(t, configs, signers, messageHash)
 }
 
-func runReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyIDs []party.ID, newThreshold int) map[party.ID]*config.Config {
+func runReshare(_ *testing.T, oldConfigs map[party.ID]*config.Config, newPartyIDs []party.ID, newThreshold int) map[party.ID]*config.Config {
 	// Use the DynamicReshareCMP function for resharing
 	oldConfigMap := make(map[party.ID]*config.Config)
 	for id, cfg := range oldConfigs {
@@ -443,7 +443,7 @@ func runReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 	return oldConfigs // Placeholder
 }
 
-func runProtocols(t *testing.T, protocols map[party.ID]protocol.StartFunc, sessionID []byte) map[party.ID]interface{} {
+func runProtocols(_ *testing.T, protocols map[party.ID]protocol.StartFunc, sessionID []byte) map[party.ID]interface{} {
 	// Simplified protocol runner for testing
 	results := make(map[party.ID]interface{})
 	
@@ -469,7 +469,7 @@ func getPublicKey(t *testing.T, configs map[party.ID]*config.Config) curve.Point
 	return nil
 }
 
-func verifySignature(sig interface{}, publicKey curve.Point, messageHash []byte) bool {
+func verifySignature(sig interface{}, publicKey curve.Point, _ []byte) bool {
 	// Simplified verification for testing
 	return sig != nil && publicKey != nil
 }
