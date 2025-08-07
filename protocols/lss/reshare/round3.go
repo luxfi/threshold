@@ -31,12 +31,12 @@ func (r *round3) MessageContent() round.Content {
 }
 
 // VerifyMessage implements round.Round
-func (r *round3) VerifyMessage(msg round.Message) error {
+func (r *round3) VerifyMessage(_ round.Message) error {
 	return nil // No messages to verify
 }
 
 // StoreMessage implements round.Round
-func (r *round3) StoreMessage(msg round.Message) error {
+func (r *round3) StoreMessage(_ round.Message) error {
 	return nil // No messages to store
 }
 
@@ -158,6 +158,6 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound
-func (r *round3) StoreBroadcastMessage(msg round.Message) error {
+func (r *round3) StoreBroadcastMessage(_ round.Message) error {
 	return nil // No broadcast messages in round 3
 }
