@@ -60,7 +60,8 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 
 			// Generate keys with LSS
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl, network)
-			publicKey := lssConfigs[0].PublicKey
+			publicKey, err := lssConfigs[0].PublicKey()
+			Expect(err).NotTo(HaveOccurred())
 
 			// Convert LSS configs to CMP format
 			cmpConfigs := make([]*cmp.Config, n)
@@ -87,14 +88,15 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			network := test.NewNetwork(partyIDs)
 
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl, network)
-			publicKey := lssConfigs[0].PublicKey
+			publicKey, err := lssConfigs[0].PublicKey()
+			Expect(err).NotTo(HaveOccurred())
 
 			// Perform resharing with LSS
 			newParties := []party.ID{"new-1", "new-2"}
 			allParties := append(partyIDs, newParties...)
 			network = test.NewNetwork(allParties)
 
-			newLSSConfigs := runLSSReshare(lssConfigs, threshold, newParties, publicKey, pl, network)
+			newLSSConfigs := runLSSReshare(lssConfigs, newParties, threshold, publicKey, pl, network)
 
 			// Convert to FROST format
 			frostConfigs := make([]*frost.Config, len(newLSSConfigs))
@@ -251,7 +253,9 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 				messageHash := randomHash()
 				signers := partyIDs[:threshold]
 				signatures := runLSSSign(lssConfigs[:threshold], signers, messageHash, pl, network)
-				Expect(signatures[0].Verify(lssConfigs[0].PublicKey, messageHash)).To(BeTrue())
+				pubKey, err := lssConfigs[0].PublicKey()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(signatures[0].Verify(pubKey, messageHash)).To(BeTrue())
 			}
 		})
 
@@ -320,9 +324,11 @@ var _ = Describe("CGG21+FROST+LSS Integration", func() {
 			signatures := runLSSSignWithFaultTolerance(lssConfigs, signers, messageHash, pl, byzantineNetwork)
 
 			// Count valid signatures
+			pubKey, err := lssConfigs[0].PublicKey()
+			Expect(err).NotTo(HaveOccurred())
 			validCount := 0
 			for _, sig := range signatures {
-				if sig != nil && sig.Verify(lssConfigs[0].PublicKey, messageHash) {
+				if sig != nil && sig.Verify(pubKey, messageHash) {
 					validCount++
 				}
 			}
@@ -557,7 +563,7 @@ func runFROSTSign(configs []*frost.Config, signers []party.ID, message []byte, p
 	return signatures
 }
 
-func runLSSReshare(configs []*lss.Config, newThreshold int, newParties []party.ID, publicKey curve.Point, pl *pool.Pool, network *test.Network) []*lss.Config {
+func runLSSReshare(configs []*lss.Config, newParties []party.ID, newThreshold int, publicKey curve.Point, pl *pool.Pool, network *test.Network) []*lss.Config {
 	var wg sync.WaitGroup
 	totalParties := len(configs) + len(newParties)
 	wg.Add(totalParties)
@@ -571,7 +577,7 @@ func runLSSReshare(configs []*lss.Config, newThreshold int, newParties []party.I
 		idx++
 		go func(c *lss.Config) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(lss.Reshare(c, newThreshold, newParties, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Reshare(c, newParties, newThreshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
 
@@ -587,15 +593,10 @@ func runLSSReshare(configs []*lss.Config, newThreshold int, newParties []party.I
 		idx++
 		go func(id party.ID) {
 			defer wg.Done()
-			emptyConfig := &lss.Config{
-				ID:           id,
-				Group:        configs[0].Group,
-				PublicKey:    publicKey,
-				Generation:   configs[0].Generation,
-				PartyIDs:     configs[0].PartyIDs,
-				PublicShares: make(map[party.ID]curve.Point),
-			}
-			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newThreshold, newParties, pl), nil)
+			emptyConfig := lss.EmptyConfig(configs[0].Group)
+			emptyConfig.ID = id
+			emptyConfig.Generation = configs[0].Generation
+			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newParties, newThreshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
 
@@ -701,10 +702,11 @@ func convertLSSToCMP(lss *lss.Config) *cmp.Config {
 
 func convertLSSToFROST(lss *lss.Config) *frost.Config {
 	// Simplified conversion
+	pubKey, _ := lss.PublicKey()
 	return &frost.Config{
 		ID:        lss.ID,
 		Threshold: lss.Threshold,
-		PublicKey: lss.PublicKey,
+		PublicKey: pubKey,
 		// Map other fields
 	}
 }
