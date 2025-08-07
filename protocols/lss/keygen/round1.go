@@ -54,13 +54,13 @@ func (broadcast1) RoundNumber() round.Number {
 }
 
 // VerifyMessage implements round.Round
-func (r *round1) VerifyMessage(msg round.Message) error {
+func (r *round1) VerifyMessage(_ round.Message) error {
 	// No P2P messages to verify
 	return nil
 }
 
 // StoreMessage implements round.Round
-func (r *round1) StoreMessage(msg round.Message) error {
+func (r *round1) StoreMessage(_ round.Message) error {
 	// No P2P messages to store
 	return nil
 }
@@ -108,7 +108,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound
-func (r *round1) StoreBroadcastMessage(msg round.Message) error {
+func (r *round1) StoreBroadcastMessage(_ round.Message) error {
 	// We'll store these in round2
 	return nil
 }

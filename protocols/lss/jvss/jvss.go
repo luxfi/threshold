@@ -50,7 +50,7 @@ func NewJVSS(group curve.Curve, threshold int, parties []party.ID, selfID party.
 	}
 }
 
-// GenerateShares generates shares for a new random secret
+// GenerateShares generates shares for a new random secret.
 func (j *JVSS) GenerateShares() (map[party.ID]*Share, *Commitment, curve.Scalar, error) {
 	// Generate random polynomial f(x) of degree t-1
 	secret := sample.Scalar(rand.Reader, j.group)
@@ -81,7 +81,7 @@ func (j *JVSS) GenerateShares() (map[party.ID]*Share, *Commitment, curve.Scalar,
 	return shares, commitment, secret, nil
 }
 
-// VerifyShare verifies a share received from another party
+// VerifyShare verifies a share received from another party.
 func (j *JVSS) VerifyShare(share *Share, commitment *Commitment, partyID party.ID) bool {
 	// Verify the share against the polynomial commitment
 	x := partyID.Scalar(j.group)
