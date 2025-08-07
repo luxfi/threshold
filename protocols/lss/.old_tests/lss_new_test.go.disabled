@@ -46,7 +46,7 @@ func TestLSSKeygen(t *testing.T) {
 			}
 			
 			// Run the protocol
-			test.Rounds(t, sessions, test.Rounds(t, sessions, test.NewNetwork(partyIDs)))
+			test.Rounds(t, sessions, test.NewNetwork(partyIDs))
 			
 			// Verify all parties have configs
 			configs := make([]*config.Config, 0, tc.n)

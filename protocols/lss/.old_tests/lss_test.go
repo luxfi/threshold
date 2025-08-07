@@ -1,4 +1,4 @@
-package lss
+package lss_test
 
 import (
 	"crypto/rand"
@@ -13,12 +13,13 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/protocols/lss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestLSSKeygen tests the initial key generation protocol
-func TestLSSKeygen(t *testing.T) {
+func TestLSSKeygenOld(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
 
 	testCases := []struct {
@@ -44,19 +45,19 @@ func TestLSSKeygen(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(tc.n)
 
-			configs := make([]*Config, tc.n)
+			configs := make([]*lss.Config, tc.n)
 			for i, id := range partyIDs {
 				i := i
 				go func(id party.ID) {
 					defer wg.Done()
 
-					h, err := protocol.NewMultiHandler(Keygen(tc.curve, id, partyIDs, tc.threshold, pl), nil)
+					h, err := protocol.NewMultiHandler(lss.Keygen(tc.curve, id, partyIDs, tc.threshold, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(id, h, network)
 
 					r, err := h.Result()
 					require.NoError(t, err)
-					configs[i] = r.(*Config)
+					configs[i] = r.(*lss.Config)
 				}(id)
 			}
 
@@ -79,7 +80,7 @@ func TestLSSKeygen(t *testing.T) {
 }
 
 // TestLSSReshare tests the dynamic re-sharing protocol
-func TestLSSReshare(t *testing.T) {
+func TestLSSReshareOld(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
 
 	pl := pool.NewPool(0)
@@ -113,7 +114,7 @@ func TestLSSReshare(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Determine new party set
 			var newPartyIDs []party.ID
-			remainingConfigs := make([]*Config, 0)
+			remainingConfigs := make([]*lss.Config, 0)
 
 			// Keep parties that aren't being removed
 			for i, config := range configs {
@@ -145,23 +146,23 @@ func TestLSSReshare(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(len(remainingConfigs) + len(newParties))
 
-			newConfigs := make([]*Config, len(newPartyIDs))
+			newConfigs := make([]*lss.Config, len(newPartyIDs))
 			configIdx := 0
 
 			// Run reshare for existing parties
 			for _, config := range remainingConfigs {
 				idx := configIdx
 				configIdx++
-				go func(c *Config) {
+				go func(c *lss.Config) {
 					defer wg.Done()
-					h, err := protocol.NewMultiHandler(Reshare(c, tc.newThreshold, newParties, pl), nil)
+					h, err := protocol.NewMultiHandler(lss.Reshare(c, tc.newThreshold, newParties, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(c.ID, h, reshareNetwork)
 
 					r, err := h.Result()
 					require.NoError(t, err)
-					require.IsType(t, &Config{}, r)
-					newConfigs[idx] = r.(*Config)
+					require.IsType(t, &lss.Config{}, r)
+					newConfigs[idx] = r.(*lss.Config)
 				}(config)
 			}
 
@@ -171,7 +172,7 @@ func TestLSSReshare(t *testing.T) {
 				configIdx++
 				go func(id party.ID) {
 					defer wg.Done()
-					emptyConfig := &Config{
+					emptyConfig := &lss.Config{
 						ID:           id,
 						Group:        curve.Secp256k1{},
 						PublicKey:    publicKey,
@@ -179,14 +180,14 @@ func TestLSSReshare(t *testing.T) {
 						PartyIDs:     remainingConfigs[0].PartyIDs,
 						PublicShares: make(map[party.ID]curve.Point),
 					}
-					h, err := protocol.NewMultiHandler(Reshare(emptyConfig, tc.newThreshold, newParties, pl), nil)
+					h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, tc.newThreshold, newParties, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(id, h, reshareNetwork)
 
 					r, err := h.Result()
 					require.NoError(t, err)
-					require.IsType(t, &Config{}, r)
-					newConfigs[idx] = r.(*Config)
+					require.IsType(t, &lss.Config{}, r)
+					newConfigs[idx] = r.(*lss.Config)
 				}(newID)
 			}
 
@@ -212,7 +213,7 @@ func TestLSSReshare(t *testing.T) {
 }
 
 // TestLSSSign tests the signing protocol
-func TestLSSSign(t *testing.T) {
+func TestLSSSignOld(t *testing.T) {
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
 
 	pl := pool.NewPool(0)
@@ -247,7 +248,7 @@ func TestLSSSign(t *testing.T) {
 
 			// Select signers
 			signers := make([]party.ID, len(tc.signerIdxs))
-			signerConfigs := make([]*Config, len(tc.signerIdxs))
+			signerConfigs := make([]*lss.Config, len(tc.signerIdxs))
 			for i, idx := range tc.signerIdxs {
 				signers[i] = configs[idx].ID
 				signerConfigs[i] = configs[idx]
@@ -265,9 +266,9 @@ func TestLSSSign(t *testing.T) {
 			signatures := make([]*ecdsa.Signature, len(signerConfigs))
 			for i, config := range signerConfigs {
 				i := i
-				go func(c *Config) {
+				go func(c *lss.Config) {
 					defer wg.Done()
-					h, err := protocol.NewMultiHandler(Sign(c, signers, messageHash, pl), nil)
+					h, err := protocol.NewMultiHandler(lss.Sign(c, signers, messageHash, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(c.ID, h, network)
 
@@ -301,6 +302,7 @@ func TestLSSSign(t *testing.T) {
 
 // TestLSSSignWithBlinding tests the signing protocol with multiplicative blinding
 func TestLSSSignWithBlinding(t *testing.T) {
+	t.Skip("SignWithBlinding function not implemented in current LSS")
 	t.Skip("LSS protocol implementation is incomplete - TODO: implement proper message flow")
 
 	pl := pool.NewPool(0)
@@ -337,9 +339,9 @@ func TestLSSSignWithBlinding(t *testing.T) {
 			signatures := make([]*ecdsa.Signature, len(signerConfigs))
 			for i, config := range signerConfigs {
 				i := i
-				go func(c *Config) {
+				go func(c *lss.Config) {
 					defer wg.Done()
-					h, err := protocol.NewMultiHandler(SignWithBlinding(c, signers, messageHash, p.protocol, pl), nil)
+					h, err := protocol.NewMultiHandler(lss.SignWithBlinding(c, signers, messageHash, p.protocol, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(c.ID, h, network)
 
@@ -362,7 +364,7 @@ func TestLSSSignWithBlinding(t *testing.T) {
 // TestLSSRollback tests the rollback functionality
 func TestLSSRollback(t *testing.T) {
 	// Create initial configuration
-	config := &Config{
+	config := &lss.Config{
 		ID:         "test-party",
 		Group:      curve.Secp256k1{},
 		Threshold:  3,
@@ -385,7 +387,7 @@ func TestLSSConfigVerification(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		config      *Config
+		config      *lss.Config
 		shouldError bool
 	}{
 		{
@@ -496,23 +498,23 @@ func TestLSSCompatibility(t *testing.T) {
 }
 
 // Helper function to run keygen and return configs
-func runKeygen(t *testing.T, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*Config {
+func runKeygen(t *testing.T, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*lss.Config {
 	var wg sync.WaitGroup
 	wg.Add(len(partyIDs))
 
-	configs := make([]*Config, len(partyIDs))
+	configs := make([]*lss.Config, len(partyIDs))
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(Keygen(group, id, partyIDs, threshold, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
 			require.NoError(t, err)
 			test.HandlerLoop(id, h, network)
 
 			r, err := h.Result()
 			require.NoError(t, err)
-			require.IsType(t, &Config{}, r)
-			configs[i] = r.(*Config)
+			require.IsType(t, &lss.Config{}, r)
+			configs[i] = r.(*lss.Config)
 		}(id)
 	}
 
@@ -556,7 +558,7 @@ func TestLSSConcurrentOperations(t *testing.T) {
 				i := i
 				go func() {
 					defer sigWg.Done()
-					h, err := protocol.NewMultiHandler(Sign(configs[i], signers, messageHash, pl), nil)
+					h, err := protocol.NewMultiHandler(lss.Sign(configs[i], signers, messageHash, pl), nil)
 					require.NoError(t, err)
 					test.HandlerLoop(configs[i].ID, h, network)
 

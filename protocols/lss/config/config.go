@@ -87,6 +87,11 @@ func (c *Config) PartyIDs() party.IDSlice {
 	return party.IDSlice(ids)
 }
 
+// PublicKey returns the combined public key (backward compatibility)
+func (c *Config) PublicKey() (curve.Point, error) {
+	return c.PublicPoint()
+}
+
 // Validate checks if the config is well-formed
 func (c *Config) Validate() error {
 	if c.Group == nil {
