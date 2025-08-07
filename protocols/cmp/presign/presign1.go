@@ -145,3 +145,16 @@ func (presign1) MessageContent() round.Content { return nil }
 
 // Number implements round.Round.
 func (presign1) Number() round.Number { return 1 }
+
+// BroadcastContent implements round.BroadcastRound.
+// Note: presign1 sends broadcast2 messages in Finalize but must implement 
+// BroadcastContent to avoid the handler thinking no broadcasts are expected
+// and finalizing immediately (handler.go line 364-365).
+func (presign1) BroadcastContent() round.BroadcastContent { return &broadcast2{} }
+
+// StoreBroadcastMessage implements round.BroadcastRound.
+// presign1 doesn't receive broadcasts, but must implement this to satisfy the interface.
+func (r *presign1) StoreBroadcastMessage(msg round.Message) error {
+	// presign1 doesn't receive broadcasts
+	return nil
+}

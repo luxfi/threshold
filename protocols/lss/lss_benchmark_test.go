@@ -326,6 +326,7 @@ func generateFROSTConfigs(group curve.Curve, partyIDs []party.ID, threshold int)
 // PrintBenchmarkSummary prints a formatted summary of benchmark results
 func TestPrintBenchmarkSummary(t *testing.T) {
 	if testing.Short() {
+		// Skip in short mode is allowed for benchmarks
 		t.Skip("Skipping benchmark summary in short mode")
 	}
 	

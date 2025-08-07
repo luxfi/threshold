@@ -22,7 +22,7 @@ BUILDFLAGS=-v
 
 # Test flags
 TESTFLAGS=-v -coverprofile=coverage.out -covermode=atomic -timeout=60s
-TESTFLAGS_RACE=-v -race -coverprofile=coverage.out -covermode=atomic -timeout=120s
+TESTFLAGS_RACE=-v -race -coverprofile=coverage.out -covermode=atomic -timeout=90s
 BENCHFLAGS=-bench=. -benchmem -benchtime=10s
 
 # Package lists
