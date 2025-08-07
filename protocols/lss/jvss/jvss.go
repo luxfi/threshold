@@ -13,7 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 )
 
-// JVSS implements Joint Verifiable Secret Sharing
+// JVSS implements Joint Verifiable Secret Sharing.
 // This is used to generate the auxiliary secrets w and q in the re-sharing protocol
 type JVSS struct {
 	group     curve.Curve
@@ -22,13 +22,13 @@ type JVSS struct {
 	selfID    party.ID
 }
 
-// Share represents a party's share of a secret
+// Share represents a party's share of a secret.
 type Share struct {
 	Value curve.Scalar
 	Proof *ShareProof
 }
 
-// ShareProof provides zero-knowledge proof of share validity
+// ShareProof provides zero-knowledge proof of share validity.
 type ShareProof struct {
 	Commitment curve.Point
 	Challenge  curve.Scalar

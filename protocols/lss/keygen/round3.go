@@ -80,7 +80,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Hash all chain keys together for final chain key
 	h := hash.New()
 	for _, data := range chainKeyData {
-		h.WriteAny(data)
+		_ = h.WriteAny(data)
 	}
 	finalChainKey := h.Sum()
 	
