@@ -161,4 +161,3 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 	return nil // No broadcast messages in round 3
 }
-
