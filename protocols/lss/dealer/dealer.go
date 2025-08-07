@@ -53,7 +53,7 @@ func NewBootstrapDealer(group curve.Curve, initialParties []party.ID, threshold 
 }
 
 // InitiateReshare starts a new re-sharing protocol as described in Section 4 of the LSS paper
-func (d *BootstrapDealer) InitiateReshare(oldThreshold, newThreshold int, addParties, removeParties []party.ID) error {
+func (d *BootstrapDealer) InitiateReshare(_ int, newThreshold int, addParties, removeParties []party.ID) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -129,6 +129,10 @@ func (d *BootstrapDealer) HandleReshareMessage(from party.ID, msg *lss.ReshareMe
 	}
 
 	switch msg.Type {
+	case lss.ReshareTypeJVSSCommitment:
+		// Handle JVSS commitment messages
+		return errors.New("JVSS commitment handling not yet implemented")
+		
 	case lss.ReshareTypeBlindedShare:
 		// Step 2: Collect blinded products a_i * w_i from original parties
 		// The dealer interpolates these to get a * w
@@ -148,7 +152,7 @@ func (d *BootstrapDealer) HandleReshareMessage(from party.ID, msg *lss.ReshareMe
 	}
 }
 
-func (d *BootstrapDealer) handleBlindedShare(from party.ID, msg *lss.ReshareMessage) error {
+func (d *BootstrapDealer) handleBlindedShare(_ party.ID, _ *lss.ReshareMessage) error {
 	// Deserialize the blinded share a_i * w_i
 	// In the real implementation, we'd properly deserialize from msg.Data
 
@@ -173,13 +177,13 @@ func (d *BootstrapDealer) handleBlindedShare(from party.ID, msg *lss.ReshareMess
 	return nil
 }
 
-func (d *BootstrapDealer) handleBlindedProduct(from party.ID, msg *lss.ReshareMessage) error {
+func (d *BootstrapDealer) handleBlindedProduct(_ party.ID, _ *lss.ReshareMessage) error {
 	// Similar to handleBlindedShare but for q_j * w_j products
 	// Once we have enough, compute z = (q * w)^{-1} and distribute z shares
 	return nil
 }
 
-func (d *BootstrapDealer) handleVerification(from party.ID, msg *lss.ReshareMessage) error {
+func (d *BootstrapDealer) handleVerification(_ party.ID, _ *lss.ReshareMessage) error {
 	// Verify that the new shares correctly reconstruct the original secret
 	// This ensures the re-sharing was successful
 	return nil
