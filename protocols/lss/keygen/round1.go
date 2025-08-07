@@ -2,6 +2,7 @@ package keygen
 
 import (
 	"crypto/rand"
+	"errors"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -20,6 +21,10 @@ type round1 struct {
 
 	// Chain key for deriving randomness
 	chainKey types.RID
+	
+	// Storage for received broadcasts
+	receivedCommitments map[party.ID]map[party.ID]curve.Point
+	receivedChainKeys   map[party.ID]types.RID
 }
 
 // broadcast1 contains the polynomial commitments
@@ -43,9 +48,17 @@ func (r *round1) Number() round.Number {
 	return 1
 }
 
+// message1 is a dummy message to work around handler initialization issue
+type message1 struct{}
+
+func (message1) RoundNumber() round.Number { return 1 }
+
 // MessageContent implements round.Round
 func (r *round1) MessageContent() round.Content {
-	return nil // No P2P messages in round 1
+	// Return a dummy message type to prevent immediate finalization
+	// This works around the issue where the handler thinks round1
+	// doesn't expect any messages and finalizes immediately
+	return &message1{}
 }
 
 // RoundNumber implements round.Content
@@ -87,6 +100,14 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		commitments[j] = share.ActOnBase()
 	}
 
+	// Send dummy P2P messages to work around handler issue
+	// The handler won't finalize round1 until it receives these
+	for _, id := range r.OtherPartyIDs() {
+		if err := r.SendMessage(out, &message1{}, id); err != nil {
+			return nil, err
+		}
+	}
+
 	// Broadcast commitments
 	if err := r.BroadcastMessage(out, &broadcast1{
 		Commitments: commitments,
@@ -95,9 +116,19 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		return nil, err
 	}
 
-	// Store commitments for next round
-	commitmentStore := make(map[party.ID]map[party.ID]curve.Point)
-	chainKeyStore := make(map[party.ID]types.RID)
+	// Initialize storage for round2 with ALL commitments
+	commitmentStore := r.receivedCommitments
+	if commitmentStore == nil {
+		commitmentStore = make(map[party.ID]map[party.ID]curve.Point)
+	}
+	chainKeyStore := r.receivedChainKeys
+	if chainKeyStore == nil {
+		chainKeyStore = make(map[party.ID]types.RID)
+	}
+	
+	// Store our own commitments and chain key
+	commitmentStore[r.SelfID()] = commitments
+	chainKeyStore[r.SelfID()] = chainKey
 
 	return &round2{
 		round1:      r,
@@ -108,7 +139,27 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound
-func (r *round1) StoreBroadcastMessage(_ round.Message) error {
-	// We'll store these in round2
+func (r *round1) StoreBroadcastMessage(msg round.Message) error {
+	// Validate the broadcast message
+	body, ok := msg.Content.(*broadcast1)
+	if !ok || body == nil {
+		return round.ErrInvalidContent
+	}
+	
+	// Basic validation
+	if len(body.Commitments) != r.N() {
+		return errors.New("wrong number of commitments")
+	}
+	
+	// Initialize storage if needed
+	if r.receivedCommitments == nil {
+		r.receivedCommitments = make(map[party.ID]map[party.ID]curve.Point)
+		r.receivedChainKeys = make(map[party.ID]types.RID)
+	}
+	
+	// Store the commitments and chain key
+	r.receivedCommitments[msg.From] = body.Commitments
+	r.receivedChainKeys[msg.From] = body.ChainKey
+	
 	return nil
 }
