@@ -1,0 +1,273 @@
+package lss_test
+
+import (
+	"crypto/rand"
+	"testing"
+
+	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/pool"
+	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/protocols/lss"
+	"github.com/luxfi/threshold/protocols/lss/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestLSSKeygen(t *testing.T) {
+	group := curve.Secp256k1{}
+	
+	testCases := []struct {
+		name      string
+		n         int
+		threshold int
+	}{
+		{"2-of-3", 3, 2},
+		{"3-of-5", 5, 3},
+		{"4-of-7", 7, 4},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pl := pool.NewPool(0)
+			defer pl.TearDown()
+			
+			partyIDs := test.PartyIDs(tc.n)
+			sessions := make([]protocol.Handler, 0, tc.n)
+			
+			// Start keygen for each party
+			for _, id := range partyIDs {
+				h, err := protocol.NewMultiHandler(
+					lss.Keygen(group, id, partyIDs, tc.threshold, pl),
+					nil,
+				)
+				require.NoError(t, err)
+				sessions = append(sessions, h)
+			}
+			
+			// Run the protocol
+			test.Rounds(t, sessions, test.Rounds(t, sessions, test.NewNetwork(partyIDs)))
+			
+			// Verify all parties have configs
+			configs := make([]*config.Config, 0, tc.n)
+			for i, h := range sessions {
+				r, err := h.Result()
+				require.NoError(t, err, "party %d failed", i)
+				
+				cfg, ok := r.(*config.Config)
+				require.True(t, ok)
+				require.NotNil(t, cfg)
+				
+				// Verify config is valid
+				err = cfg.Validate()
+				require.NoError(t, err)
+				
+				configs = append(configs, cfg)
+			}
+			
+			// Verify all parties have the same public key
+			publicKey1, err := configs[0].PublicPoint()
+			require.NoError(t, err)
+			
+			for i := 1; i < tc.n; i++ {
+				publicKey, err := configs[i].PublicPoint()
+				require.NoError(t, err)
+				assert.True(t, publicKey.Equal(publicKey1), "party %d has different public key", i)
+			}
+			
+			// Verify threshold is correct
+			for _, cfg := range configs {
+				assert.Equal(t, tc.threshold, cfg.Threshold)
+				assert.Equal(t, tc.n, len(cfg.Public))
+			}
+		})
+	}
+}
+
+func TestLSSSign(t *testing.T) {
+	group := curve.Secp256k1{}
+	n := 5
+	threshold := 3
+	
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
+	
+	partyIDs := test.PartyIDs(n)
+	
+	// First run keygen
+	keygenSessions := make([]protocol.Handler, 0, n)
+	for _, id := range partyIDs {
+		h, err := protocol.NewMultiHandler(
+			lss.Keygen(group, id, partyIDs, threshold, pl),
+			nil,
+		)
+		require.NoError(t, err)
+		keygenSessions = append(keygenSessions, h)
+	}
+	
+	test.Rounds(t, keygenSessions, test.NewNetwork(partyIDs))
+	
+	// Get configs from keygen
+	configs := make([]*config.Config, 0, n)
+	for _, h := range keygenSessions {
+		r, err := h.Result()
+		require.NoError(t, err)
+		cfg := r.(*config.Config)
+		configs = append(configs, cfg)
+	}
+	
+	// Sign with threshold parties
+	messageHash := make([]byte, 32)
+	_, err := rand.Read(messageHash)
+	require.NoError(t, err)
+	
+	signers := partyIDs[:threshold]
+	signSessions := make([]protocol.Handler, 0, threshold)
+	
+	for i := 0; i < threshold; i++ {
+		h, err := protocol.NewMultiHandler(
+			lss.Sign(configs[i], signers, messageHash, pl),
+			nil,
+		)
+		require.NoError(t, err)
+		signSessions = append(signSessions, h)
+	}
+	
+	// Run signing protocol
+	test.Rounds(t, signSessions, test.NewNetwork(signers))
+	
+	// Verify all signers got the same signature
+	var firstSig interface{}
+	for i, h := range signSessions {
+		r, err := h.Result()
+		require.NoError(t, err)
+		
+		if i == 0 {
+			firstSig = r
+		} else {
+			// Signatures should be identical
+			assert.Equal(t, firstSig, r)
+		}
+	}
+}
+
+func TestLSSReshare(t *testing.T) {
+	group := curve.Secp256k1{}
+	n := 5
+	threshold := 3
+	
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
+	
+	partyIDs := test.PartyIDs(n)
+	
+	// First run keygen
+	keygenSessions := make([]protocol.Handler, 0, n)
+	for _, id := range partyIDs {
+		h, err := protocol.NewMultiHandler(
+			lss.Keygen(group, id, partyIDs, threshold, pl),
+			nil,
+		)
+		require.NoError(t, err)
+		keygenSessions = append(keygenSessions, h)
+	}
+	
+	test.Rounds(t, keygenSessions, test.NewNetwork(partyIDs))
+	
+	// Get configs from keygen
+	oldConfigs := make([]*config.Config, 0, n)
+	for _, h := range keygenSessions {
+		r, err := h.Result()
+		require.NoError(t, err)
+		cfg := r.(*config.Config)
+		oldConfigs = append(oldConfigs, cfg)
+	}
+	
+	// Get old public key
+	oldPublicKey, err := oldConfigs[0].PublicPoint()
+	require.NoError(t, err)
+	
+	// Reshare to new set (3 old, 2 new)
+	newN := 5
+	newThreshold := 3
+	newPartyIDs := test.PartyIDs(newN)
+	
+	// First 3 parties participate in resharing (from old group)
+	reshareSessions := make([]protocol.Handler, 0, threshold)
+	for i := 0; i < threshold; i++ {
+		h, err := protocol.NewMultiHandler(
+			lss.Reshare(oldConfigs[i], newPartyIDs, newThreshold, pl),
+			nil,
+		)
+		require.NoError(t, err)
+		reshareSessions = append(reshareSessions, h)
+	}
+	
+	// Run reshare protocol
+	test.Rounds(t, reshareSessions, test.NewNetwork(partyIDs[:threshold]))
+	
+	// Verify reshare results
+	for i, h := range reshareSessions {
+		r, err := h.Result()
+		require.NoError(t, err)
+		
+		newCfg, ok := r.(*config.Config)
+		require.True(t, ok)
+		
+		// Verify generation increased
+		assert.Equal(t, oldConfigs[i].Generation+1, newCfg.Generation)
+		
+		// Verify threshold updated
+		assert.Equal(t, newThreshold, newCfg.Threshold)
+		
+		// Verify public key preserved
+		newPublicKey, err := newCfg.PublicPoint()
+		require.NoError(t, err)
+		assert.True(t, newPublicKey.Equal(oldPublicKey), "public key changed during reshare")
+	}
+}
+
+func TestIsCompatibleForSigning(t *testing.T) {
+	group := curve.Secp256k1{}
+	
+	// Create sample public shares
+	publicShares := make(map[party.ID]*config.Public)
+	publicShares["1"] = &config.Public{ECDSA: group.NewPoint()}
+	publicShares["2"] = &config.Public{ECDSA: group.NewPoint()}
+	
+	c1 := &config.Config{
+		ID:         "1",
+		Group:      group,
+		Threshold:  2,
+		Generation: 1,
+		ECDSA:      group.NewScalar(),
+		Public:     publicShares,
+		ChainKey:   []byte("chainkey1"),
+		RID:        []byte("rid1"),
+	}
+	
+	c2 := &config.Config{
+		ID:         "2",
+		Group:      group,
+		Threshold:  2,
+		Generation: 1,
+		ECDSA:      group.NewScalar(),
+		Public:     publicShares,
+		ChainKey:   []byte("chainkey2"),
+		RID:        []byte("rid2"),
+	}
+	
+	// Should be compatible (same generation, same public key)
+	assert.True(t, lss.IsCompatibleForSigning(c1, c2))
+	
+	// Different generation - not compatible
+	c2.Generation = 2
+	assert.False(t, lss.IsCompatibleForSigning(c1, c2))
+	
+	// Different threshold - still compatible if same public key
+	c2.Generation = 1
+	c2.Threshold = 3
+	// This might be false due to insufficient parties for recovery
+	// The function will return false because PublicPoint() will fail
+	assert.False(t, lss.IsCompatibleForSigning(c1, c2))
+}
