@@ -21,8 +21,6 @@ Lux implementation of multi-party threshold signing for:
   Supports automated fault tolerance with state rollback and node eviction.
   See [protocols/lss](protocols/lss/) for details.
 
-> DISCLAIMER: Use at your own risk, this project needs further testing and auditing to be production-ready.
-
 ## Features
 
 - **[BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) key derivation**.
