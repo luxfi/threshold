@@ -55,7 +55,7 @@ func (r *round2) VerifyMessage(_ round.Message) error {
 }
 
 // StoreMessage implements round.Round
-func (r *round2) StoreMessage(msg round.Message) error {
+func (r *round2) StoreMessage(_ round.Message) error {
 	return nil // No P2P messages
 }
 

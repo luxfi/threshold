@@ -250,11 +250,11 @@ func (d *BootstrapDealer) handleBlindedProduct(from party.ID, msg *lss.ReshareMe
 
 		// Create shares of z for distribution
 		zPoly := polynomial.NewPolynomial(d.group, d.newThreshold-1, d.inverseZ)
-		
+
 		// Distribute z shares to new parties
 		for _, partyID := range d.newParties {
 			zShare := zPoly.Evaluate(partyID.Scalar(d.group))
-			
+
 			// Serialize and send z share
 			zShareData, err := zShare.MarshalBinary()
 			if err != nil {
@@ -266,7 +266,7 @@ func (d *BootstrapDealer) handleBlindedProduct(from party.ID, msg *lss.ReshareMe
 				Generation: d.currentGeneration + 1,
 				Data:       zShareData,
 			}
-			
+
 			d.broadcastChan <- msg
 		}
 	}
@@ -277,33 +277,33 @@ func (d *BootstrapDealer) handleBlindedProduct(from party.ID, msg *lss.ReshareMe
 func (d *BootstrapDealer) handleVerification(from party.ID, msg *lss.ReshareMessage) error {
 	// This message contains verification data from parties
 	// confirming they have valid new shares
-	
+
 	if len(msg.Data) == 0 {
 		return errors.New("empty verification data")
 	}
-	
+
 	// In a complete implementation, parties would send:
 	// 1. Proof that their new share is valid
 	// 2. Commitment to their new public share
 	// 3. Verification that they can participate in signing
-	
+
 	// For now, we'll just track that we received verification
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	// Count verifications received
 	if d.verificationCount == nil {
 		d.verificationCount = make(map[party.ID]bool)
 	}
 	d.verificationCount[from] = true
-	
+
 	// Check if we have enough verifications
 	if len(d.verificationCount) >= d.newThreshold {
 		// Resharing is considered successful
 		// Parties can now use their new shares
 		return d.CompleteReshare()
 	}
-	
+
 	return nil
 }
 
