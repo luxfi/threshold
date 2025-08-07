@@ -16,21 +16,21 @@ func Start(oldConfig *config.Config, newParticipants []party.ID, newThreshold in
 		oldID := oldConfig.ID
 		inOldGroup := false
 		inNewGroup := false
-		
+
 		for _, id := range oldConfig.PartyIDs() {
 			if id == oldID {
 				inOldGroup = true
 				break
 			}
 		}
-		
+
 		for _, id := range newParticipants {
 			if id == oldID {
 				inNewGroup = true
 				break
 			}
 		}
-		
+
 		// Combine old and new participants for the protocol
 		allParticipants := make(map[party.ID]bool)
 		for _, id := range oldConfig.PartyIDs() {
@@ -39,12 +39,12 @@ func Start(oldConfig *config.Config, newParticipants []party.ID, newThreshold in
 		for _, id := range newParticipants {
 			allParticipants[id] = true
 		}
-		
+
 		participantList := make([]party.ID, 0, len(allParticipants))
 		for id := range allParticipants {
 			participantList = append(participantList, id)
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "lss/reshare",
 			FinalRoundNumber: 3,
@@ -60,12 +60,12 @@ func Start(oldConfig *config.Config, newParticipants []party.ID, newThreshold in
 		}
 
 		return &round1{
-			Helper:           helper,
-			oldConfig:        oldConfig,
-			newParticipants:  newParticipants,
-			newThreshold:     newThreshold,
-			inOldGroup:       inOldGroup,
-			inNewGroup:       inNewGroup,
+			Helper:          helper,
+			oldConfig:       oldConfig,
+			newParticipants: newParticipants,
+			newThreshold:    newThreshold,
+			inOldGroup:      inOldGroup,
+			inNewGroup:      inNewGroup,
 		}, nil
 	}
 }

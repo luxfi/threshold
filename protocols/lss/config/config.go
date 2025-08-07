@@ -57,15 +57,15 @@ func (c *Config) PublicPoint() (curve.Point, error) {
 	for j := range c.Public {
 		partyIDs = append(partyIDs, j)
 	}
-	
+
 	// Use first threshold parties for interpolation
 	if len(partyIDs) < c.Threshold {
 		return nil, fmt.Errorf("insufficient parties: have %d, need %d", len(partyIDs), c.Threshold)
 	}
-	
+
 	contributingParties := partyIDs[:c.Threshold]
 	lagrange := polynomial.Lagrange(c.Group, contributingParties)
-	
+
 	sum := c.Group.NewPoint()
 	for _, j := range contributingParties {
 		if coeff, exists := lagrange[j]; exists {
@@ -74,7 +74,7 @@ func (c *Config) PublicPoint() (curve.Point, error) {
 			sum = sum.Add(contribution)
 		}
 	}
-	
+
 	return sum, nil
 }
 
@@ -115,7 +115,7 @@ func (c *Config) Validate() error {
 	if len(c.RID) == 0 {
 		return errors.New("lss/config: missing RID")
 	}
-	
+
 	// Verify all public shares are present
 	for id, pub := range c.Public {
 		if pub == nil {
@@ -125,7 +125,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("lss/config: missing ECDSA public share for %s", id)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -141,12 +141,13 @@ func (c *Config) Copy() *Config {
 		ChainKey:   append([]byte(nil), c.ChainKey...),
 		RID:        append([]byte(nil), c.RID...),
 	}
-	
+
 	for id, pub := range c.Public {
 		newConfig.Public[id] = &Public{
 			ECDSA: pub.ECDSA,
 		}
 	}
-	
+
 	return newConfig
 }
+

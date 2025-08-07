@@ -85,4 +85,3 @@ func (r *round1) StoreBroadcastMessage(_ round.Message) error {
 	// Messages stored in round2
 	return nil
 }
-
