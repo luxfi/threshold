@@ -36,12 +36,12 @@ func (r *round3) MessageContent() round.Content {
 }
 
 // VerifyMessage implements round.Round
-func (r *round3) VerifyMessage(msg round.Message) error {
+func (r *round3) VerifyMessage(_ round.Message) error {
 	return nil // No messages to verify
 }
 
 // StoreMessage implements round.Round
-func (r *round3) StoreMessage(msg round.Message) error {
+func (r *round3) StoreMessage(_ round.Message) error {
 	return nil // No messages to store
 }
 

@@ -38,7 +38,7 @@ func EmptyConfig(group curve.Curve) *config.Config {
 // Keygen generates a new shared ECDSA key with LSS protocol.
 func Keygen(group curve.Curve, selfID party.ID, participants []party.ID, threshold int, pl *pool.Pool) protocol.StartFunc {
 	if threshold < 1 || threshold > len(participants) {
-		return func(sessionID []byte) (round.Session, error) {
+		return func(_ []byte) (round.Session, error) {
 			return nil, fmt.Errorf("lss: invalid threshold %d for %d parties", threshold, len(participants))
 		}
 	}
@@ -55,7 +55,7 @@ func Refresh(c *config.Config, pl *pool.Pool) protocol.StartFunc {
 // Reshare performs dynamic resharing to change the participant set.
 func Reshare(c *config.Config, newParticipants []party.ID, newThreshold int, pl *pool.Pool) protocol.StartFunc {
 	if newThreshold < 1 || newThreshold > len(newParticipants) {
-		return func(sessionID []byte) (round.Session, error) {
+		return func(_ []byte) (round.Session, error) {
 			return nil, fmt.Errorf("lss: invalid threshold %d for %d parties", newThreshold, len(newParticipants))
 		}
 	}
@@ -66,13 +66,13 @@ func Reshare(c *config.Config, newParticipants []party.ID, newThreshold int, pl 
 // Sign generates an ECDSA signature using the LSS protocol.
 func Sign(c *config.Config, signers []party.ID, messageHash []byte, pl *pool.Pool) protocol.StartFunc {
 	if len(signers) < c.Threshold {
-		return func(sessionID []byte) (round.Session, error) {
+		return func(_ []byte) (round.Session, error) {
 			return nil, fmt.Errorf("lss: insufficient signers: have %d, need %d", len(signers), c.Threshold)
 		}
 	}
 
 	if len(messageHash) != 32 {
-		return func(sessionID []byte) (round.Session, error) {
+		return func(_ []byte) (round.Session, error) {
 			return nil, errors.New("lss: message hash must be 32 bytes")
 		}
 	}
@@ -106,7 +106,7 @@ func IsCompatibleForSigning(c1, c2 *config.Config) bool {
 	return true
 }
 
-// ReshareMessageType represents the type of reshare message
+// ReshareMessageType represents the type of reshare message.
 type ReshareMessageType int
 
 const (
