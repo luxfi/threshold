@@ -26,6 +26,10 @@ import (
 	"github.com/luxfi/threshold/protocols/lss/sign"
 )
 
+// Config represents the configuration for the LSS protocol.
+// This is an alias to the config.Config type for backward compatibility.
+type Config = config.Config
+
 // EmptyConfig creates an empty Config with a fixed group, ready for unmarshalling.
 func EmptyConfig(group curve.Curve) *config.Config {
 	return config.EmptyConfig(group)
@@ -100,4 +104,25 @@ func IsCompatibleForSigning(c1, c2 *config.Config) bool {
 		return false
 	}
 	return true
+}
+
+// ReshareMessageType represents the type of reshare message
+type ReshareMessageType int
+
+const (
+	// ReshareTypeJVSSCommitment is a JVSS commitment message
+	ReshareTypeJVSSCommitment ReshareMessageType = iota
+	// ReshareTypeBlindedShare is a blinded share message
+	ReshareTypeBlindedShare
+	// ReshareTypeBlindedProduct is a blinded product message
+	ReshareTypeBlindedProduct
+	// ReshareTypeVerification is a verification message
+	ReshareTypeVerification
+)
+
+// ReshareMessage represents a message in the reshare protocol
+type ReshareMessage struct {
+	Type       ReshareMessageType
+	Generation uint64
+	Data       []byte // Serialized message data
 }

@@ -1,4 +1,4 @@
-package lss
+package lss_test
 
 import (
 	cryptorand "crypto/rand"
@@ -13,6 +13,8 @@ import (
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/protocols/lss"
+	"github.com/luxfi/threshold/protocols/lss/config"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	. "github.com/onsi/ginkgo/v2"
@@ -57,7 +59,11 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				signatures := runSign(configs[:t], signers, messageHash, pl, network)
 
 				// Verify signature
-				return signatures[0].Verify(configs[0].PublicKey, messageHash)
+				pubKey, err := configs[0].PublicKey()
+				if err != nil {
+					return false
+				}
+				return signatures[0].Verify(pubKey, messageHash)
 			}
 
 			// Run property test
@@ -82,7 +88,10 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 				// Initial keygen
 				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
-				publicKey := configs[0].PublicKey
+				publicKey, err := configs[0].PublicKey()
+				if err != nil {
+					return false
+				}
 
 				// Add parties
 				newParties := make([]party.ID, add)
@@ -98,12 +107,16 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 				// Perform reshare if there are changes
 				if add > 0 || remove > 0 {
-					allParties := append(remainingConfigs[0].PartyIDs, newParties...)
+					allParties := append(remainingConfigs[0].PartyIDs(), newParties...)
 					network = test.NewNetwork(allParties)
 					newConfigs := runReshare(remainingConfigs, t, newParties, pl, network)
 
 					// Verify new configuration
-					return newConfigs[0].PublicKey.Equal(publicKey) &&
+					newPubKey, err := newConfigs[0].PublicKey()
+					if err != nil {
+						return false
+					}
+					return newPubKey.Equal(publicKey) &&
 						len(newConfigs) == len(remainingConfigs)+add
 				}
 
@@ -137,8 +150,12 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				sig2 := runSign(configs[:t], signers, messageHash, pl, network)[0]
 
 				// Both should be valid
-				return sig1.Verify(configs[0].PublicKey, messageHash) &&
-					sig2.Verify(configs[0].PublicKey, messageHash)
+				pubKey, err := configs[0].PublicKey()
+				if err != nil {
+					return false
+				}
+				return sig1.Verify(pubKey, messageHash) &&
+					sig2.Verify(pubKey, messageHash)
 			}
 
 			config := &quick.Config{MaxCount: 10}
@@ -160,7 +177,10 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 				// Initial setup with oldThreshold
 				configs := runKeygenGinkgo(partyIDs, oldThreshold, group, pl, network)
-				publicKey := configs[0].PublicKey
+				publicKey, err := configs[0].PublicKey()
+				if err != nil {
+					return false
+				}
 
 				// Reshare with new threshold
 				newConfigs := runReshare(configs, newThreshold, nil, pl, network)
@@ -228,8 +248,11 @@ var _ = Describe("LSS Property-Based Tests", func() {
 					}()
 
 					signatures := runSign(configs[:threshold], signers, messageHash, pl, fuzzNetwork.Network)
-					if signatures[0] != nil && signatures[0].Verify(configs[0].PublicKey, messageHash) {
-						successCount++
+					if signatures[0] != nil {
+						pubKey, err := configs[0].PublicKey()
+						if err == nil && signatures[0].Verify(pubKey, messageHash) {
+							successCount++
+						}
 					}
 				}()
 			}
@@ -263,8 +286,12 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 				// Count successful signatures
 				successCount := 0
+				pubKey, err := configs[0].PublicKey()
+				if err != nil {
+					return false
+				}
 				for _, sig := range signatures {
-					if sig != nil && sig.Verify(configs[0].PublicKey, messageHash) {
+					if sig != nil && sig.Verify(pubKey, messageHash) {
 						successCount++
 					}
 				}
@@ -297,7 +324,9 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			signatures := runSignWithTimeout(configs[:threshold], signers, messageHash, pl, delayNetwork.Network, 30*time.Second)
 
 			Expect(signatures[0]).NotTo(BeNil())
-			Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
+			pubKey, err := configs[0].PublicKey()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(signatures[0].Verify(pubKey, messageHash)).To(BeTrue())
 		})
 	})
 
@@ -321,7 +350,9 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 			signatures := runSign(configs[:threshold], signers, messageHash, pl, network)
 
-			Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
+			pubKey, err := configs[0].PublicKey()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(signatures[0].Verify(pubKey, messageHash)).To(BeTrue())
 		})
 
 		It("should handle rapid consecutive operations", func() {
@@ -341,7 +372,12 @@ var _ = Describe("LSS Property-Based Tests", func() {
 					messageHash := randomHashProperty()
 					signers := partyIDs[:threshold]
 					signatures := runSign(configs[:threshold], signers, messageHash, pl, network)
-					results <- signatures[0].Verify(configs[0].PublicKey, messageHash)
+					pubKey, err := configs[0].PublicKey()
+					if err != nil {
+						results <- false
+						return
+					}
+					results <- signatures[0].Verify(pubKey, messageHash)
 				}()
 			}
 
@@ -376,7 +412,9 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 				signatures := runSign(configs[:tc.threshold], signers, messageHash, pl, network)
 
-				Expect(signatures[0].Verify(configs[0].PublicKey, messageHash)).To(BeTrue())
+				pubKey, err := configs[0].PublicKey()
+				Expect(err).NotTo(HaveOccurred())
+				Expect(signatures[0].Verify(pubKey, messageHash)).To(BeTrue())
 			}
 		})
 	})
@@ -463,7 +501,7 @@ func FuzzLSSProtocol(f *testing.F) {
 		partyIDs := test.PartyIDs(int(n))
 		network := test.NewNetwork(partyIDs)
 
-		configs := make([]*Config, n)
+		configs := make([]*lss.Config, n)
 		var wg sync.WaitGroup
 		wg.Add(int(n))
 
@@ -471,7 +509,7 @@ func FuzzLSSProtocol(f *testing.F) {
 			i := i
 			go func(id party.ID) {
 				defer wg.Done()
-				h, err := protocol.NewMultiHandler(Keygen(curve.Secp256k1{}, id, partyIDs, int(threshold), pl), nil)
+				h, err := protocol.NewMultiHandler(lss.Keygen(curve.Secp256k1{}, id, partyIDs, int(threshold), pl), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -481,7 +519,7 @@ func FuzzLSSProtocol(f *testing.F) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				configs[i] = r.(*Config)
+				configs[i] = r.(*lss.Config)
 			}(id)
 		}
 
@@ -496,7 +534,7 @@ func FuzzLSSProtocol(f *testing.F) {
 			i := i
 			go func() {
 				defer wg.Done()
-				h, err := protocol.NewMultiHandler(Sign(configs[i], signers, messageHash, pl), nil)
+				h, err := protocol.NewMultiHandler(lss.Sign(configs[i], signers, messageHash, pl), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -513,7 +551,11 @@ func FuzzLSSProtocol(f *testing.F) {
 		wg.Wait()
 
 		// Verify
-		if !signatures[0].Verify(configs[0].PublicKey, messageHash) {
+		pubKey, err := configs[0].PublicKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !signatures[0].Verify(pubKey, messageHash) {
 			t.Fatal("Invalid signature")
 		}
 	})
@@ -521,22 +563,22 @@ func FuzzLSSProtocol(f *testing.F) {
 
 // Helper functions for Ginkgo tests
 
-func runKeygenGinkgo(partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*Config {
+func runKeygenGinkgo(partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool, network *test.Network) []*lss.Config {
 	var wg sync.WaitGroup
 	wg.Add(len(partyIDs))
 
-	configs := make([]*Config, len(partyIDs))
+	configs := make([]*lss.Config, len(partyIDs))
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(Keygen(group, id, partyIDs, threshold, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
 
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
-			configs[i] = r.(*Config)
+			configs[i] = r.(*lss.Config)
 		}(id)
 	}
 
@@ -544,16 +586,16 @@ func runKeygenGinkgo(partyIDs []party.ID, threshold int, group curve.Curve, pl *
 	return configs
 }
 
-func runSign(configs []*Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network) []*ecdsa.Signature {
+func runSign(configs []*lss.Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network) []*ecdsa.Signature {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 
 	signatures := make([]*ecdsa.Signature, len(configs))
 	for i, config := range configs {
 		i := i
-		go func(config *Config) {
+		go func(config *lss.Config) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(Sign(config, signers, messageHash, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Sign(config, signers, messageHash, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(config.ID, h, network)
 
@@ -567,7 +609,7 @@ func runSign(configs []*Config, signers []party.ID, messageHash []byte, pl *pool
 	return signatures
 }
 
-func runSignWithTimeout(configs []*Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network, timeout time.Duration) []*ecdsa.Signature {
+func runSignWithTimeout(configs []*lss.Config, signers []party.ID, messageHash []byte, pl *pool.Pool, network *test.Network, timeout time.Duration) []*ecdsa.Signature {
 	done := make(chan struct{})
 	var signatures []*ecdsa.Signature
 
@@ -585,9 +627,9 @@ func runSignWithTimeout(configs []*Config, signers []party.ID, messageHash []byt
 	}
 }
 
-func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, pl *pool.Pool, network *test.Network) []*Config {
-	allParties := append(oldConfigs[0].PartyIDs, newParties...)
-	newConfigs := make([]*Config, len(allParties))
+func runReshare(oldConfigs []*lss.Config, newThreshold int, newParties []party.ID, pl *pool.Pool, network *test.Network) []*lss.Config {
+	allParties := append(oldConfigs[0].PartyIDs(), newParties...)
+	newConfigs := make([]*lss.Config, len(allParties))
 
 	var wg sync.WaitGroup
 	wg.Add(len(oldConfigs) + len(newParties))
@@ -595,15 +637,15 @@ func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, p
 	// Existing parties reshare
 	for i, config := range oldConfigs {
 		i := i
-		go func(c *Config) {
+		go func(c *lss.Config) {
 			defer wg.Done()
-			h, err := protocol.NewMultiHandler(Reshare(c, newThreshold, newParties, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Reshare(c, newParties, newThreshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(c.ID, h, network)
 
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
-			newConfigs[i] = r.(*Config)
+			newConfigs[i] = r.(*lss.Config)
 		}(config)
 	}
 
@@ -612,21 +654,19 @@ func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, p
 		idx := len(oldConfigs) + i
 		go func(id party.ID, idx int) {
 			defer wg.Done()
-			emptyConfig := &Config{
-				ID:           id,
-				Group:        oldConfigs[0].Group,
-				PublicKey:    oldConfigs[0].PublicKey,
-				Generation:   oldConfigs[0].Generation,
-				PartyIDs:     oldConfigs[0].PartyIDs,
-				PublicShares: make(map[party.ID]curve.Point),
+			emptyConfig := &lss.Config{
+				ID:         id,
+				Group:      oldConfigs[0].Group,
+				Generation: oldConfigs[0].Generation,
+				Public:     make(map[party.ID]*config.Public),
 			}
-			h, err := protocol.NewMultiHandler(Reshare(emptyConfig, newThreshold, newParties, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newParties, newThreshold, pl), nil)
 			Expect(err).NotTo(HaveOccurred())
 			test.HandlerLoop(id, h, network)
 
 			r, err := h.Result()
 			Expect(err).NotTo(HaveOccurred())
-			newConfigs[idx] = r.(*Config)
+			newConfigs[idx] = r.(*lss.Config)
 		}(newID, idx)
 	}
 
