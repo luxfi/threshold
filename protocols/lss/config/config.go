@@ -24,6 +24,9 @@ type Config struct {
 	// Generation tracks the current resharing generation
 	Generation uint64
 
+	// RollbackFrom tracks if this config was created via rollback
+	RollbackFrom uint64
+
 	// ECDSA is this party's share of the master private key
 	ECDSA curve.Scalar
 
@@ -132,14 +135,15 @@ func (c *Config) Validate() error {
 // Copy creates a deep copy of the config
 func (c *Config) Copy() *Config {
 	newConfig := &Config{
-		ID:         c.ID,
-		Group:      c.Group,
-		Threshold:  c.Threshold,
-		Generation: c.Generation,
-		ECDSA:      c.ECDSA,
-		Public:     make(map[party.ID]*Public),
-		ChainKey:   append([]byte(nil), c.ChainKey...),
-		RID:        append([]byte(nil), c.RID...),
+		ID:           c.ID,
+		Group:        c.Group,
+		Threshold:    c.Threshold,
+		Generation:   c.Generation,
+		RollbackFrom: c.RollbackFrom,
+		ECDSA:        c.ECDSA,
+		Public:       make(map[party.ID]*Public),
+		ChainKey:     append([]byte(nil), c.ChainKey...),
+		RID:          append([]byte(nil), c.RID...),
 	}
 
 	for id, pub := range c.Public {
