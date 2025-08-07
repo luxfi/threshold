@@ -35,12 +35,12 @@ type ShareProof struct {
 	Response   curve.Scalar
 }
 
-// Commitment represents a polynomial commitment
+// Commitment represents a polynomial commitment.
 type Commitment struct {
 	Points []curve.Point // Coefficient commitments
 }
 
-// NewJVSS creates a new JVSS instance
+// NewJVSS creates a new JVSS instance.
 func NewJVSS(group curve.Curve, threshold int, parties []party.ID, selfID party.ID) *JVSS {
 	return &JVSS{
 		group:     group,

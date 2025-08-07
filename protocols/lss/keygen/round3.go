@@ -30,19 +30,19 @@ func (r *round3) MessageContent() round.Content {
 }
 
 // VerifyMessage implements round.Round
-func (r *round3) VerifyMessage(msg round.Message) error {
+func (r *round3) VerifyMessage(_ round.Message) error {
 	// No messages to verify
 	return nil
 }
 
 // StoreMessage implements round.Round
-func (r *round3) StoreMessage(msg round.Message) error {
+func (r *round3) StoreMessage(_ round.Message) error {
 	// No messages to store
 	return nil
 }
 
 // Finalize implements round.Round
-func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
+func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 	// Verify we have shares from all parties
 	if len(r.shares) != r.N() {
 		return nil, errors.New("missing shares from some parties")
@@ -116,7 +116,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // StoreBroadcastMessage implements round.BroadcastRound
-func (r *round3) StoreBroadcastMessage(msg round.Message) error {
+func (r *round3) StoreBroadcastMessage(_ round.Message) error {
 	// No broadcast messages in round 3
 	return nil
 }
