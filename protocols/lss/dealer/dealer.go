@@ -132,7 +132,7 @@ func (d *BootstrapDealer) HandleReshareMessage(from party.ID, msg *lss.ReshareMe
 	case lss.ReshareTypeJVSSCommitment:
 		// Handle JVSS commitment messages
 		return errors.New("JVSS commitment handling not yet implemented")
-		
+
 	case lss.ReshareTypeBlindedShare:
 		// Step 2: Collect blinded products a_i * w_i from original parties
 		// The dealer interpolates these to get a * w
