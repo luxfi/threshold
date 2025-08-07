@@ -291,7 +291,7 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 	// Try to sign
 	message := make([]byte, 32)
 	if _, err := rand.Read(message); err != nil {
-		return err
+		return false, err
 	}
 
 	err = runSingleSign(protocolName, configs[:threshold+byzantineCount], message)
@@ -321,7 +321,7 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 	// Try to sign with all parties
 	message := make([]byte, 32)
 	if _, err := rand.Read(message); err != nil {
-		return err
+		return "failure", err
 	}
 
 	successCount := 0

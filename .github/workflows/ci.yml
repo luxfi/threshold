@@ -2,81 +2,237 @@ name: CI
 
 on:
   push:
-    branches: [ main, lss-dynamic-resharing ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24'
 
 jobs:
-  test:
-    name: Test
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.5'
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run tests
-      run: |
-        go test -v -race -coverprofile=coverage.out ./...
-    
-    - name: Upload coverage
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage
-        path: coverage.out
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.63.4
+
+      - name: Run golangci-lint
+        run: golangci-lint run ./...
+
+      - name: Run go fmt
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.24']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run tests
+        run: go test -v -race -timeout 30s ./...
+
+      - name: Run build verification
+        run: go build -v ./...
+
+      - name: Run tests with coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
 
   benchmark:
     name: Benchmark
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.5'
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run benchmarks
-      run: |
-        echo "LSS Benchmarks:" > benchmarks.txt
-        go test -bench=. -benchmem ./protocols/lss/... | tee -a benchmarks.txt
-        echo -e "\n\nIntegration Benchmarks:" >> benchmarks.txt
-        go test -bench=. -benchmem ./protocols/... | tee -a benchmarks.txt
-    
-    - name: Upload benchmark results
-      uses: actions/upload-artifact@v4
-      with:
-        name: benchmarks
-        path: benchmarks.txt
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  lint:
-    name: Lint
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run benchmarks
+        run: go test -bench=. -benchtime=10s -benchmem ./...
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            *.prof
+            *.test
+
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        arch: [amd64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build binary
+        env:
+          GOOS: ${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p bin
+          go build -v -ldflags "-s -w" -o bin/threshold${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/threshold-cli
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: threshold-${{ runner.os }}-${{ matrix.arch }}
+          path: bin/
+
+  security:
+    name: Security Scan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.5'
-    
-    - name: Run go vet
-      run: go vet ./...
-    
-    - name: Check formatting
-      run: |
-        fmt_files=$(gofmt -l .)
-        if [ -n "$fmt_files" ]; then
-          echo "The following files need formatting:"
-          echo "$fmt_files"
-          exit 1
-        fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
+      - name: Run go mod audit
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  integration:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [lint, test, build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build binary
+        run: |
+          go build -o bin/threshold-cli ./cmd/threshold-cli
+
+      - name: Run integration tests
+        run: |
+          # Run protocol integration tests
+          go test -v -tags=integration ./protocols/...
+
+      - name: Test CLI functionality
+        run: |
+          ./bin/threshold-cli --help
+          ./bin/threshold-cli info
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [lint, test, build, security, integration]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build release binaries
+        run: |
+          # Build for multiple platforms
+          platforms=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64" "windows/amd64")
+          for platform in "${platforms[@]}"; do
+            platform_split=(${platform//\// })
+            GOOS=${platform_split[0]}
+            GOARCH=${platform_split[1]}
+            output_name="threshold-${GOOS}-${GOARCH}"
+            if [ $GOOS = "windows" ]; then
+              output_name+='.exe'
+            fi
+            echo "Building ${output_name}..."
+            GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-s -w" -o "bin/${output_name}" ./cmd/threshold-cli
+          done
+
+      - name: Create checksums
+        run: |
+          cd bin
+          sha256sum * > checksums.txt
+          cd ..
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-binaries
+          path: bin/
