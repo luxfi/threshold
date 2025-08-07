@@ -507,7 +507,26 @@ func selectRandomSigners(partyIDs []party.ID, count int) []party.ID {
 func injectFaults(configs map[party.ID]*config.Config, faultType string, rate float64) map[party.ID]*config.Config {
 	faultyConfigs := make(map[party.ID]*config.Config)
 	
-	for id, cfg := range configs {
+	// Deterministically inject faults in the first N parties based on rate
+	totalParties := len(configs)
+	faultyCount := int(float64(totalParties) * rate)
+	
+	// Create sorted list of party IDs for deterministic ordering
+	partyIDs := make([]party.ID, 0, totalParties)
+	for id := range configs {
+		partyIDs = append(partyIDs, id)
+	}
+	// Sort for deterministic ordering
+	for i := 0; i < len(partyIDs); i++ {
+		for j := i + 1; j < len(partyIDs); j++ {
+			if string(partyIDs[i]) > string(partyIDs[j]) {
+				partyIDs[i], partyIDs[j] = partyIDs[j], partyIDs[i]
+			}
+		}
+	}
+	
+	for idx, id := range partyIDs {
+		cfg := configs[id]
 		// Make a copy of the config to avoid modifying the original
 		cfgCopy := &config.Config{
 			ID:         cfg.ID,
@@ -525,7 +544,8 @@ func injectFaults(configs map[party.ID]*config.Config, faultType string, rate fl
 			cfgCopy.Public[pid] = pub
 		}
 		
-		if randFloat() < rate {
+		// Inject fault in first faultyCount parties
+		if idx < faultyCount {
 			// Inject fault based on type
 			switch faultType {
 			case "stale":
