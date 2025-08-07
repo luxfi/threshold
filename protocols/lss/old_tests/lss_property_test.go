@@ -52,7 +52,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				configs := runKeygenGinkgo(partyIDs, t, group, pl, network)
 
 				// Test: Any t parties can sign
-				messageHash := randomHash()
+				messageHash := randomHashProperty()
 				signers := partyIDs[:t]
 				signatures := runSign(configs[:t], signers, messageHash, pl, network)
 
@@ -166,7 +166,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 				newConfigs := runReshare(configs, newThreshold, nil, pl, network)
 
 				// Test: exactly newThreshold parties needed
-				messageHash := randomHash()
+				messageHash := randomHashProperty()
 				signers := partyIDs[:newThreshold]
 				signatures := runSign(newConfigs[:newThreshold], signers, messageHash, pl, network)
 
@@ -216,7 +216,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 			attempts := 10
 
 			for i := 0; i < attempts; i++ {
-				messageHash := randomHash()
+				messageHash := randomHashProperty()
 				signers := partyIDs[:threshold]
 
 				func() {
@@ -255,7 +255,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 					MaxDropouts:    n - threshold - 1, // Keep at least threshold+1
 				}
 
-				messageHash := randomHash()
+				messageHash := randomHashProperty()
 				signers := partyIDs
 
 				// Should still work with some dropouts
@@ -290,7 +290,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, delayNetwork.Network)
 
-			messageHash := randomHash()
+			messageHash := randomHashProperty()
 			signers := partyIDs[:threshold]
 
 			// Should complete despite delays
@@ -316,7 +316,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 			configs := runKeygenGinkgo(partyIDs, threshold, group, pl, network)
 
-			messageHash := randomHash()
+			messageHash := randomHashProperty()
 			signers := partyIDs[:threshold]
 
 			signatures := runSign(configs[:threshold], signers, messageHash, pl, network)
@@ -338,7 +338,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 			for i := 0; i < numOps; i++ {
 				go func() {
-					messageHash := randomHash()
+					messageHash := randomHashProperty()
 					signers := partyIDs[:threshold]
 					signatures := runSign(configs[:threshold], signers, messageHash, pl, network)
 					results <- signatures[0].Verify(configs[0].PublicKey, messageHash)
@@ -371,7 +371,7 @@ var _ = Describe("LSS Property-Based Tests", func() {
 
 				configs := runKeygenGinkgo(partyIDs, tc.threshold, group, pl, network)
 
-				messageHash := randomHash()
+				messageHash := randomHashProperty()
 				signers := partyIDs[:tc.threshold]
 
 				signatures := runSign(configs[:tc.threshold], signers, messageHash, pl, network)
@@ -634,7 +634,7 @@ func runReshare(oldConfigs []*Config, newThreshold int, newParties []party.ID, p
 	return newConfigs
 }
 
-func randomHash() []byte {
+func randomHashProperty() []byte {
 	hash := make([]byte, 32)
 	_, err := cryptorand.Read(hash)
 	Expect(err).NotTo(HaveOccurred())
