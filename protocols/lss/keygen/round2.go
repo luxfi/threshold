@@ -12,13 +12,13 @@ import (
 // round2 receives commitments and sends shares
 type round2 struct {
 	*round1
-	
+
 	// Commitments from all parties: commitments[i][j] = g^f_i(j)
 	commitments map[party.ID]map[party.ID]curve.Point
-	
+
 	// Chain keys from all parties
 	chainKeys map[party.ID]types.RID
-	
+
 	// Shares we receive
 	shares map[party.ID]curve.Scalar
 }
@@ -55,28 +55,28 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	if to != r.SelfID() {
 		return errors.New("message not for us")
 	}
-	
+
 	// Verify share against commitment
 	commitments, ok := r.commitments[from]
 	if !ok {
 		return errors.New("missing commitments from sender")
 	}
-	
+
 	// Check g^share = commitment[to]
 	expectedCommitment, ok := commitments[to]
 	if !ok {
 		return errors.New("missing commitment for our ID")
 	}
-	
+
 	sharePoint := body.Share.ActOnBase()
 	if !sharePoint.Equal(expectedCommitment) {
 		return errors.New("share doesn't match commitment")
 	}
-	
+
 	return nil
 }
 
@@ -84,7 +84,7 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 func (r *round2) StoreMessage(msg round.Message) error {
 	from := msg.From
 	body := msg.Content.(*message2)
-	
+
 	r.shares[from] = body.Share
 	return nil
 }
@@ -95,18 +95,18 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	for _, id := range r.OtherPartyIDs() {
 		x := id.Scalar(r.Group())
 		share := r.poly.Evaluate(x)
-		
+
 		if err := r.SendMessage(out, &message2{
 			Share: share,
 		}, id); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	// Our own share
 	ownX := r.SelfID().Scalar(r.Group())
 	r.shares[r.SelfID()] = r.poly.Evaluate(ownX)
-	
+
 	return &round3{
 		round2: r,
 	}, nil
@@ -119,14 +119,14 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	// Verify we have commitments for all parties
 	if len(body.Commitments) != r.N() {
 		return errors.New("wrong number of commitments")
 	}
-	
+
 	r.commitments[from] = body.Commitments
 	r.chainKeys[from] = body.ChainKey
-	
+
 	return nil
 }
