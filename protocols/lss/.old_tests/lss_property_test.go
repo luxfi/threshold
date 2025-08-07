@@ -13,10 +13,10 @@ import (
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/protocols/lss"
-	"github.com/luxfi/threshold/protocols/lss/config"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/luxfi/threshold/protocols/lss"
+	"github.com/luxfi/threshold/protocols/lss/config"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

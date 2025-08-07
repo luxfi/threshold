@@ -126,3 +126,4 @@ type ReshareMessage struct {
 	Generation uint64
 	Data       []byte // Serialized message data
 }
+

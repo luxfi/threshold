@@ -13,7 +13,7 @@ import (
 
 func TestConfigValidation(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	// Valid config
 	cfg := &config.Config{
 		ID:         "test",
@@ -29,10 +29,10 @@ func TestConfigValidation(t *testing.T) {
 		ChainKey: []byte("chainkey"),
 		RID:      []byte("rid"),
 	}
-	
+
 	err := cfg.Validate()
 	assert.NoError(t, err)
-	
+
 	// Invalid: missing group
 	badCfg := &config.Config{
 		ID:        "test",
@@ -41,7 +41,7 @@ func TestConfigValidation(t *testing.T) {
 	err = badCfg.Validate()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing group")
-	
+
 	// Invalid: threshold too high
 	badCfg2 := &config.Config{
 		ID:        "test",
@@ -62,11 +62,11 @@ func TestConfigValidation(t *testing.T) {
 
 func TestConfigMarshaling(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	// Create a config with proper points (not identity)
 	scalar1 := group.NewScalar().SetNat(new(saferith.Nat).SetUint64(1))
 	scalar2 := group.NewScalar().SetNat(new(saferith.Nat).SetUint64(2))
-	
+
 	cfg := &config.Config{
 		ID:         "test",
 		Group:      group,
@@ -80,17 +80,17 @@ func TestConfigMarshaling(t *testing.T) {
 		ChainKey: []byte("chainkey"),
 		RID:      []byte("rid123456"),
 	}
-	
+
 	// Marshal to JSON
 	data, err := cfg.MarshalJSON()
 	require.NoError(t, err)
 	require.NotEmpty(t, data)
-	
+
 	// Unmarshal back
 	cfg2 := config.EmptyConfig(group)
 	err = cfg2.UnmarshalJSON(data)
 	require.NoError(t, err)
-	
+
 	// Verify fields match
 	assert.Equal(t, cfg.ID, cfg2.ID)
 	assert.Equal(t, cfg.Threshold, cfg2.Threshold)
@@ -102,7 +102,7 @@ func TestConfigMarshaling(t *testing.T) {
 
 func TestPublicPointRecovery(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	// Create config with enough parties
 	cfg := &config.Config{
 		ID:         "test",
@@ -118,12 +118,12 @@ func TestPublicPointRecovery(t *testing.T) {
 		ChainKey: []byte("chainkey"),
 		RID:      []byte("rid"),
 	}
-	
+
 	// Should be able to recover public point
 	pubPoint, err := cfg.PublicPoint()
 	require.NoError(t, err)
 	require.NotNil(t, pubPoint)
-	
+
 	// Config with insufficient parties
 	badCfg := &config.Config{
 		ID:         "test",
@@ -138,7 +138,7 @@ func TestPublicPointRecovery(t *testing.T) {
 		ChainKey: []byte("chainkey"),
 		RID:      []byte("rid"),
 	}
-	
+
 	// Should fail with insufficient parties
 	_, err = badCfg.PublicPoint()
 	assert.Error(t, err)
@@ -147,12 +147,12 @@ func TestPublicPointRecovery(t *testing.T) {
 
 func TestCompatibility(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	publicShares := make(map[party.ID]*config.Public)
 	publicShares["1"] = &config.Public{ECDSA: group.NewPoint()}
 	publicShares["2"] = &config.Public{ECDSA: group.NewPoint()}
 	publicShares["3"] = &config.Public{ECDSA: group.NewPoint()}
-	
+
 	c1 := &config.Config{
 		ID:         "1",
 		Group:      group,
@@ -163,7 +163,7 @@ func TestCompatibility(t *testing.T) {
 		ChainKey:   []byte("chainkey1"),
 		RID:        []byte("rid1"),
 	}
-	
+
 	c2 := &config.Config{
 		ID:         "2",
 		Group:      group,
@@ -174,10 +174,10 @@ func TestCompatibility(t *testing.T) {
 		ChainKey:   []byte("chainkey2"),
 		RID:        []byte("rid2"),
 	}
-	
+
 	// Same generation and public key - compatible
 	assert.True(t, IsCompatibleForSigning(c1, c2))
-	
+
 	// Different generation - not compatible
 	c2.Generation = 2
 	assert.False(t, IsCompatibleForSigning(c1, c2))

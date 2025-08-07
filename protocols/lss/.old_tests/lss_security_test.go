@@ -436,7 +436,7 @@ var _ = Describe("LSS Protocol Security Properties", func() {
 			})
 
 			It("should properly implement blinding protocols", func() {
-			Skip("SignWithBlinding function not implemented in current LSS")
+				Skip("SignWithBlinding function not implemented in current LSS")
 				n := 5
 				threshold := 3
 				partyIDs := test.PartyIDs(n)

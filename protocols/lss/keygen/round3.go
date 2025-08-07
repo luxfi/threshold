@@ -47,13 +47,13 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	if len(r.shares) != r.N() {
 		return nil, errors.New("missing shares from some parties")
 	}
-	
+
 	// Compute our final ECDSA share: sum of all shares received
 	ecdsaShare := r.Group().NewScalar()
 	for _, share := range r.shares {
 		ecdsaShare = ecdsaShare.Add(share)
 	}
-	
+
 	// Build public shares map
 	// The public share for party j is the sum of all g^f_i(j)
 	publicShares := make(map[party.ID]*config.Public, r.N())
@@ -68,7 +68,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 			ECDSA: publicPoint,
 		}
 	}
-	
+
 	// Compute combined chain key and RID
 	chainKeyData := make([][]byte, 0, r.N())
 	for _, id := range r.PartyIDs() {
@@ -76,20 +76,20 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 			chainKeyData = append(chainKeyData, chainKey[:])
 		}
 	}
-	
+
 	// Hash all chain keys together for final chain key
 	h := hash.New()
 	for _, data := range chainKeyData {
 		_ = h.WriteAny(data)
 	}
 	finalChainKey := h.Sum()
-	
+
 	// Create final RID by hashing session ID and chain key
 	ridHash := hash.New()
-	ridHash.WriteAny(r.Hash())
-	ridHash.WriteAny(finalChainKey)
+	_ = ridHash.WriteAny(r.Hash())
+	_ = ridHash.WriteAny(finalChainKey)
 	finalRID := ridHash.Sum()
-	
+
 	// Create the final config
 	cfg := &config.Config{
 		ID:         r.SelfID(),
@@ -101,17 +101,17 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 		ChainKey:   finalChainKey[:],
 		RID:        finalRID[:],
 	}
-	
+
 	// Validate the config before returning
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	
+
 	// Verify that the public key can be recovered
 	if _, err := cfg.PublicPoint(); err != nil {
 		return nil, errors.New("failed to recover public key")
 	}
-	
+
 	return r.ResultRound(cfg), nil
 }
 
@@ -120,3 +120,4 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 	// No broadcast messages in round 3
 	return nil
 }
+

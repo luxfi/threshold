@@ -153,4 +153,3 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	r.nonces[from] = body.K
 	return nil
 }
-
