@@ -36,7 +36,7 @@ func DynamicReshareCMP(
 	oldConfigs map[party.ID]*config.Config,
 	newPartyIDs []party.ID,
 	newThreshold int,
-	pool *pool.Pool,
+	_ *pool.Pool,
 ) (map[party.ID]*config.Config, error) {
 
 	if len(oldConfigs) == 0 {
@@ -230,10 +230,10 @@ func DynamicReshareCMP(
 
 // verifyResharingCMP validates that new shares correctly reconstruct the original public key
 func verifyResharingCMP(
-	oldConfigs map[party.ID]*config.Config,
-	newConfigs map[party.ID]*config.Config,
-	oldThreshold int,
-	newThreshold int,
+	_ map[party.ID]*config.Config,
+	_ map[party.ID]*config.Config,
+	_ int,
+	_ int,
 ) error {
 	// In a complete implementation, we would:
 	// 1. Use Lagrange interpolation to reconstruct the secret from T old shares
@@ -247,7 +247,7 @@ func verifyResharingCMP(
 }
 
 // Sign performs CMP signing with the current configuration
-func (c *CMP) Sign(signers []party.ID, message []byte) ([]byte, error) {
+func (c *CMP) Sign(_ []party.ID, _ []byte) ([]byte, error) {
 	// CMP.Sign returns a protocol.StartFunc, we need to execute it
 	// In a real implementation, this would run the protocol
 	// For now, return a placeholder

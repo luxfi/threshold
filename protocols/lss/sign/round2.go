@@ -50,7 +50,7 @@ func (broadcast2) RoundNumber() round.Number {
 }
 
 // VerifyMessage implements round.Round
-func (r *round2) VerifyMessage(msg round.Message) error {
+func (r *round2) VerifyMessage(_ round.Message) error {
 	return nil // No P2P messages
 }
 
