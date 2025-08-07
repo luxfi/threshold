@@ -168,7 +168,9 @@ func simulateConcurrentSigning(protocolName string, rounds int) error {
 					defer wg.Done()
 
 					message := make([]byte, 32)
-					rand.Read(message)
+					if _, err := rand.Read(message); err != nil {
+						return
+					}
 
 					err := runSingleSign(protocolName, configs[:threshold], message)
 					if err == nil {
@@ -288,7 +290,9 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 
 	// Try to sign
 	message := make([]byte, 32)
-	rand.Read(message)
+	if _, err := rand.Read(message); err != nil {
+		return err
+	}
 
 	err = runSingleSign(protocolName, configs[:threshold+byzantineCount], message)
 
@@ -316,7 +320,9 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 
 	// Try to sign with all parties
 	message := make([]byte, 32)
-	rand.Read(message)
+	if _, err := rand.Read(message); err != nil {
+		return err
+	}
 
 	successCount := 0
 	var wg sync.WaitGroup
@@ -360,7 +366,9 @@ func runLargeScaleRound(protocolName string, n, threshold int) error {
 
 	// Sign
 	message := make([]byte, 32)
-	rand.Read(message)
+	if _, err := rand.Read(message); err != nil {
+		return err
+	}
 
 	return runSingleSign(protocolName, configs[:threshold], message)
 }
