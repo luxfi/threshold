@@ -2,6 +2,7 @@ package keygen_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -33,7 +34,7 @@ func TestKeygenStart(t *testing.T) {
 }
 
 func TestKeygenWithNetwork(t *testing.T) {
-	t.Skip("LSS keygen protocol has architectural issues with broadcast handling - needs handler modification")
+	// Fixed by using P2P messages instead of broadcasts in round1
 	
 	group := curve.Secp256k1{}
 	n := 3
@@ -51,9 +52,11 @@ func TestKeygenWithNetwork(t *testing.T) {
 	for i, id := range partyIDs {
 		i := i
 		go func(id party.ID) {
+			t.Logf("Starting keygen for party %s", id)
 			startFunc := keygen.Start(id, partyIDs, threshold, group, pl)
 			h, err := protocol.NewMultiHandler(startFunc, nil)
 			if err != nil {
+				t.Logf("Party %s: Failed to create handler: %v", id, err)
 				errChan <- err
 				return
 			}
@@ -63,29 +66,36 @@ func TestKeygenWithNetwork(t *testing.T) {
 			
 			result, err := h.Result()
 			if err != nil {
+				t.Logf("Party %s: Protocol failed: %v", id, err)
 				errChan <- err
 				return
 			}
 			
 			cfg, ok := result.(*config.Config)
 			if !ok {
+				t.Logf("Party %s: Invalid result type", id)
 				errChan <- assert.AnError
 				return
 			}
 			
+			t.Logf("Party %s: Protocol completed successfully", id)
 			results[i] = cfg
 			errChan <- nil
 		}(id)
 	}
 	
 	// Wait for all parties with timeout
+	timeout := time.After(5 * time.Second)
 	for i := 0; i < n; i++ {
 		select {
 		case err := <-errChan:
 			if err != nil {
-				t.Skipf("Keygen protocol not fully implemented: %v", err)
+				t.Fatalf("Keygen protocol failed: %v", err)
 				return
 			}
+		case <-timeout:
+			t.Fatal("Keygen protocol timed out")
+			return
 		}
 	}
 	

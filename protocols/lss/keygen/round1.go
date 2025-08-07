@@ -32,10 +32,37 @@ type broadcast1 struct {
 	round.NormalBroadcastContent
 
 	// Commitments to polynomial - we commit to g^f(i) for each party i
-	Commitments map[party.ID]curve.Point
+	// Stored as binary data for CBOR compatibility
+	Commitments map[party.ID][]byte
 
 	// Chain key commitment
 	ChainKey types.RID
+}
+
+// SetCommitments converts a map of points to binary for storage
+func (b *broadcast1) SetCommitments(commitments map[party.ID]curve.Point) error {
+	b.Commitments = make(map[party.ID][]byte)
+	for id, point := range commitments {
+		data, err := point.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		b.Commitments[id] = data
+	}
+	return nil
+}
+
+// GetCommitments converts the binary data back to points
+func (b *broadcast1) GetCommitments(group curve.Curve) (map[party.ID]curve.Point, error) {
+	commitments := make(map[party.ID]curve.Point)
+	for id, data := range b.Commitments {
+		point := group.NewPoint()
+		if err := point.UnmarshalBinary(data); err != nil {
+			return nil, err
+		}
+		commitments[id] = point
+	}
+	return commitments, nil
 }
 
 // BroadcastContent implements round.BroadcastRound
@@ -48,17 +75,10 @@ func (r *round1) Number() round.Number {
 	return 1
 }
 
-// message1 is a dummy message to work around handler initialization issue
-type message1 struct{}
-
-func (message1) RoundNumber() round.Number { return 1 }
-
 // MessageContent implements round.Round
 func (r *round1) MessageContent() round.Content {
-	// Return a dummy message type to prevent immediate finalization
-	// This works around the issue where the handler thinks round1
-	// doesn't expect any messages and finalizes immediately
-	return &message1{}
+	// Round1 only broadcasts, no P2P messages
+	return nil
 }
 
 // RoundNumber implements round.Content
@@ -80,60 +100,60 @@ func (r *round1) StoreMessage(_ round.Message) error {
 
 // Finalize implements round.Round
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
-	// Generate our polynomial with random secret
-	secret := sample.Scalar(rand.Reader, r.Group())
-	r.poly = polynomial.NewPolynomial(r.Group(), r.Threshold()-1, secret)
+	// If we haven't generated our polynomial yet, do it now
+	if r.poly == nil {
+		// Generate our polynomial with random secret
+		secret := sample.Scalar(rand.Reader, r.Group())
+		r.poly = polynomial.NewPolynomial(r.Group(), r.Threshold()-1, secret)
 
-	// Generate chain key
-	chainKey, err := types.NewRID(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
-	r.chainKey = chainKey
-
-	// Create commitments: g^f(j) for each party j
-	// This allows verification of shares later
-	commitments := make(map[party.ID]curve.Point)
-	for _, j := range r.PartyIDs() {
-		x := j.Scalar(r.Group())
-		share := r.poly.Evaluate(x)
-		commitments[j] = share.ActOnBase()
-	}
-
-	// Send dummy P2P messages to work around handler issue
-	// The handler won't finalize round1 until it receives these
-	for _, id := range r.OtherPartyIDs() {
-		if err := r.SendMessage(out, &message1{}, id); err != nil {
+		// Generate chain key
+		chainKey, err := types.NewRID(rand.Reader)
+		if err != nil {
 			return nil, err
 		}
+		r.chainKey = chainKey
+
+		// Create commitments: g^f(j) for each party j
+		// This allows verification of shares later
+		commitments := make(map[party.ID]curve.Point)
+		for _, j := range r.PartyIDs() {
+			x := j.Scalar(r.Group())
+			share := r.poly.Evaluate(x)
+			commitments[j] = share.ActOnBase()
+		}
+
+		// Broadcast commitments
+		broadcast := &broadcast1{ChainKey: chainKey}
+		if err := broadcast.SetCommitments(commitments); err != nil {
+			return nil, err
+		}
+		if err := r.BroadcastMessage(out, broadcast); err != nil {
+			return nil, err
+		}
+		
+		// Store our own commitments
+		if r.receivedCommitments == nil {
+			r.receivedCommitments = make(map[party.ID]map[party.ID]curve.Point)
+			r.receivedChainKeys = make(map[party.ID]types.RID)
+		}
+		r.receivedCommitments[r.SelfID()] = commitments
+		r.receivedChainKeys[r.SelfID()] = chainKey
 	}
 
-	// Broadcast commitments
-	if err := r.BroadcastMessage(out, &broadcast1{
-		Commitments: commitments,
-		ChainKey:    chainKey,
-	}); err != nil {
-		return nil, err
+	// Check if we have received all commitments
+	// We need commitments from all N parties (including ourselves)
+	if len(r.receivedCommitments) < r.N() {
+		// Not ready to advance yet - return ourselves
+		// This is called from finalizeInitial when we don't have all broadcasts yet
+		return r, nil
 	}
 
-	// Initialize storage for round2 with ALL commitments
-	commitmentStore := r.receivedCommitments
-	if commitmentStore == nil {
-		commitmentStore = make(map[party.ID]map[party.ID]curve.Point)
-	}
-	chainKeyStore := r.receivedChainKeys
-	if chainKeyStore == nil {
-		chainKeyStore = make(map[party.ID]types.RID)
-	}
-	
-	// Store our own commitments and chain key
-	commitmentStore[r.SelfID()] = commitments
-	chainKeyStore[r.SelfID()] = chainKey
-
+	// We have all commitments, create round2 with complete data
 	return &round2{
-		round1:      r,
-		commitments: commitmentStore,
-		chainKeys:   chainKeyStore,
+		Helper:      r.Helper,
+		poly:        r.poly,
+		commitments: r.receivedCommitments,
+		chainKeys:   r.receivedChainKeys,
 		shares:      make(map[party.ID]curve.Scalar),
 	}, nil
 }
@@ -157,8 +177,12 @@ func (r *round1) StoreBroadcastMessage(msg round.Message) error {
 		r.receivedChainKeys = make(map[party.ID]types.RID)
 	}
 	
-	// Store the commitments and chain key
-	r.receivedCommitments[msg.From] = body.Commitments
+	// Convert back to map and store
+	commitments, err := body.GetCommitments(r.Group())
+	if err != nil {
+		return err
+	}
+	r.receivedCommitments[msg.From] = commitments
 	r.receivedChainKeys[msg.From] = body.ChainKey
 	
 	return nil
