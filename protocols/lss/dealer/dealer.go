@@ -30,7 +30,13 @@ type BootstrapDealer struct {
 	qShares map[party.ID]curve.Scalar // Shares of auxiliary secret q
 
 	// Blinded products collected during re-sharing
-	blindedProducts map[party.ID]curve.Scalar
+	blindedProducts   map[party.ID]curve.Scalar
+	qwProducts        map[party.ID]curve.Scalar
+	verificationCount map[party.ID]bool
+
+	// Computed values during resharing
+	blindedSecret curve.Scalar // a * w
+	inverseZ      curve.Scalar // (q * w)^{-1}
 
 	// Communication channels
 	broadcastChan chan *lss.ReshareMessage
@@ -48,6 +54,7 @@ func NewBootstrapDealer(group curve.Curve, initialParties []party.ID, threshold 
 		wShares:           make(map[party.ID]curve.Scalar),
 		qShares:           make(map[party.ID]curve.Scalar),
 		blindedProducts:   make(map[party.ID]curve.Scalar),
+		qwProducts:        make(map[party.ID]curve.Scalar),
 		broadcastChan:     make(chan *lss.ReshareMessage, 100),
 	}
 }
@@ -152,23 +159,46 @@ func (d *BootstrapDealer) HandleReshareMessage(from party.ID, msg *lss.ReshareMe
 	}
 }
 
-func (d *BootstrapDealer) handleBlindedShare(_ party.ID, _ *lss.ReshareMessage) error {
+func (d *BootstrapDealer) handleBlindedShare(from party.ID, msg *lss.ReshareMessage) error {
 	// Deserialize the blinded share a_i * w_i
-	// In the real implementation, we'd properly deserialize from msg.Data
+	if len(msg.Data) == 0 {
+		return errors.New("empty blinded share data")
+	}
+
+	// Parse the scalar from message data
+	blindedShare := d.group.NewScalar()
+	if err := blindedShare.UnmarshalBinary(msg.Data); err != nil {
+		return fmt.Errorf("failed to unmarshal blinded share: %w", err)
+	}
 
 	// Store the blinded product
-	// d.blindedProducts[from] = deserializedShare
+	d.blindedProducts[from] = blindedShare
 
 	// Check if we have enough shares to interpolate
 	if len(d.blindedProducts) >= d.currentThreshold {
-		// Interpolate to get a * w
-		shares := make(map[party.ID]curve.Scalar)
-		for pid, share := range d.blindedProducts {
-			shares[pid] = share
+		// Get the party IDs that contributed
+		contributingParties := make([]party.ID, 0, len(d.blindedProducts))
+		for pid := range d.blindedProducts {
+			contributingParties = append(contributingParties, pid)
 		}
 
-		// The interpolation would give us the blinded secret a * w
-		// This is used in Step 4 for final share derivation
+		// Compute Lagrange coefficients
+		lagrange := polynomial.Lagrange(d.group, contributingParties[:d.currentThreshold])
+
+		// Interpolate to get a * w
+		aTimesW := d.group.NewScalar()
+		for _, pid := range contributingParties[:d.currentThreshold] {
+			share := d.blindedProducts[pid]
+			if coeff, exists := lagrange[pid]; exists {
+				contribution := d.group.NewScalar().Set(coeff).Mul(share)
+				aTimesW.Add(contribution)
+			}
+		}
+
+		// Store the blinded secret for later use
+		d.mu.Lock()
+		d.blindedSecret = aTimesW
+		d.mu.Unlock()
 
 		// Move to next phase
 		d.initiateInverseComputation()
@@ -177,15 +207,103 @@ func (d *BootstrapDealer) handleBlindedShare(_ party.ID, _ *lss.ReshareMessage) 
 	return nil
 }
 
-func (d *BootstrapDealer) handleBlindedProduct(_ party.ID, _ *lss.ReshareMessage) error {
-	// Similar to handleBlindedShare but for q_j * w_j products
-	// Once we have enough, compute z = (q * w)^{-1} and distribute z shares
+func (d *BootstrapDealer) handleBlindedProduct(from party.ID, msg *lss.ReshareMessage) error {
+	// Deserialize the q_j * w_j product
+	if len(msg.Data) == 0 {
+		return errors.New("empty blinded product data")
+	}
+
+	qwProduct := d.group.NewScalar()
+	if err := qwProduct.UnmarshalBinary(msg.Data); err != nil {
+		return fmt.Errorf("failed to unmarshal blinded product: %w", err)
+	}
+
+	// Store the product
+	d.qwProducts[from] = qwProduct
+
+	// Check if we have enough products to interpolate
+	if len(d.qwProducts) >= d.newThreshold {
+		// Get contributing parties
+		contributingParties := make([]party.ID, 0, len(d.qwProducts))
+		for pid := range d.qwProducts {
+			contributingParties = append(contributingParties, pid)
+			if len(contributingParties) >= d.newThreshold {
+				break
+			}
+		}
+
+		// Compute Lagrange coefficients
+		lagrange := polynomial.Lagrange(d.group, contributingParties)
+
+		// Interpolate to get q * w
+		qTimesW := d.group.NewScalar()
+		for _, pid := range contributingParties {
+			product := d.qwProducts[pid]
+			if coeff, exists := lagrange[pid]; exists {
+				contribution := d.group.NewScalar().Set(coeff).Mul(product)
+				qTimesW.Add(contribution)
+			}
+		}
+
+		// Compute z = (q * w)^{-1}
+		d.inverseZ = qTimesW.Invert()
+
+		// Create shares of z for distribution
+		zPoly := polynomial.NewPolynomial(d.group, d.newThreshold-1, d.inverseZ)
+		
+		// Distribute z shares to new parties
+		for _, partyID := range d.newParties {
+			zShare := zPoly.Evaluate(partyID.Scalar(d.group))
+			
+			// Serialize and send z share
+			zShareData, err := zShare.MarshalBinary()
+			if err != nil {
+				return fmt.Errorf("failed to marshal z share: %w", err)
+			}
+
+			msg := &lss.ReshareMessage{
+				Type:       lss.ReshareTypeVerification,
+				Generation: d.currentGeneration + 1,
+				Data:       zShareData,
+			}
+			
+			d.broadcastChan <- msg
+		}
+	}
+
 	return nil
 }
 
-func (d *BootstrapDealer) handleVerification(_ party.ID, _ *lss.ReshareMessage) error {
-	// Verify that the new shares correctly reconstruct the original secret
-	// This ensures the re-sharing was successful
+func (d *BootstrapDealer) handleVerification(from party.ID, msg *lss.ReshareMessage) error {
+	// This message contains verification data from parties
+	// confirming they have valid new shares
+	
+	if len(msg.Data) == 0 {
+		return errors.New("empty verification data")
+	}
+	
+	// In a complete implementation, parties would send:
+	// 1. Proof that their new share is valid
+	// 2. Commitment to their new public share
+	// 3. Verification that they can participate in signing
+	
+	// For now, we'll just track that we received verification
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	// Count verifications received
+	if d.verificationCount == nil {
+		d.verificationCount = make(map[party.ID]bool)
+	}
+	d.verificationCount[from] = true
+	
+	// Check if we have enough verifications
+	if len(d.verificationCount) >= d.newThreshold {
+		// Resharing is considered successful
+		// Parties can now use their new shares
+		return d.CompleteReshare()
+	}
+	
 	return nil
 }
 
@@ -222,6 +340,8 @@ func (d *BootstrapDealer) CompleteReshare() error {
 	d.wShares = make(map[party.ID]curve.Scalar)
 	d.qShares = make(map[party.ID]curve.Scalar)
 	d.blindedProducts = make(map[party.ID]curve.Scalar)
+	d.qwProducts = make(map[party.ID]curve.Scalar)
+	d.verificationCount = make(map[party.ID]bool)
 
 	return nil
 }

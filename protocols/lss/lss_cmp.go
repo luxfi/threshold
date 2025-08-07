@@ -230,19 +230,73 @@ func DynamicReshareCMP(
 
 // verifyResharingCMP validates that new shares correctly reconstruct the original public key
 func verifyResharingCMP(
-	_ map[party.ID]*config.Config,
-	_ map[party.ID]*config.Config,
-	_ int,
-	_ int,
+	oldConfigs map[party.ID]*config.Config,
+	newConfigs map[party.ID]*config.Config,
+	oldThreshold int,
+	newThreshold int,
 ) error {
-	// In a complete implementation, we would:
-	// 1. Use Lagrange interpolation to reconstruct the secret from T old shares
-	// 2. Use Lagrange interpolation to reconstruct the secret from T' new shares
-	// 3. Verify both secrets are equal
-	//
-	// For now, we trust the mathematical correctness of the resharing protocol
-	// The blinding with w and q ensures the secret is preserved while shares change
-
+	// Get the original public key from old configs
+	var oldPublicKey curve.Point
+	var group curve.Curve
+	
+	// Get first old config to extract public key and group
+	for _, cfg := range oldConfigs {
+		oldPublicKey = cfg.PublicPoint()
+		group = cfg.Group
+		break
+	}
+	
+	// Verify new shares reconstruct to the same public key
+	// Use Lagrange interpolation with new threshold parties
+	newPartyIDs := make([]party.ID, 0, len(newConfigs))
+	for pid := range newConfigs {
+		newPartyIDs = append(newPartyIDs, pid)
+		if len(newPartyIDs) >= newThreshold {
+			break
+		}
+	}
+	
+	if len(newPartyIDs) < newThreshold {
+		return fmt.Errorf("insufficient new parties for verification: have %d, need %d", 
+			len(newPartyIDs), newThreshold)
+	}
+	
+	// Compute Lagrange coefficients for the new parties
+	lagrange := polynomial.Lagrange(group, newPartyIDs)
+	
+	// Reconstruct public key from new shares
+	reconstructedKey := group.NewPoint()
+	for _, pid := range newPartyIDs {
+		cfg := newConfigs[pid]
+		if cfg == nil {
+			return fmt.Errorf("missing config for party %s", pid)
+		}
+		
+		// Get the public share for this party
+		publicShare := cfg.ECDSA.ActOnBase()
+		
+		// Apply Lagrange coefficient
+		if coeff, exists := lagrange[pid]; exists {
+			contribution := coeff.Act(publicShare)
+			reconstructedKey = reconstructedKey.Add(contribution)
+		}
+	}
+	
+	// Verify the reconstructed key matches the original
+	if !reconstructedKey.Equal(oldPublicKey) {
+		return errors.New("resharing verification failed: public keys do not match")
+	}
+	
+	// Additional verification: check threshold consistency
+	if oldThreshold > len(oldConfigs) {
+		return fmt.Errorf("old threshold %d exceeds old party count %d", 
+			oldThreshold, len(oldConfigs))
+	}
+	if newThreshold > len(newConfigs) {
+		return fmt.Errorf("new threshold %d exceeds new party count %d", 
+			newThreshold, len(newConfigs))
+	}
+	
 	return nil
 }
 
