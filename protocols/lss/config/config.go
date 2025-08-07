@@ -150,4 +150,3 @@ func (c *Config) Copy() *Config {
 
 	return newConfig
 }
-

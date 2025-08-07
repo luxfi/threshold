@@ -120,4 +120,3 @@ func (r *round3) StoreBroadcastMessage(_ round.Message) error {
 	// No broadcast messages in round 3
 	return nil
 }
-
