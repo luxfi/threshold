@@ -33,8 +33,8 @@ func TestDealerBasicOperations(t *testing.T) {
 		
 		// InitiateReshare requires: oldThreshold, newThreshold, oldParties, newParties
 		err := d.InitiateReshare(threshold, newThreshold, initialParties, newParties)
-		// Dealer operations are not yet implemented
-		assert.Error(t, err) // Expected to fail until implemented
+		// Dealer operations are implemented
+		assert.NoError(t, err)
 	})
 	
 	t.Run("GetCurrentGeneration", func(t *testing.T) {
