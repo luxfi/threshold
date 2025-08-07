@@ -6,12 +6,16 @@ import (
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
 	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/party"
 )
 
 // round2 receives commitments and sends shares
 type round2 struct {
-	*round1
+	*round.Helper
+
+	// Our polynomial from round 1
+	poly *polynomial.Polynomial
 
 	// Commitments from all parties: commitments[i][j] = g^f_i(j)
 	commitments map[party.ID]map[party.ID]curve.Point
@@ -25,13 +29,12 @@ type round2 struct {
 
 // message2 contains the secret share for a party
 type message2 struct {
-	Share curve.Scalar
+	// Share encoded as binary for CBOR compatibility
+	Share []byte
 }
 
-// BroadcastContent implements round.BroadcastRound
-func (r *round2) BroadcastContent() round.BroadcastContent {
-	return nil // Round2 doesn't broadcast
-}
+// Round2 doesn't broadcast, so we don't implement BroadcastContent
+// This ensures round2 doesn't implement the BroadcastRound interface
 
 // Number implements round.Round
 func (r *round2) Number() round.Number {
@@ -60,6 +63,12 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 		return errors.New("message not for us")
 	}
 
+	// Unmarshal the share
+	share := r.Group().NewScalar()
+	if err := share.UnmarshalBinary(body.Share); err != nil {
+		return errors.New("invalid share encoding")
+	}
+
 	// Verify share against commitment
 	commitments, ok := r.commitments[from]
 	if !ok {
@@ -72,7 +81,7 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 		return errors.New("missing commitment for our ID")
 	}
 
-	sharePoint := body.Share.ActOnBase()
+	sharePoint := share.ActOnBase()
 	if !sharePoint.Equal(expectedCommitment) {
 		return errors.New("share doesn't match commitment")
 	}
@@ -85,7 +94,13 @@ func (r *round2) StoreMessage(msg round.Message) error {
 	from := msg.From
 	body := msg.Content.(*message2)
 
-	r.shares[from] = body.Share
+	// Unmarshal the share
+	share := r.Group().NewScalar()
+	if err := share.UnmarshalBinary(body.Share); err != nil {
+		return errors.New("invalid share encoding")
+	}
+
+	r.shares[from] = share
 	return nil
 }
 
@@ -95,9 +110,15 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	for _, id := range r.OtherPartyIDs() {
 		x := id.Scalar(r.Group())
 		share := r.poly.Evaluate(x)
+		
+		// Marshal the share for CBOR
+		shareBytes, err := share.MarshalBinary()
+		if err != nil {
+			return nil, errors.New("failed to marshal share")
+		}
 
 		if err := r.SendMessage(out, &message2{
-			Share: share,
+			Share: shareBytes,
 		}, id); err != nil {
 			return nil, err
 		}
@@ -108,7 +129,10 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	r.shares[r.SelfID()] = r.poly.Evaluate(ownX)
 
 	return &round3{
-		round2: r,
+		Helper:      r.Helper,
+		commitments: r.commitments,
+		chainKeys:   r.chainKeys,
+		shares:      r.shares,
 	}, nil
 }
 

@@ -4,20 +4,25 @@ import (
 	"errors"
 
 	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/internal/types"
 	"github.com/luxfi/threshold/pkg/hash"
+	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/protocols/lss/config"
 )
 
 // round3 finalizes the keygen protocol
 type round3 struct {
-	*round2
+	*round.Helper
+
+	// Data from previous rounds
+	commitments map[party.ID]map[party.ID]curve.Point
+	chainKeys   map[party.ID]types.RID
+	shares      map[party.ID]curve.Scalar
 }
 
-// BroadcastContent implements round.BroadcastRound
-func (r *round3) BroadcastContent() round.BroadcastContent {
-	return nil // No broadcast in round 3
-}
+// Round3 doesn't broadcast, so we don't implement BroadcastContent
+// This ensures round3 doesn't implement the BroadcastRound interface
 
 // Number implements round.Round
 func (r *round3) Number() round.Number {
@@ -115,8 +120,4 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 	return r.ResultRound(cfg), nil
 }
 
-// StoreBroadcastMessage implements round.BroadcastRound
-func (r *round3) StoreBroadcastMessage(_ round.Message) error {
-	// No broadcast messages in round 3
-	return nil
-}
+// Round3 doesn't need StoreBroadcastMessage since it's not a BroadcastRound
