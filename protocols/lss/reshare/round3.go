@@ -112,14 +112,14 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Hash all chain keys together
 	h := hash.New()
 	for _, data := range chainKeyData {
-		h.WriteAny(data)
+		_ = h.WriteAny(data)
 	}
 	finalChainKey := h.Sum()
 	
 	// Create final RID
 	ridHash := hash.New()
-	ridHash.WriteAny(r.Hash())
-	ridHash.WriteAny(finalChainKey)
+	_ = ridHash.WriteAny(r.Hash())
+	_ = ridHash.WriteAny(finalChainKey)
 	finalRID := ridHash.Sum()
 	
 	// Create new config with updated generation
