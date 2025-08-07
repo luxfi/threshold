@@ -275,8 +275,9 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 	// Display public key
 	switch c := config.(type) {
 	case *lss.Config:
-		if c.PublicKey != nil {
-			pkBytes, err := c.PublicKey.MarshalBinary()
+		pubKey, err := c.PublicKey()
+		if err == nil {
+			pkBytes, err := pubKey.MarshalBinary()
 			if err == nil {
 				fmt.Printf("Public key: %s\n", hex.EncodeToString(pkBytes))
 			}
@@ -426,7 +427,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create network with all parties
-	allParties := append(config.PartyIDs, newPartyIDs...)
+	allParties := append(config.PartyIDs(), newPartyIDs...)
 	network := test.NewNetwork(allParties)
 
 	// Run resharing
@@ -450,7 +451,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Resharing complete. New config saved to: %s\n", outputFile)
-	fmt.Printf("New threshold: %d, Total parties: %d\n", newConfig.Threshold, len(newConfig.PartyIDs))
+	fmt.Printf("New threshold: %d, Total parties: %d\n", newConfig.Threshold, len(newConfig.PartyIDs()))
 
 	return nil
 }

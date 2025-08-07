@@ -379,7 +379,7 @@ func runSingleReshare(configs []*lss.Config, newThreshold, addParties, removePar
 		go func(c *lss.Config) {
 			defer wg.Done()
 
-			h, err := protocol.NewMultiHandler(lss.Reshare(c, newThreshold, newPartyIDs, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Reshare(c, newPartyIDs, newThreshold, pl), nil)
 			if err != nil {
 				return
 			}
@@ -393,16 +393,11 @@ func runSingleReshare(configs []*lss.Config, newThreshold, addParties, removePar
 		go func(id party.ID) {
 			defer wg.Done()
 
-			emptyConfig := &lss.Config{
-				ID:           id,
-				Group:        configs[0].Group,
-				PublicKey:    configs[0].PublicKey,
-				Generation:   configs[0].Generation,
-				PartyIDs:     remainingConfigs[0].PartyIDs,
-				PublicShares: make(map[party.ID]curve.Point),
-			}
+			emptyConfig := lss.EmptyConfig(configs[0].Group)
+			emptyConfig.ID = id
+			emptyConfig.Generation = configs[0].Generation
 
-			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newThreshold, newPartyIDs, pl), nil)
+			h, err := protocol.NewMultiHandler(lss.Reshare(emptyConfig, newPartyIDs, newThreshold, pl), nil)
 			if err != nil {
 				return
 			}

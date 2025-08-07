@@ -79,7 +79,7 @@ func runLSSReshare(config *lss.Config, newThreshold int, newParties []party.ID, 
 		newThreshold = config.Threshold
 	}
 
-	h, err := protocol.NewMultiHandler(lss.Reshare(config, newThreshold, newParties, pl), nil)
+	h, err := protocol.NewMultiHandler(lss.Reshare(config, newParties, newThreshold, pl), nil)
 	if err != nil {
 		return nil, err
 	}
