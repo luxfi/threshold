@@ -56,12 +56,14 @@ func NewMultiHandler(create StartFunc, sessionID []byte) (*MultiHandler, error) 
 	h := &MultiHandler{
 		currentRound:    r,
 		rounds:          map[round.Number]round.Session{r.Number(): r},
-		messages:        newQueue(r.OtherPartyIDs(), r.FinalRoundNumber()),
-		broadcast:       newQueue(r.OtherPartyIDs(), r.FinalRoundNumber()),
+		messages:        make(map[round.Number]map[party.ID]*Message),
+		broadcast:       make(map[round.Number]map[party.ID]*Message),
 		broadcastHashes: map[round.Number][]byte{},
 		out:             make(chan *Message, 2*r.N()),
 	}
-	h.finalize()
+	// Initialize storage for the first round
+	h.initRoundStorage(r)
+	h.finalizeInitial()
 	return h, nil
 }
 
@@ -120,7 +122,12 @@ func (h *MultiHandler) CanAccept(msg *Message) bool {
 		return false
 	}
 
+	// Check if message is for a round we've already passed
+	// msg.RoundNumber < r.Number() means the message is for an earlier round
+	// We reject it unless it's round 0 (abort message)
 	if msg.RoundNumber < r.Number() && msg.RoundNumber > 0 {
+		// This is the condition that's likely failing
+		// If we're in round 2 and receive a round 1 message, we reject it
 		return false
 	}
 
@@ -230,13 +237,132 @@ func (h *MultiHandler) verifyMessage(msg *Message) error {
 	return nil
 }
 
-func (h *MultiHandler) finalize() {
-	// only finalize if we have received all messages
-	if !h.receivedAll() {
+// finalizeInitial is called during handler initialization to generate initial messages
+// without advancing the round
+func (h *MultiHandler) finalizeInitial() {
+	// For round 1 broadcast rounds, generate the initial broadcast but don't advance yet
+	if h.currentRound.Number() != 1 {
 		return
 	}
+	
+	if _, ok := h.currentRound.(round.BroadcastRound); !ok {
+		return
+	}
+	
+	// Special handling: generate broadcast but stay in round 1
+	out := make(chan *round.Message, h.currentRound.N()+1)
+	r, err := h.currentRound.Finalize(out)
+	close(out)
+	
+	if err != nil {
+		h.abort(err, h.currentRound.SelfID())
+		return
+	}
+	
+	// Save the next round for later but don't advance to it yet
+	if r != nil && r.Number() > h.currentRound.Number() {
+		h.rounds[r.Number()] = r
+		// Pre-initialize storage for round 2 so it's ready when we advance
+		h.initRoundStorage(r)
+	}
+	
+	// Forward messages
+	for roundMsg := range out {
+		data, err := cbor.Marshal(roundMsg.Content)
+		if err != nil {
+			panic(fmt.Errorf("failed to marshal round message: %w", err))
+		}
+		msg := &Message{
+			SSID:                  h.currentRound.SSID(),
+			From:                  h.currentRound.SelfID(),
+			To:                    roundMsg.To,
+			Protocol:              h.currentRound.ProtocolID(),
+			RoundNumber:           roundMsg.Content.RoundNumber(),
+			Data:                  data,
+			Broadcast:             roundMsg.Broadcast,
+			BroadcastVerification: nil,
+		}
+		if msg.Broadcast {
+			// Store our own broadcast for hash calculation
+			h.store(msg)
+			// Verify it was stored
+			if h.broadcast[msg.RoundNumber] != nil && h.broadcast[msg.RoundNumber][msg.From] == nil {
+				// Storage failed - this is a problem
+				// For debugging: try to understand why
+			}
+		}
+		h.out <- msg
+	}
+	// Stay in round 1 to accept other broadcasts
+}
+
+func (h *MultiHandler) finalize() {
+	// Special case: Round 2 needs to send shares immediately without waiting
+	if h.currentRound.Number() == 2 && expectsNormalMessage(h.currentRound) {
+		// Check if we've already sent shares (to avoid double-sending)
+		// If round 3 exists, we've already sent shares
+		if _, ok := h.rounds[3]; !ok {
+			// fmt.Printf("Handler %s: Round 2 - sending shares immediately\n", h.currentRound.SelfID())
+			// Call Finalize to generate and send share messages
+			out2 := make(chan *round.Message, h.currentRound.N()+1)
+			nextRound, err := h.currentRound.Finalize(out2)
+			close(out2)
+			
+			if err != nil {
+				h.abort(err, h.currentRound.SelfID())
+				return
+			}
+			
+			// Send the share messages
+			for roundMsg := range out2 {
+				data, err := cbor.Marshal(roundMsg.Content)
+				if err != nil {
+					panic(fmt.Errorf("failed to marshal round message: %w", err))
+				}
+				msg := &Message{
+					SSID:                  h.currentRound.SSID(),
+					From:                  h.currentRound.SelfID(),
+					To:                    roundMsg.To,
+					Protocol:              h.currentRound.ProtocolID(),
+					RoundNumber:           roundMsg.Content.RoundNumber(),
+					Data:                  data,
+					Broadcast:             roundMsg.Broadcast,
+					BroadcastVerification: h.broadcastHashes[h.currentRound.Number()-1],
+				}
+				h.out <- msg
+			}
+			
+			// Save and advance to round 3
+			if nextRound != nil {
+				h.rounds[nextRound.Number()] = nextRound
+				// Don't advance yet - we'll do that when we receive all shares
+			}
+			// Return here to avoid sending shares again in the normal flow
+			return
+		}
+	}
+	
+	// only finalize if we have received all messages
+	if !h.receivedAll() {
+		// fmt.Printf("finalize: Not all messages received for round %d (handler %s)\n", h.currentRound.Number(), h.currentRound.SelfID())
+		return
+	}
+	// fmt.Printf("finalize: All messages received for round %d (handler %s), advancing...\n", h.currentRound.Number(), h.currentRound.SelfID())
 	if !h.checkBroadcastHash() {
 		h.abort(errors.New("broadcast verification failed"))
+		return
+	}
+
+	// Check if we've already finalized this round 
+	nextRoundNumber := h.currentRound.Number() + 1
+	if existingRound, ok := h.rounds[nextRoundNumber]; ok {
+		// We've already finalized this round, just advance to the next
+		h.currentRound = existingRound
+		// Initialize storage for the next round
+		h.initRoundStorage(existingRound)
+		
+		// Process any queued messages for the new round
+		h.processQueuedMessages()
 		return
 	}
 
@@ -280,6 +406,9 @@ func (h *MultiHandler) finalize() {
 	}
 	h.rounds[roundNumber] = r
 	h.currentRound = r
+	// fmt.Printf("Handler %s: Advanced to round %d\n", r.SelfID(), r.Number())
+	// Initialize storage for the new round
+	h.initRoundStorage(r)
 
 	// either we get the current round, the next one, or one of the two final ones
 	switch R := r.(type) {
@@ -325,6 +454,39 @@ func (h *MultiHandler) finalize() {
 	h.finalize()
 }
 
+func (h *MultiHandler) processQueuedMessages() {
+	roundNumber := h.currentRound.Number()
+	
+	if _, ok := h.currentRound.(round.BroadcastRound); ok {
+		// handle queued broadcast messages
+		for id, m := range h.broadcast[roundNumber] {
+			if m == nil || id == h.currentRound.SelfID() {
+				continue
+			}
+			// if false, we aborted and so we return
+			if err := h.verifyBroadcastMessage(m); err != nil {
+				h.abort(err, m.From)
+				return
+			}
+		}
+	} else {
+		// handle simple queued messages
+		for _, m := range h.messages[roundNumber] {
+			if m == nil {
+				continue
+			}
+			// if false, we aborted and so we return
+			if err := h.verifyMessage(m); err != nil {
+				h.abort(err, m.From)
+				return
+			}
+		}
+	}
+	
+	// Continue processing if needed
+	h.finalize()
+}
+
 func (h *MultiHandler) abort(err error, culprits ...party.ID) {
 	if err != nil {
 		h.err = &Error{
@@ -361,12 +523,25 @@ func (h *MultiHandler) receivedAll() bool {
 	number := r.Number()
 	// check all broadcast messages
 	if _, ok := r.(round.BroadcastRound); ok {
+		// fmt.Printf("receivedAll: Round %d IS a BroadcastRound\n", number)
+		// Only check broadcasts if this round actually broadcasts
 		if h.broadcast[number] == nil {
-			return true
+			// No broadcast storage means we haven't initialized it yet
+			// This should not happen if initRoundStorage was called
+			return false
 		}
+		
+		// Normal case: check for all broadcasts
+		// We need all broadcasts including our own for the hash
 		for _, id := range r.PartyIDs() {
 			msg := h.broadcast[number][id]
 			if msg == nil {
+				// Debug: Print which party's broadcast is missing
+				if id == r.SelfID() {
+					// Our own broadcast is missing - this shouldn't happen
+					// fmt.Printf("WARNING: Handler %s missing OWN broadcast for round %d\n", r.SelfID(), number)
+				}
+				// fmt.Printf("Handler %s missing broadcast from %s for round %d\n", r.SelfID(), id, number)
 				return false
 			}
 		}
@@ -388,6 +563,7 @@ func (h *MultiHandler) receivedAll() bool {
 	// check all normal messages
 	if expectsNormalMessage(r) {
 		if h.messages[number] == nil {
+			// No message storage means no messages expected
 			return true
 		}
 		for _, id := range r.OtherPartyIDs() {
@@ -423,10 +599,18 @@ func (h *MultiHandler) store(msg *Message) {
 	} else {
 		q = h.messages[msg.RoundNumber]
 	}
-	if q == nil || q[msg.From] != nil {
+	if q == nil {
+		// Storage not initialized for this round
+		// fmt.Printf("store: Storage not initialized for round %d (broadcast=%v)\n", msg.RoundNumber, msg.Broadcast)
+		return
+	}
+	if q[msg.From] != nil {
+		// Already have a message from this sender
+		// fmt.Printf("store: Already have message from %s for round %d\n", msg.From, msg.RoundNumber)
 		return
 	}
 	q[msg.From] = msg
+	// fmt.Printf("store: Stored message from %s for round %d (broadcast=%v)\n", msg.From, msg.RoundNumber, msg.Broadcast)
 }
 
 // getRoundMessage attempts to unmarshal a raw Message for round `r` in a round.Message.
@@ -483,7 +667,8 @@ func (h *MultiHandler) checkBroadcastHash() bool {
 func newQueue(senders []party.ID, rounds round.Number) map[round.Number]map[party.ID]*Message {
 	n := len(senders)
 	q := make(map[round.Number]map[party.ID]*Message, rounds)
-	for i := round.Number(2); i <= rounds; i++ {
+	// Start from round 1 to support protocols that broadcast in the first round
+	for i := round.Number(1); i <= rounds; i++ {
 		q[i] = make(map[party.ID]*Message, n)
 		for _, id := range senders {
 			q[i][id] = nil
@@ -494,4 +679,29 @@ func newQueue(senders []party.ID, rounds round.Number) map[round.Number]map[part
 
 func (h *MultiHandler) String() string {
 	return fmt.Sprintf("party: %s, protocol: %s", h.currentRound.SelfID(), h.currentRound.ProtocolID())
+}
+
+// initRoundStorage initializes message storage for a specific round based on its requirements
+func (h *MultiHandler) initRoundStorage(r round.Session) {
+	number := r.Number()
+	
+	// Initialize broadcast storage only if this is a broadcast round
+	if _, ok := r.(round.BroadcastRound); ok {
+		if h.broadcast[number] == nil {
+			h.broadcast[number] = make(map[party.ID]*Message, r.N())
+			for _, id := range r.PartyIDs() {
+				h.broadcast[number][id] = nil
+			}
+		}
+	}
+	
+	// Initialize message storage only if this round expects messages
+	if expectsNormalMessage(r) {
+		if h.messages[number] == nil {
+			h.messages[number] = make(map[party.ID]*Message, r.N()-1)
+			for _, id := range r.OtherPartyIDs() {
+				h.messages[number][id] = nil
+			}
+		}
+	}
 }
