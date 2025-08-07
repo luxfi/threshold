@@ -1,21 +1,182 @@
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - vendor
+    - .git
+  skip-files:
+    - ".*_test.go"
+
 linters:
   enable:
-    - goimports
-    - revive
-    - govet
-    - unused
-    - gosimple
-    - errcheck
-    - ineffassign
-    - staticcheck
-    - goconst
+    - bodyclose
+    - depguard
+    - dogsled
     - dupl
+    - errcheck
+    - exportloopref
     - exhaustive
-    - gocognit
-    - godot
-    - godox
-    - importas
-    - nilerr
-    - prealloc
-  disable:
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - revive
+    - staticcheck
+    - stylecheck
     - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+  disable:
+    - funlen
+    - gochecknoglobals
+    - gocognit
+    - godox
+    - prealloc
+
+linters-settings:
+  depguard:
+    rules:
+      main:
+        deny:
+          - pkg: "github.com/sirupsen/logrus"
+            desc: "Use standard library log package"
+
+  dupl:
+    threshold: 100
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  exhaustive:
+    default-signifies-exhaustive: false
+
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+
+  gocyclo:
+    min-complexity: 15
+
+  goimports:
+    local-prefixes: github.com/lux/threshold
+
+  gomnd:
+    settings:
+      mnd:
+        checks:
+          - argument
+          - case
+          - condition
+          - operation
+          - return
+        ignored-numbers:
+          - '0'
+          - '1'
+          - '2'
+          - '3'
+          - '10'
+          - '32'
+          - '64'
+          - '128'
+          - '256'
+          - '512'
+          - '1024'
+
+  govet:
+    check-shadowing: true
+    enable-all: true
+
+  lll:
+    line-length: 140
+
+  misspell:
+    locale: US
+
+  nolintlint:
+    allow-leading-space: true
+    allow-unused: false
+    require-explanation: false
+    require-specific: false
+
+  revive:
+    confidence: 0
+
+  gosec:
+    excludes:
+      - G104  # Ignore error checking for some cases
+      - G115  # Integer overflow (controlled conversions in cryptographic operations)
+      - G304  # File path provided by user
+      - G401  # Use of weak cryptographic primitive (specific crypto for threshold schemes)
+      - G501  # Weak crypto (same reason)
+      - G502  # Weak crypto (same reason)
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - gomnd
+
+    - path: pkg/math/
+      linters:
+        - gomnd  # Cryptographic code has many magic numbers
+
+    - path: pkg/zk/
+      linters:
+        - gomnd  # Zero-knowledge proofs have many magic numbers
+
+    - path: protocols/
+      linters:
+        - gomnd  # Protocol implementations have specific constants
+
+    - path: cmd/
+      linters:
+        - gochecknoinits
+
+    - linters:
+        - lll
+      source: "^//go:generate "
+
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
