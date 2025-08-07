@@ -2,6 +2,8 @@
 package reshare
 
 import (
+	"fmt"
+	
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
@@ -12,6 +14,17 @@ import (
 // Start initiates the LSS resharing protocol.
 func Start(oldConfig *config.Config, newParticipants []party.ID, newThreshold int, pl *pool.Pool) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
+		// Validate parameters
+		if len(newParticipants) == 0 {
+			return nil, fmt.Errorf("new participant list cannot be empty")
+		}
+		if newThreshold <= 0 {
+			return nil, fmt.Errorf("threshold must be positive")
+		}
+		if newThreshold >= len(newParticipants) {
+			return nil, fmt.Errorf("threshold %d must be less than number of parties %d", newThreshold, len(newParticipants))
+		}
+		
 		// Determine if we're in the old group, new group, or both
 		oldID := oldConfig.ID
 		inOldGroup := false

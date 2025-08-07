@@ -87,14 +87,14 @@ func TestReshareParameterValidation(t *testing.T) {
 		{
 			name:         "remove parties",
 			newParties:   []party.ID{"alice", "bob"},
-			newThreshold: 2,
+			newThreshold: 1,
 			expectError:  false,
 		},
 		{
 			name:         "change threshold only",
 			newParties:   []party.ID{"alice", "bob", "charlie"},
 			newThreshold: 3,
-			expectError:  false,
+			expectError:  true, // threshold must be < n
 		},
 		{
 			name:         "invalid threshold too high",
