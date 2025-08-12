@@ -2,6 +2,7 @@ package keygen
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -33,10 +34,15 @@ type round2 struct {
 	ChainKeys map[party.ID]types.RID
 	// ChainKeyCommitments holds the commitments for the chain key contributions
 	ChainKeyCommitments map[party.ID]hash.Commitment
+	
+	// mu protects concurrent access to maps
+	mu sync.Mutex
+	// finalized indicates whether this round has been finalized
+	finalized bool
 }
 
 type broadcast2 struct {
-	round.ReliableBroadcastContent
+	round.NormalBroadcastContent
 	// PhiI is the commitment to the polynomial that this participant generated.
 	PhiI *polynomial.Exponent
 	// SigmaI is the Schnorr proof of knowledge of the participant's secret
@@ -47,6 +53,14 @@ type broadcast2 struct {
 
 // StoreBroadcastMessage implements round.BroadcastRound.
 func (r *round2) StoreBroadcastMessage(msg round.Message) error {
+	// Protect concurrent access and check if finalized
+	r.mu.Lock()
+	if r.finalized {
+		r.mu.Unlock()
+		return nil // Ignore messages after finalization
+	}
+	r.mu.Unlock()
+	
 	from := msg.From
 	body, ok := msg.Content.(*broadcast2)
 	if !ok || body == nil {
@@ -58,8 +72,11 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		return round.ErrNilFields
 	}
 
-	if err := body.Commitment.Validate(); err != nil {
-		return fmt.Errorf("commitment: %w", err)
+	// During refresh, commitment can be empty
+	if !r.refresh {
+		if err := body.Commitment.Validate(); err != nil {
+			return fmt.Errorf("commitment: %w", err)
+		}
 	}
 
 	// These steps come from Figure 1, Round 1 of the Frost paper
@@ -88,8 +105,20 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		}
 	}
 
+	// Protect concurrent map writes
+	r.mu.Lock()
 	r.Phi[from] = body.PhiI
-	r.ChainKeyCommitments[from] = body.Commitment
+	// Store chain key commitments - make a defensive copy to avoid issues with shared slices
+	var commitmentCopy []byte
+	if body.Commitment != nil {
+		commitmentCopy = make([]byte, len(body.Commitment))
+		copy(commitmentCopy, body.Commitment)
+	}
+	r.ChainKeyCommitments[from] = commitmentCopy
+	// Debug: Log stored commitment (commented out for production)
+	// fmt.Printf("[ROUND2] Party %s stored commitment from %s: %x (len=%d)\n", r.SelfID(), from, commitmentCopy, len(commitmentCopy))
+	r.mu.Unlock()
+	
 	return nil
 }
 
@@ -106,8 +135,9 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// (l, fᵢ(l)), deleting f_i and each share afterward except for (i, fᵢ(i)),
 	// which they keep for themselves."
 
+	ck := r.ChainKeys[r.SelfID()]
 	if err := r.BroadcastMessage(out, &broadcast3{
-		CL:           r.ChainKeys[r.SelfID()],
+		CL:           ck,
 		Decommitment: r.ChainKeyDecommitment,
 	}); err != nil {
 		return r, err
@@ -122,6 +152,19 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	selfShare := r.fI.Evaluate(r.SelfID().Scalar(r.Group()))
+	
+	// Mark as finalized to prevent further modifications
+	r.mu.Lock()
+	r.finalized = true
+	// Debug: Check what commitments we have
+	commitmentCount := len(r.ChainKeyCommitments)
+	r.mu.Unlock()
+	
+	// We should have commitments from all other parties (not including ourselves)
+	if !r.refresh && commitmentCount != r.PartyIDs().Len()-1 {
+		return r, fmt.Errorf("missing chain key commitments: have %d, need %d", commitmentCount, r.PartyIDs().Len()-1)
+	}
+	
 	return &round3{
 		round2:    r,
 		shareFrom: map[party.ID]curve.Scalar{r.SelfID(): selfShare},

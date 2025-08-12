@@ -13,6 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/paillier"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pedersen"
+	"github.com/luxfi/threshold/pkg/protocol"
 	zksch "github.com/luxfi/threshold/pkg/zk/sch"
 )
 
@@ -42,6 +43,9 @@ type round1 struct {
 	// Keygen:  fᵢ(0) = xⁱ
 	// Refresh: fᵢ(0) = 0
 	VSSSecret *polynomial.Polynomial
+
+	// keyID is the stable cross-phase identifier for this key generation context
+	keyID *protocol.KeyID
 }
 
 // VerifyMessage implements round.Round.
@@ -88,7 +92,8 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	// commit to data in message 2
-	SelfCommitment, Decommitment, err := r.HashForID(r.SelfID()).Commit(
+	// Use KeyID for stable cross-phase commitments instead of sessionID-based hash
+	SelfCommitment, Decommitment, err := r.keyID.HashForParty(r.SelfID()).Commit(
 		SelfRID, chainKey, SelfVSSPolynomial, SchnorrRand.Commitment(), ElGamalPublic,
 		SelfPedersenPublic.N(), SelfPedersenPublic.S(), SelfPedersenPublic.T())
 	if err != nil {

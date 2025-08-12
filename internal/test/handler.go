@@ -6,7 +6,7 @@ import (
 )
 
 // HandlerLoop blocks until the handler has finished. The result of the execution is given by Handler.Result().
-func HandlerLoop(id party.ID, h protocol.Handler, network *Network) {
+func HandlerLoop(id party.ID, h *protocol.Handler, network *Network) {
 	for {
 		select {
 

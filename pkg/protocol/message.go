@@ -27,6 +27,8 @@ type Message struct {
 	// BroadcastVerification is the hash of all messages broadcast by the parties,
 	// and is included in all messages in the round following a broadcast round.
 	BroadcastVerification []byte
+	// Compressed indicates whether the Data field is compressed
+	Compressed bool
 }
 
 // String implements fmt.Stringer.

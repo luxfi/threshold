@@ -105,7 +105,8 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 		return err
 	}
 	// Verify decommit
-	if !r.HashForID(from).Decommit(r.Commitments[from], body.Decommitment,
+	// Use KeyID for stable cross-phase verification instead of sessionID-based hash
+	if !r.keyID.HashForParty(from).Decommit(r.Commitments[from], body.Decommitment,
 		body.RID, body.C, VSSPolynomial, body.SchnorrCommitments, body.ElGamalPublic, body.N, body.S, body.T) {
 		return errors.New("failed to decommit")
 	}
@@ -136,6 +137,13 @@ func (round3) StoreMessage(round.Message) error { return nil }
 //
 // - send proofs and encryption of share for Pⱼ.
 func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
+	// Check if we have received all broadcasts before proceeding
+	// We need ChainKeys and RIDs from all N parties
+	if len(r.ChainKeys) < r.N() || len(r.RIDs) < r.N() {
+		// Not ready to advance yet - return ourselves to wait for more messages
+		return r, nil
+	}
+	
 	// c = ⊕ⱼ cⱼ
 	chainKey := r.PreviousChainKey
 	if chainKey == nil {
