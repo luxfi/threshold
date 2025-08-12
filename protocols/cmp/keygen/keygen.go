@@ -30,6 +30,11 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 
 		group := helper.Group()
 
+		// Create a stable KeyID for cross-phase commitments
+		// We don't include the public key in the KeyID for keygen since it's not known yet
+		// This ensures all parties compute the same KeyID independently
+		keyID := protocol.NewKeyID(info.ProtocolID, group, nil, info.PartyIDs, info.Threshold, 0)
+
 		if c != nil {
 			PublicSharesECDSA := make(map[party.ID]curve.Point, len(c.Public))
 			for id, public := range c.Public {
@@ -41,6 +46,7 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 				PreviousPublicSharesECDSA: PublicSharesECDSA,
 				PreviousChainKey:          c.ChainKey,
 				VSSSecret:                 polynomial.NewPolynomial(group, helper.Threshold(), group.NewScalar()), // fᵢ(X) deg(fᵢ) = t, fᵢ(0) = 0
+				keyID:                     keyID,
 			}, nil
 		}
 
@@ -50,6 +56,7 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 		return &round1{
 			Helper:    helper,
 			VSSSecret: VSSSecret,
+			keyID:     keyID,
 		}, nil
 
 	}

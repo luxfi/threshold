@@ -44,16 +44,42 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 		return round.ErrInvalidContent
 	}
 
-	if err := body.CL.Validate(); err != nil {
-		return err
+	// During refresh, skip chain key verification
+	if !r.refresh {
+		if err := body.CL.Validate(); err != nil {
+			return err
+		}
+		// Verify that the commitment to the chain key contribution matches, and then xor
+		// it into the accumulated chain key so far.
+		r.mu.Lock()
+		commitment, exists := r.ChainKeyCommitments[from]
+		r.mu.Unlock()
+		
+		if !exists {
+			// This can happen if we receive round3 messages before all round2 messages
+			// The protocol handler will retry this message later
+			return round.ErrNotReady
+		}
+		// Debug: Log verification attempt (commented out for production)
+		// fmt.Printf("[ROUND3] Party %s verifying commitment from %s: stored_commitment=%x, decommit=%x, CL=%x\n", 
+		//	r.SelfID(), from, commitment, body.Decommitment, body.CL)
+		// Use session-based hash for verification - using the SENDER's ID
+		// The Helper should be the same as the one used in round1 for commitment creation
+		if !r.Helper.HashForID(from).Decommit(commitment, body.Decommitment, body.CL) {
+			// Debug: log details (commented out for production)
+			// fmt.Printf("[ROUND3] Party %s FAILED to verify from %s - commitment=%x, decommit=%x, CL=%x\n", 
+			//	r.SelfID(), from, commitment, body.Decommitment, body.CL)
+			return fmt.Errorf("failed to verify chain key commitment from party %s (hash mismatch)", from)
+		}
+		r.ChainKeys[from] = body.CL
+	} else {
+		// During refresh, chain key should be empty
+		if body.CL == nil || len(body.CL) == 0 {
+			r.ChainKeys[from] = types.EmptyRID()
+		} else {
+			r.ChainKeys[from] = body.CL
+		}
 	}
-
-	// Verify that the commitment to the chain key contribution matches, and then xor
-	// it into the accumulated chain key so far.
-	if !r.HashForID(from).Decommit(r.ChainKeyCommitments[from], body.Decommitment, body.CL) {
-		return fmt.Errorf("failed to verify chain key commitment")
-	}
-	r.ChainKeys[from] = body.CL
 	return nil
 }
 
@@ -86,9 +112,21 @@ func (r *round3) StoreMessage(msg round.Message) error {
 	//
 	// aborting if the check fails."
 	expected := body.FLi.ActOnBase()
-	actual := r.Phi[from].Evaluate(r.SelfID().Scalar(r.Group()))
+	
+	// Protect concurrent map read since round2's maps might still be getting updated
+	r.mu.Lock()
+	phi, ok := r.Phi[from]
+	r.mu.Unlock()
+	
+	if !ok || phi == nil {
+		// This can happen if we receive p2p messages before broadcast messages
+		// The protocol handler will retry this message later
+		return round.ErrNotReady
+	}
+	actual := phi.Evaluate(r.SelfID().Scalar(r.Group()))
 	if !expected.Equal(actual) {
-		return fmt.Errorf("VSS failed to validate")
+		// Debug: log the mismatch
+		return fmt.Errorf("VSS failed to validate from party %s (expected != actual)", from)
 	}
 
 	r.shareFrom[from] = body.FLi
@@ -98,9 +136,32 @@ func (r *round3) StoreMessage(msg round.Message) error {
 
 // Finalize implements round.Round.
 func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
-	ChainKey := types.EmptyRID()
+	// All messages should have been received before Finalize is called
+	// The protocol handler ensures all expected messages are received
+	
+	// Verify we have all chain keys (can be empty during refresh)
 	for _, j := range r.PartyIDs() {
-		ChainKey.XOR(r.ChainKeys[j])
+		if _, ok := r.ChainKeys[j]; !ok {
+			// During refresh, set empty chain key if missing
+			if r.refresh {
+				r.ChainKeys[j] = types.EmptyRID()
+			} else {
+				return nil, fmt.Errorf("missing chain key from party %s", j)
+			}
+		}
+	}
+	
+	// Now we have all chain keys, XOR them together
+	// During refresh, chain keys are empty, so ChainKey remains empty
+	ChainKey := types.EmptyRID()
+	if !r.refresh {
+		for _, j := range r.PartyIDs() {
+			ck := r.ChainKeys[j]
+			if ck == nil || len(ck) == 0 {
+				return nil, fmt.Errorf("invalid chain key from party %s", j)
+			}
+			ChainKey.XOR(ck)
+		}
 	}
 
 	// These steps come from Figure 1, Round 2 of the Frost paper

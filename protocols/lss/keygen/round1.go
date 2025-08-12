@@ -25,6 +25,9 @@ type round1 struct {
 	// Storage for received broadcasts
 	receivedCommitments map[party.ID]map[party.ID]curve.Point
 	receivedChainKeys   map[party.ID]types.RID
+	
+	// Track if we've already generated our values to prevent regeneration
+	generated bool
 }
 
 // broadcast1 contains the polynomial commitments
@@ -100,8 +103,10 @@ func (r *round1) StoreMessage(_ round.Message) error {
 
 // Finalize implements round.Round
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
-	// If we haven't generated our polynomial yet, do it now
-	if r.poly == nil {
+	// Only generate values once to prevent different values on repeated calls
+	if !r.generated {
+		r.generated = true
+		
 		// Generate our polynomial with random secret
 		secret := sample.Scalar(rand.Reader, r.Group())
 		r.poly = polynomial.NewPolynomial(r.Group(), r.Threshold()-1, secret)

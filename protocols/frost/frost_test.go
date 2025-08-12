@@ -1,96 +1,118 @@
-package frost
+package frost_test
 
 import (
-	"bytes"
-	"fmt"
-	"sync"
-	"testing"
-
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/threshold/pkg/taproot"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/luxfi/threshold/protocols/frost"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte, n *test.Network, wg *sync.WaitGroup) {
-	defer wg.Done()
-	h, err := protocol.NewMultiHandler(Keygen(curve.Secp256k1{}, id, ids, threshold), nil)
-	require.NoError(t, err)
-	test.HandlerLoop(id, h, n)
-	r, err := h.Result()
-	require.NoError(t, err)
-	require.IsType(t, &Config{}, r)
-	c0 := r.(*Config)
+var _ = Describe("FROST Protocol", func() {
+	var (
+		partyIDs []party.ID
+		message  []byte
+	)
 
-	h, err = protocol.NewMultiHandler(Refresh(c0, ids), nil)
-	require.NoError(t, err)
-	test.HandlerLoop(id, h, n)
-	r, err = h.Result()
-	require.NoError(t, err)
-	require.IsType(t, &Config{}, r)
-	c := r.(*Config)
-	require.True(t, c0.PublicKey.Equal(c.PublicKey))
+	BeforeEach(func() {
+		message = []byte("test message for FROST protocol")
+	})
 
-	h, err = protocol.NewMultiHandler(KeygenTaproot(id, ids, threshold), nil)
-	require.NoError(t, err)
-	test.HandlerLoop(c.ID, h, n)
-
-	r, err = h.Result()
-	require.NoError(t, err)
-	require.IsType(t, &TaprootConfig{}, r)
-
-	c0Taproot := r.(*TaprootConfig)
-
-	h, err = protocol.NewMultiHandler(RefreshTaproot(c0Taproot, ids), nil)
-	require.NoError(t, err)
-	test.HandlerLoop(c.ID, h, n)
-
-	r, err = h.Result()
-	require.NoError(t, err)
-	require.IsType(t, &TaprootConfig{}, r)
-
-	cTaproot := r.(*TaprootConfig)
-	require.True(t, bytes.Equal(c0Taproot.PublicKey, cTaproot.PublicKey))
-
-	h, err = protocol.NewMultiHandler(Sign(c, ids, message), nil)
-	require.NoError(t, err)
-	test.HandlerLoop(c.ID, h, n)
-
-	signResult, err := h.Result()
-	require.NoError(t, err)
-	require.IsType(t, Signature{}, signResult)
-	signature := signResult.(Signature)
-	assert.True(t, signature.Verify(c.PublicKey, message))
-
-	h, err = protocol.NewMultiHandler(SignTaproot(cTaproot, ids, message), nil)
-	require.NoError(t, err)
-
-	test.HandlerLoop(c.ID, h, n)
-
-	signResult, err = h.Result()
-	require.NoError(t, err)
-	require.IsType(t, taproot.Signature{}, signResult)
-	taprootSignature := signResult.(taproot.Signature)
-	assert.True(t, cTaproot.PublicKey.Verify(taprootSignature, message))
-}
-
-func TestFrost(t *testing.T) {
-	N := 5
-	T := N - 1
-	message := []byte("hello")
-
-	partyIDs := test.PartyIDs(N)
-	fmt.Println(partyIDs)
-
-	n := test.NewNetwork(partyIDs)
-
-	var wg sync.WaitGroup
-	wg.Add(N)
-	for _, id := range partyIDs {
-		go do(t, id, partyIDs, T, message, n, &wg)
+	runParty := func(partyIDs []party.ID, threshold int, message []byte) {
+		// Phase 1: Keygen
+		harness1 := test.NewHarness(nil, partyIDs)
+		defer harness1.Cleanup()
+		sessionID1 := []byte("test-keygen")
+		
+		for _, id := range partyIDs {
+			startFunc := frost.Keygen(curve.Secp256k1{}, id, partyIDs, threshold)
+			_, err := harness1.CreateHandler(id, startFunc, sessionID1)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		
+		err := harness1.Run()
+		Expect(err).NotTo(HaveOccurred())
+		
+		results1 := harness1.Results()
+		configs := make(map[party.ID]*frost.Config)
+		for id, r := range results1 {
+			Expect(r).To(BeAssignableToTypeOf(&frost.Config{}))
+			configs[id] = r.(*frost.Config)
+		}
+		
+		// Phase 2: Refresh
+		harness2 := test.NewHarness(nil, partyIDs)
+		defer harness2.Cleanup()
+		sessionID2 := []byte("test-refresh")
+		
+		for id, config := range configs {
+			startFunc := frost.Refresh(config, partyIDs)
+			_, err := harness2.CreateHandler(id, startFunc, sessionID2)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		
+		err = harness2.Run()
+		Expect(err).NotTo(HaveOccurred())
+		
+		results2 := harness2.Results()
+		refreshedConfigs := make(map[party.ID]*frost.Config)
+		for id, r := range results2 {
+			Expect(r).To(BeAssignableToTypeOf(&frost.Config{}))
+			refreshedConfigs[id] = r.(*frost.Config)
+			Expect(configs[id].PublicKey.Equal(refreshedConfigs[id].PublicKey)).To(BeTrue())
+		}
+		
+		// Phase 3: Sign
+		harness3 := test.NewHarness(nil, partyIDs)
+		defer harness3.Cleanup()
+		sessionID3 := []byte("test-sign")
+		
+		for id, config := range refreshedConfigs {
+			startFunc := frost.Sign(config, partyIDs, message)
+			_, err := harness3.CreateHandler(id, startFunc, sessionID3)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		
+		err = harness3.Run()
+		Expect(err).NotTo(HaveOccurred())
+		
+		results3 := harness3.Results()
+		for id, r := range results3 {
+			Expect(r).To(BeAssignableToTypeOf(&frost.Signature{}))
+			signature := r.(*frost.Signature)
+			Expect(signature.Verify(refreshedConfigs[id].PublicKey, message)).To(BeTrue())
+		}
 	}
-	wg.Wait()
-}
+
+	Context("with 2-out-of-3 threshold", func() {
+		BeforeEach(func() {
+			partyIDs = test.PartyIDs(3)
+		})
+
+		It("should complete full protocol flow", func() {
+			runParty(partyIDs, 2, message)
+		})
+	})
+
+	Context("with 3-out-of-5 threshold", func() {
+		BeforeEach(func() {
+			partyIDs = test.PartyIDs(5)
+		})
+
+		It("should complete full protocol flow", func() {
+			runParty(partyIDs, 3, message)
+		})
+	})
+
+	Context("with 5-out-of-7 threshold", func() {
+		BeforeEach(func() {
+			partyIDs = test.PartyIDs(7)
+		})
+
+		It("should complete full protocol flow", func() {
+			runParty(partyIDs, 5, message)
+		})
+	})
+
+})

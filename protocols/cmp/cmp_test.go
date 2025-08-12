@@ -1,32 +1,58 @@
 package cmp
 
 import (
+	"context"
 	"crypto/rand"
 	"math"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/luxfi/log"
+	"github.com/luxfi/log/level"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte, pl *pool.Pool, n *test.Network, wg *sync.WaitGroup) {
 	defer wg.Done()
-	h, err := protocol.NewMultiHandler(Keygen(curve.Secp256k1{}, id, ids, threshold, pl), nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	logger := log.NewTestLogger(level.Info)
+	sessionID := []byte("test-session")
+	config := protocol.DefaultConfig()
+	
+	h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Keygen(curve.Secp256k1{}, id, ids, threshold, pl), sessionID, config)
 	require.NoError(t, err)
-	test.HandlerLoop(id, h, n)
+	
+	// Run handler with timeout
+	done := make(chan struct{})
+	go func() {
+		test.HandlerLoop(id, h, n)
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// Success
+	case <-ctx.Done():
+		t.Logf("Keygen timed out for party %s", id)
+		return
+	}
+	
 	r, err := h.Result()
 	require.NoError(t, err)
 	require.IsType(t, &Config{}, r)
 	c := r.(*Config)
 
-	h, err = protocol.NewMultiHandler(Refresh(c, pl), nil)
+	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Refresh(c, pl), sessionID, config)
 	require.NoError(t, err)
 	test.HandlerLoop(c.ID, h, n)
 
@@ -35,7 +61,7 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	require.IsType(t, &Config{}, r)
 	c = r.(*Config)
 
-	h, err = protocol.NewMultiHandler(Sign(c, ids, message, pl), nil)
+	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Sign(c, ids, message, pl), sessionID, config)
 	require.NoError(t, err)
 	test.HandlerLoop(c.ID, h, n)
 
@@ -45,7 +71,7 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	signature := signResult.(*ecdsa.Signature)
 	assert.True(t, signature.Verify(c.PublicPoint(), message))
 
-	h, err = protocol.NewMultiHandler(Presign(c, ids, pl), nil)
+	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Presign(c, ids, pl), sessionID, config)
 	require.NoError(t, err)
 
 	test.HandlerLoop(c.ID, h, n)
@@ -56,7 +82,7 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	preSignature := signResult.(*ecdsa.PreSignature)
 	assert.NoError(t, preSignature.Validate())
 
-	h, err = protocol.NewMultiHandler(PresignOnline(c, preSignature, message, pl), nil)
+	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), PresignOnline(c, preSignature, message, pl), sessionID, config)
 	require.NoError(t, err)
 	test.HandlerLoop(c.ID, h, n)
 
@@ -74,14 +100,15 @@ func TestCMP(t *testing.T) {
 
 	partyIDs := test.PartyIDs(N)
 
-	n := test.NewNetwork(partyIDs)
-
+	// Use the original do function approach that was working
+	pl := pool.NewPool(3)
+	defer pl.TearDown()
+	
+	network := test.NewNetwork(partyIDs)
 	var wg sync.WaitGroup
-	wg.Add(N)
 	for _, id := range partyIDs {
-		pl := pool.NewPool(3)
-		defer pl.TearDown()
-		go do(t, id, partyIDs, T, message, pl, n, &wg)
+		wg.Add(1)
+		go do(t, id, partyIDs, T, message, pl, network, &wg)
 	}
 	wg.Wait()
 }

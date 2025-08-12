@@ -81,6 +81,14 @@ func (round2) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round.
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
+	// Check if we have all D and E values - if not, return self to wait for more broadcasts
+	for _, l := range r.PartyIDs() {
+		if r.D[l] == nil || r.E[l] == nil {
+			// Not ready yet, return self to continue waiting for broadcasts
+			return r, nil
+		}
+	}
+	
 	// This essentially follows parts of Figure 3.
 
 	// 4. "Each Pᵢ then computes the set of binding values ρₗ = H₁(l, m, B).
