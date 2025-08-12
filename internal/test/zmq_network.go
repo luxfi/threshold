@@ -9,7 +9,7 @@ import (
 
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/zmq4/networking"
+	"github.com/luxfi/zmq/v4/networking"
 )
 
 // ZMQNetwork provides real network communication for protocol testing using ZMQ4
@@ -49,22 +49,22 @@ func (n *ZMQNetwork) Start() error {
 			RetryDelay:  100 * time.Millisecond,
 			BufferSize:  1000,
 		}
-		
+
 		transport := networking.New(n.ctx, config)
 		n.transports[id] = transport
-		
+
 		// Create handler channel
 		n.handlers[id] = make(chan *protocol.Message, 100)
-		
+
 		// Start the transport
 		if err := transport.Start(); err != nil {
 			return fmt.Errorf("failed to start transport for %s: %w", id, err)
 		}
-		
+
 		// Register protocol message handler
 		transport.RegisterHandler("protocol", n.createHandler(id))
 	}
-	
+
 	// Connect all parties to each other
 	for _, id1 := range n.parties {
 		transport1 := n.transports[id1]
@@ -77,29 +77,29 @@ func (n *ZMQNetwork) Start() error {
 			}
 		}
 	}
-	
+
 	// Give connections time to establish
 	time.Sleep(200 * time.Millisecond)
-	
+
 	return nil
 }
 
 // Stop shuts down all transports
 func (n *ZMQNetwork) Stop() {
 	n.cancel()
-	
+
 	// Stop all transports
 	for _, transport := range n.transports {
 		transport.Stop()
 	}
-	
+
 	// Close all handler channels
 	n.mu.Lock()
 	for _, ch := range n.handlers {
 		close(ch)
 	}
 	n.mu.Unlock()
-	
+
 	n.wg.Wait()
 }
 
@@ -107,11 +107,11 @@ func (n *ZMQNetwork) Stop() {
 func (n *ZMQNetwork) Next(id party.ID) <-chan *protocol.Message {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	
+
 	if ch, ok := n.handlers[id]; ok {
 		return ch
 	}
-	
+
 	// Return closed channel if not found
 	closed := make(chan *protocol.Message)
 	close(closed)
@@ -125,14 +125,14 @@ func (n *ZMQNetwork) Send(msg *protocol.Message) {
 		fmt.Printf("No transport for party %s\n", msg.From)
 		return
 	}
-	
+
 	// Marshal the protocol message
 	data, err := json.Marshal(msg)
 	if err != nil {
 		fmt.Printf("Failed to marshal protocol message: %v\n", err)
 		return
 	}
-	
+
 	// Create network message
 	netMsg := &networking.Message{
 		Type:      "protocol",
@@ -141,7 +141,7 @@ func (n *ZMQNetwork) Send(msg *protocol.Message) {
 		Data:      data,
 		Timestamp: time.Now().UnixNano(),
 	}
-	
+
 	// Send to appropriate recipients
 	if msg.To != "" {
 		// Point-to-point message
@@ -161,12 +161,12 @@ func (n *ZMQNetwork) Send(msg *protocol.Message) {
 func (n *ZMQNetwork) Done(id party.ID) chan struct{} {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	
+
 	if ch, ok := n.handlers[id]; ok {
 		close(ch)
 		delete(n.handlers, id)
 	}
-	
+
 	done := make(chan struct{})
 	if len(n.handlers) == 0 {
 		close(done)
@@ -183,12 +183,12 @@ func (n *ZMQNetwork) createHandler(partyID party.ID) networking.MessageHandler {
 			fmt.Printf("Failed to unmarshal protocol message: %v\n", err)
 			return
 		}
-		
+
 		// Route to party's channel
 		n.mu.RLock()
 		ch, ok := n.handlers[partyID]
 		n.mu.RUnlock()
-		
+
 		if ok && protocolMsg.IsFor(partyID) {
 			select {
 			case ch <- &protocolMsg:
@@ -210,7 +210,7 @@ func (n *ZMQNetwork) GetMetrics() map[party.ID]struct {
 		Received uint64
 		Dropped  uint64
 	})
-	
+
 	for id, transport := range n.transports {
 		sent, received, dropped := transport.GetMetrics()
 		metrics[id] = struct {
@@ -223,6 +223,6 @@ func (n *ZMQNetwork) GetMetrics() map[party.ID]struct {
 			Dropped:  dropped,
 		}
 	}
-	
+
 	return metrics
 }
