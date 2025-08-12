@@ -93,7 +93,10 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	assert.True(t, signature.Verify(c.PublicPoint(), message))
 }
 
-func TestCMP(t *testing.T) {
+func TestCMPFull(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping full CMP protocol test in short mode")
+	}
 	N := 3
 	T := N - 1
 	message := []byte("hello")
