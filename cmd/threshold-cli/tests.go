@@ -211,7 +211,7 @@ func testBasicSignature(protocolName string) error {
 		go func(id party.ID) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
@@ -257,7 +257,7 @@ func testBasicSignature(protocolName string) error {
 		go func() {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
@@ -480,7 +480,7 @@ func setupTestConfigs(protocolName string, n, threshold int, pl *pool.Pool, netw
 		go func(id party.ID) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
@@ -529,7 +529,7 @@ func performSign(protocolName string, configs []interface{}, signers []party.ID,
 		go func(cfg interface{}) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {

@@ -112,13 +112,30 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	PhiI := polynomial.NewPolynomialExponent(fI)
 
 	// cI is our contribution to the chaining key
-	cI, err := types.NewRID(rand.Reader)
-	if err != nil {
-		return r, fmt.Errorf("failed to sample ChainKey")
-	}
-	commitment, decommitment, err := r.HashForID(r.SelfID()).Commit(cI)
-	if err != nil {
-		return r, fmt.Errorf("failed to commit to chain key")
+	// During refresh, we don't need to regenerate the chain key
+	var cI types.RID
+	var commitment hash.Commitment
+	var decommitment hash.Decommitment
+	var err error
+	
+	if !r.refresh {
+		cI, err = types.NewRID(rand.Reader)
+		if err != nil {
+			return r, fmt.Errorf("failed to sample ChainKey")
+		}
+		// Use session-based hash for commitments - with OUR ID
+		commitment, decommitment, err = r.Helper.HashForID(r.SelfID()).Commit(cI)
+		if err != nil {
+			return r, fmt.Errorf("failed to commit to chain key")
+		}
+		// Debug: Log commitment details (commented out for production)
+		// fmt.Printf("[ROUND1] Party %s created commitment: %x (len=%d) for chainkey: %x\n", r.SelfID(), commitment, len(commitment), cI)
+	} else {
+		// During refresh, use empty values for chain key
+		cI = types.EmptyRID()
+		// Use nil for refresh - they will be properly handled
+		commitment = nil
+		decommitment = nil
 	}
 
 	// 4. "Every Pᵢ broadcasts Φᵢ, σᵢ to all other participants
@@ -131,6 +148,13 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		return r, err
 	}
 
+	// Make a defensive copy of the commitment to avoid potential issues with shared slices
+	var commitmentCopy []byte
+	if commitment != nil {
+		commitmentCopy = make([]byte, len(commitment))
+		copy(commitmentCopy, commitment)
+	}
+	
 	return &round2{
 		round1:               r,
 		fI:                   fI,

@@ -214,7 +214,7 @@ func runSingleKeygen(protocolName string, n, threshold int) error {
 		go func(id party.ID) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
@@ -256,7 +256,7 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 		go func(id party.ID) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
@@ -319,7 +319,7 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 		go func(idx int, cfg interface{}) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
