@@ -106,28 +106,45 @@ func (r *round2) StoreMessage(msg round.Message) error {
 
 // Finalize implements round.Round
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
-	// Send shares to each party
-	for _, id := range r.OtherPartyIDs() {
-		x := id.Scalar(r.Group())
-		share := r.poly.Evaluate(x)
-		
-		// Marshal the share for CBOR
-		shareBytes, err := share.MarshalBinary()
-		if err != nil {
-			return nil, errors.New("failed to marshal share")
+	// Initialize shares map if needed
+	if r.shares == nil {
+		r.shares = make(map[party.ID]curve.Scalar)
+	}
+	
+	// First time: Send shares to each party
+	if r.shares[r.SelfID()] == nil {
+		for _, id := range r.OtherPartyIDs() {
+			x := id.Scalar(r.Group())
+			share := r.poly.Evaluate(x)
+			
+			// Marshal the share for CBOR
+			shareBytes, err := share.MarshalBinary()
+			if err != nil {
+				return nil, errors.New("failed to marshal share")
+			}
+
+			if err := r.SendMessage(out, &message2{
+				Share: shareBytes,
+			}, id); err != nil {
+				return nil, err
+			}
 		}
 
-		if err := r.SendMessage(out, &message2{
-			Share: shareBytes,
-		}, id); err != nil {
-			return nil, err
-		}
+		// Our own share
+		ownX := r.SelfID().Scalar(r.Group())
+		r.shares[r.SelfID()] = r.poly.Evaluate(ownX)
+		
+		// Return self to wait for incoming shares
+		return r, nil
 	}
 
-	// Our own share
-	ownX := r.SelfID().Scalar(r.Group())
-	r.shares[r.SelfID()] = r.poly.Evaluate(ownX)
+	// Second time: Check if we have all shares before advancing
+	if len(r.shares) < r.N() {
+		// Still waiting for shares
+		return r, nil
+	}
 
+	// We have all shares, advance to round3
 	return &round3{
 		Helper:      r.Helper,
 		commitments: r.commitments,

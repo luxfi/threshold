@@ -325,9 +325,10 @@ func generateFROSTConfigs(group curve.Curve, partyIDs []party.ID, threshold int)
 
 // PrintBenchmarkSummary prints a formatted summary of benchmark results
 func TestPrintBenchmarkSummary(t *testing.T) {
-	if testing.Short() {
-		// Skip in short mode is allowed for benchmarks
-		t.Skip("Skipping benchmark summary in short mode")
+	// Print benchmark summary when run in verbose mode
+	if !testing.Verbose() {
+		t.Log("Run with -v flag to see benchmark summary")
+		return
 	}
 	
 	fmt.Println("\n=== LSS Performance Benchmark Results ===")

@@ -124,6 +124,13 @@ func (r *round4) StoreMessage(msg round.Message) error {
 // - write new ssid hash to old hash state
 // - create proof of knowledge of secret.
 func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
+	// Check if we have received all shares before proceeding
+	// We need shares from all N parties
+	if len(r.ShareReceived) < r.N() {
+		// Not ready to advance yet - return ourselves to wait for more messages
+		return r, nil
+	}
+	
 	// add all shares to our secret
 	UpdatedSecretECDSA := r.Group().NewScalar()
 	if r.PreviousSecretECDSA != nil {
