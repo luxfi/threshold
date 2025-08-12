@@ -73,14 +73,14 @@ func TestDynamicMembership(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup initial parties
 			initialIDs := generatePartyIDs(tt.initialParties)
-			configs := runKeygen(t, group, initialIDs, tt.initialThresh)
+			configs := runKeygenDynamic(t, group, initialIDs, tt.initialThresh)
 
 			// Verify initial signing works
 			testMessage := []byte("initial test message for signature")
 			messageHash := hashMessage(testMessage)
 			signers := initialIDs[:tt.initialThresh]
 			
-			sig1 := runSign(t, configs, signers, messageHash)
+			sig1 := runSignDynamic(t, configs, signers, messageHash)
 			require.NotNil(t, sig1, "Initial signing should succeed")
 
 			// Prepare new party set
@@ -115,7 +115,7 @@ func TestDynamicMembership(t *testing.T) {
 
 				// Verify new configuration can sign
 				newSigners := selectSigners(newPartyIDs, tt.finalThresh, removedParties)
-				sig2 := runSign(t, newConfigs, newSigners, messageHash)
+				sig2 := runSignDynamic(t, newConfigs, newSigners, messageHash)
 				require.NotNil(t, sig2, "Signing with new configuration should succeed")
 
 				// Verify both signatures are valid and match
@@ -138,7 +138,7 @@ func TestRollbackOnFailure(t *testing.T) {
 	
 	// Setup initial configuration
 	partyIDs := generatePartyIDs(5)
-	configs := runKeygen(t, group, partyIDs, 3)
+	configs := runKeygenDynamic(t, group, partyIDs, 3)
 	
 	// Save initial generation
 	initialGen := configs[partyIDs[0]].Generation
@@ -233,7 +233,7 @@ func TestFaultInjection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			partyIDs := generatePartyIDs(9)
-			configs := runKeygen(t, group, partyIDs, 5)
+			configs := runKeygenDynamic(t, group, partyIDs, 5)
 			
 			// Inject faults
 			faultyConfigs := injectFaults(configs, tt.faultType, tt.faultRate)
@@ -265,7 +265,7 @@ func TestCorrectnessVerification(t *testing.T) {
 		t.Run(fmt.Sprintf("Round_%d", round), func(t *testing.T) {
 			// Generate keys
 			partyIDs := generatePartyIDs(7)
-			configs := runKeygen(t, group, partyIDs, 4)
+			configs := runKeygenDynamic(t, group, partyIDs, 4)
 			
 			// Get the combined public key
 			publicKey := getPublicKey(t, configs)
@@ -289,7 +289,7 @@ func TestCorrectnessVerification(t *testing.T) {
 				
 				signatures := make([]interface{}, 0)
 				for _, signers := range signerSets {
-					sig := runSign(t, configs, signers, messageHash)
+					sig := runSignDynamic(t, configs, signers, messageHash)
 					require.NotNil(t, sig, "Signing should succeed")
 					signatures = append(signatures, sig)
 					
@@ -318,7 +318,7 @@ func TestCorrectnessVerification(t *testing.T) {
 			// Sign with new configuration
 			newSigners := newPartyIDs[:5]
 			newMessageHash := hashMessage([]byte("Post-reshare message"))
-			newSig := runSign(t, newConfigs, newSigners, newMessageHash)
+			newSig := runSignDynamic(t, newConfigs, newSigners, newMessageHash)
 			
 			assert.True(t, verifySignature(newSig, newPublicKey, newMessageHash),
 				"New configuration should produce valid signatures")
@@ -332,7 +332,7 @@ func TestConcurrentOperations(t *testing.T) {
 	
 	// Setup initial configuration
 	partyIDs := generatePartyIDs(7)
-	configs := runKeygen(t, group, partyIDs, 4)
+	configs := runKeygenDynamic(t, group, partyIDs, 4)
 	
 	// Run concurrent operations
 	var wg sync.WaitGroup
@@ -347,7 +347,7 @@ func TestConcurrentOperations(t *testing.T) {
 			messageHash := hashMessage([]byte(fmt.Sprintf("Concurrent message %d", id)))
 			signers := selectRandomSigners(partyIDs, 4)
 			
-			sig := runSign(t, configs, signers, messageHash)
+			sig := runSignDynamic(t, configs, signers, messageHash)
 			results <- (sig != nil)
 		}(i)
 	}
@@ -384,11 +384,11 @@ func hashMessage(message []byte) []byte {
 	return hash
 }
 
-func runKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold int) map[party.ID]*config.Config {
+func runKeygenDynamic(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold int) map[party.ID]*config.Config {
 	return lss.RunKeygen(t, group, partyIDs, threshold)
 }
 
-func runSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.ID, messageHash []byte) interface{} {
+func runSignDynamic(t *testing.T, configs map[party.ID]*config.Config, signers []party.ID, messageHash []byte) interface{} {
 	return lss.RunSign(t, configs, signers, messageHash)
 }
 
@@ -453,7 +453,7 @@ func runSignWithFaults(t *testing.T, configs map[party.ID]*config.Config, signer
 	}
 	
 	// Use only the available signers
-	return runSign(t, configs, availableSigners, messageHash)
+	return runSignDynamic(t, configs, availableSigners, messageHash)
 }
 
 func runReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyIDs []party.ID, newThreshold int) map[party.ID]*config.Config {

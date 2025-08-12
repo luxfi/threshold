@@ -386,7 +386,7 @@ func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool
 		go func(id party.ID) {
 			defer wg.Done()
 
-			var h protocol.Handler
+			var h *protocol.Handler
 			var err error
 
 			switch protocolName {
@@ -427,7 +427,7 @@ func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool
 }
 
 func attemptSignWithConfig(protocolName string, config interface{}, partyIDs []party.ID, message []byte, pl *pool.Pool, network *test.Network) error {
-	var h protocol.Handler
+	var h *protocol.Handler
 	var err error
 	var id party.ID
 

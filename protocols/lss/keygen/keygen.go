@@ -3,6 +3,7 @@ package keygen
 
 import (
 	"github.com/luxfi/threshold/internal/round"
+	"github.com/luxfi/threshold/internal/types"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
@@ -28,7 +29,9 @@ func Start(selfID party.ID, participants []party.ID, threshold int, group curve.
 		}
 
 		return &round1{
-			Helper: helper,
+			Helper:              helper,
+			receivedCommitments: make(map[party.ID]map[party.ID]curve.Point),
+			receivedChainKeys:   make(map[party.ID]types.RID),
 		}, nil
 	}
 }
