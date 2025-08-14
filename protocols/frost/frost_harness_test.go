@@ -11,6 +11,7 @@ import (
 	"github.com/luxfi/threshold/protocols/frost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zeebo/blake3"
 )
 
 func TestFROSTKeygen(t *testing.T) {
@@ -99,23 +100,43 @@ func TestFROSTKeygen(t *testing.T) {
 }
 
 func TestFROSTKeygenAndSign(t *testing.T) {
+	// Helper function to hash messages for FROST
+	// FROST expects a properly hashed message, not raw bytes
+	hashMessage := func(msg []byte) []byte {
+		// Use blake3 hash as expected by FROST
+		h := blake3.New()
+		h.Write(msg)
+		return h.Sum(nil)
+	}
+	
 	tests := []test.KeygenAndSign{
 		{
 			Name:       "2-of-3 signature",
 			PartyCount: 3,
 			Threshold:  2,
-			Message:    []byte("test message for 2-of-3"),
+			Message:    hashMessage([]byte("test message for 2-of-3")),
 			CreateKeygen: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
 				return frost.Keygen(curve.Secp256k1{}, id, ids, threshold)
 			},
 			CreateSign: func(config interface{}, signers []party.ID, message []byte) protocol.StartFunc {
 				frostConfig := config.(*frost.Config)
+				// Message is already hashed
 				return frost.Sign(frostConfig, signers, message)
 			},
 			ValidateSign: func(t *testing.T, config interface{}, signature interface{}, message []byte) {
 				frostConfig := config.(*frost.Config)
-				sig := signature.(*frost.Signature)
+				// Signature may be returned as value or pointer
+				var sig *frost.Signature
+				switch s := signature.(type) {
+				case *frost.Signature:
+					sig = s
+				case frost.Signature:
+					sig = &s
+				default:
+					t.Fatalf("unexpected signature type: %T", signature)
+				}
 				require.NotNil(t, sig)
+				// Message is already hashed
 				assert.True(t, sig.Verify(frostConfig.PublicKey, message), "signature should verify")
 			},
 		},
@@ -123,18 +144,29 @@ func TestFROSTKeygenAndSign(t *testing.T) {
 			Name:       "3-of-5 signature",
 			PartyCount: 5,
 			Threshold:  3,
-			Message:    []byte("test message for 3-of-5"),
+			Message:    hashMessage([]byte("test message for 3-of-5")),
 			CreateKeygen: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
 				return frost.Keygen(curve.Secp256k1{}, id, ids, threshold)
 			},
 			CreateSign: func(config interface{}, signers []party.ID, message []byte) protocol.StartFunc {
 				frostConfig := config.(*frost.Config)
+				// Message is already hashed
 				return frost.Sign(frostConfig, signers, message)
 			},
 			ValidateSign: func(t *testing.T, config interface{}, signature interface{}, message []byte) {
 				frostConfig := config.(*frost.Config)
-				sig := signature.(*frost.Signature)
+				// Signature may be returned as value or pointer
+				var sig *frost.Signature
+				switch s := signature.(type) {
+				case *frost.Signature:
+					sig = s
+				case frost.Signature:
+					sig = &s
+				default:
+					t.Fatalf("unexpected signature type: %T", signature)
+				}
 				require.NotNil(t, sig)
+				// Message is already hashed
 				assert.True(t, sig.Verify(frostConfig.PublicKey, message), "signature should verify")
 			},
 		},
@@ -142,18 +174,29 @@ func TestFROSTKeygenAndSign(t *testing.T) {
 			Name:       "5-of-7 signature",
 			PartyCount: 7,
 			Threshold:  5,
-			Message:    []byte("test message for 5-of-7"),
+			Message:    hashMessage([]byte("test message for 5-of-7")),
 			CreateKeygen: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
 				return frost.Keygen(curve.Secp256k1{}, id, ids, threshold)
 			},
 			CreateSign: func(config interface{}, signers []party.ID, message []byte) protocol.StartFunc {
 				frostConfig := config.(*frost.Config)
+				// Message is already hashed
 				return frost.Sign(frostConfig, signers, message)
 			},
 			ValidateSign: func(t *testing.T, config interface{}, signature interface{}, message []byte) {
 				frostConfig := config.(*frost.Config)
-				sig := signature.(*frost.Signature)
+				// Signature may be returned as value or pointer
+				var sig *frost.Signature
+				switch s := signature.(type) {
+				case *frost.Signature:
+					sig = s
+				case frost.Signature:
+					sig = &s
+				default:
+					t.Fatalf("unexpected signature type: %T", signature)
+				}
 				require.NotNil(t, sig)
+				// Message is already hashed
 				assert.True(t, sig.Verify(frostConfig.PublicKey, message), "signature should verify")
 			},
 		},

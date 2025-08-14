@@ -26,7 +26,8 @@ func TestCMPFast(t *testing.T) {
 		require.NotNil(t, startFunc, "Keygen start function should not be nil for party %s", id)
 		
 		// Verify the start function creates a valid round
-		round := startFunc(nil)
+		round, err := startFunc(nil)
+		require.NoError(t, err, "Keygen should not error for party %s", id)
 		require.NotNil(t, round, "Keygen should create initial round for party %s", id)
 	}
 	
@@ -41,7 +42,6 @@ func TestCMPTimeout(t *testing.T) {
 	
 	N := 3
 	T := 2
-	partyIDs := test.PartyIDs(N)
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 	

@@ -2,6 +2,7 @@ package keygen
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -20,7 +21,8 @@ type round3 struct {
 	// shareFrom is the secret share sent to us by a given party, including ourselves.
 	//
 	// shareFrom[l] corresponds to fₗ(i) in the Frost paper, with i our own ID.
-	shareFrom map[party.ID]curve.Scalar
+	// Using sync.Map for thread-safe concurrent access
+	shareFrom *sync.Map // map[party.ID]curve.Scalar
 }
 
 type message3 struct {
@@ -49,35 +51,27 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 		if err := body.CL.Validate(); err != nil {
 			return err
 		}
-		// Verify that the commitment to the chain key contribution matches, and then xor
-		// it into the accumulated chain key so far.
-		r.mu.Lock()
-		commitment, exists := r.ChainKeyCommitments[from]
-		r.mu.Unlock()
-		
+		// Verify that the commitment to the chain key contribution matches
+		commitmentValue, exists := r.ChainKeyCommitments.Load(from)
 		if !exists {
 			// This can happen if we receive round3 messages before all round2 messages
 			// The protocol handler will retry this message later
 			return round.ErrNotReady
 		}
-		// Debug: Log verification attempt (commented out for production)
-		// fmt.Printf("[ROUND3] Party %s verifying commitment from %s: stored_commitment=%x, decommit=%x, CL=%x\n", 
-		//	r.SelfID(), from, commitment, body.Decommitment, body.CL)
+		commitment, _ := commitmentValue.([]byte)
+		
 		// Use session-based hash for verification - using the SENDER's ID
 		// The Helper should be the same as the one used in round1 for commitment creation
 		if !r.Helper.HashForID(from).Decommit(commitment, body.Decommitment, body.CL) {
-			// Debug: log details (commented out for production)
-			// fmt.Printf("[ROUND3] Party %s FAILED to verify from %s - commitment=%x, decommit=%x, CL=%x\n", 
-			//	r.SelfID(), from, commitment, body.Decommitment, body.CL)
 			return fmt.Errorf("failed to verify chain key commitment from party %s (hash mismatch)", from)
 		}
-		r.ChainKeys[from] = body.CL
+		r.ChainKeys.Store(from, body.CL)
 	} else {
 		// During refresh, chain key should be empty
 		if body.CL == nil || len(body.CL) == 0 {
-			r.ChainKeys[from] = types.EmptyRID()
+			r.ChainKeys.Store(from, types.EmptyRID())
 		} else {
-			r.ChainKeys[from] = body.CL
+			r.ChainKeys.Store(from, body.CL)
 		}
 	}
 	return nil
@@ -113,23 +107,26 @@ func (r *round3) StoreMessage(msg round.Message) error {
 	// aborting if the check fails."
 	expected := body.FLi.ActOnBase()
 	
-	// Protect concurrent map read since round2's maps might still be getting updated
-	r.mu.Lock()
-	phi, ok := r.Phi[from]
-	r.mu.Unlock()
-	
-	if !ok || phi == nil {
+	// Load phi from sync.Map
+	phiValue, ok := r.Phi.Load(from)
+	if !ok {
 		// This can happen if we receive p2p messages before broadcast messages
 		// The protocol handler will retry this message later
 		return round.ErrNotReady
 	}
+	phi, _ := phiValue.(*polynomial.Exponent)
+	if phi == nil {
+		return round.ErrNotReady
+	}
+	
 	actual := phi.Evaluate(r.SelfID().Scalar(r.Group()))
 	if !expected.Equal(actual) {
 		// Debug: log the mismatch
 		return fmt.Errorf("VSS failed to validate from party %s (expected != actual)", from)
 	}
 
-	r.shareFrom[from] = body.FLi
+	// Store share using sync.Map
+	r.shareFrom.Store(from, body.FLi)
 
 	return nil
 }
@@ -141,10 +138,10 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	
 	// Verify we have all chain keys (can be empty during refresh)
 	for _, j := range r.PartyIDs() {
-		if _, ok := r.ChainKeys[j]; !ok {
+		if _, ok := r.ChainKeys.Load(j); !ok {
 			// During refresh, set empty chain key if missing
 			if r.refresh {
-				r.ChainKeys[j] = types.EmptyRID()
+				r.ChainKeys.Store(j, types.EmptyRID())
 			} else {
 				return nil, fmt.Errorf("missing chain key from party %s", j)
 			}
@@ -156,7 +153,8 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	ChainKey := types.EmptyRID()
 	if !r.refresh {
 		for _, j := range r.PartyIDs() {
-			ck := r.ChainKeys[j]
+			ckValue, _ := r.ChainKeys.Load(j)
+			ck, _ := ckValue.(types.RID)
 			if ck == nil || len(ck) == 0 {
 				return nil, fmt.Errorf("invalid chain key from party %s", j)
 			}
@@ -169,10 +167,21 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	// 3. "Each P_i calculates their long-lived private signing share by computing
 	// sᵢ = ∑ₗ₌₁ⁿ fₗ(i), stores s_i securely, and deletes each fₗ(i)"
 
-	for l, fLi := range r.shareFrom {
+	// Iterate over shares in sync.Map
+	// Debug: count shares
+	shareCount := 0
+	r.shareFrom.Range(func(key, value interface{}) bool {
+		fLi := value.(curve.Scalar)
 		r.privateShare.Add(fLi)
-		// TODO: Maybe actually clear this in a better way
-		delete(r.shareFrom, l)
+		shareCount++
+		// Delete from sync.Map after processing
+		r.shareFrom.Delete(key)
+		return true
+	})
+	
+	// We should have exactly n shares (including our own)
+	if shareCount != r.PartyIDs().Len() {
+		return r.AbortRound(fmt.Errorf("expected %d shares, got %d", r.PartyIDs().Len(), shareCount)), nil
 	}
 
 	// 4. "Each Pᵢ calculates their public verification share Yᵢ = sᵢ • G,
@@ -181,22 +190,37 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	//
 	// Yᵢ = ∑ⱼ₌₁ⁿ ∑ₖ₌₀ᵗ (iᵏ mod q) * ϕⱼₖ."
 
-	for _, phiJ := range r.Phi {
+	// Iterate over Phi in sync.Map to calculate public key
+	r.Phi.Range(func(key, value interface{}) bool {
+		phiJ := value.(*polynomial.Exponent)
 		r.publicKey = r.publicKey.Add(phiJ.Constant())
-	}
+		return true
+	})
 
 	// This accomplishes the same sum as in the paper, by first summing
 	// together the exponent coefficients, and then evaluating.
 	exponents := make([]*polynomial.Exponent, 0, r.PartyIDs().Len())
-	for _, phiJ := range r.Phi {
+	r.Phi.Range(func(key, value interface{}) bool {
+		phiJ := value.(*polynomial.Exponent)
 		exponents = append(exponents, phiJ)
-	}
+		return true
+	})
 	verificationExponent, err := polynomial.Sum(exponents)
 	if err != nil {
 		panic(err)
 	}
-	for k, v := range r.verificationShares {
-		r.verificationShares[k] = v.Add(verificationExponent.Evaluate(k.Scalar(r.Group())))
+	if r.refresh {
+		// For refresh, add to existing verification shares
+		for k, v := range r.verificationShares {
+			r.verificationShares[k] = v.Add(verificationExponent.Evaluate(k.Scalar(r.Group())))
+		}
+	} else {
+		// For fresh keygen, set verification shares directly
+		// Debug: log that we're in fresh keygen mode
+		for k := range r.verificationShares {
+			evaluated := verificationExponent.Evaluate(k.Scalar(r.Group()))
+			r.verificationShares[k] = evaluated
+		}
 	}
 
 	if r.taproot {
@@ -224,6 +248,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 			Threshold:          r.threshold,
 			PrivateShare:       r.privateShare.(*curve.Secp256k1Scalar),
 			PublicKey:          YSecp.XBytes()[:],
+			ChainKey:           ChainKey,
 			VerificationShares: secpVerificationShares,
 		}), nil
 	}
@@ -233,6 +258,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		Threshold:          r.threshold,
 		PrivateShare:       r.privateShare,
 		PublicKey:          r.publicKey,
+		ChainKey:           ChainKey,
 		VerificationShares: party.NewPointMap(r.verificationShares),
 	}), nil
 }

@@ -41,6 +41,7 @@ type Handler struct {
 	rounds       sync.Map     // round.Number -> round.Session
 	result       atomic.Value // stores interface{}
 	err          atomic.Value // stores *Error
+	stopped      atomic.Bool  // tracks if handler is stopped
 
 	// Sharded message storage for zero contention
 	messages     *MessageStore
@@ -57,9 +58,10 @@ type Handler struct {
 	priority chan *Message // High-priority messages
 
 	// Lifecycle management
-	ctx    context.Context
-	cancel context.CancelFunc
-	done   chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
+	done      chan struct{}
+	closeOnce sync.Once
 
 	// Worker pool
 	workers     int
@@ -584,6 +586,14 @@ func (h *Handler) tryAdvanceRound() {
 	// The LoadOrStore returns the existing value if present, or stores and returns the new value
 	if finalized, loaded := h.finalized.LoadOrStore(r.Number(), true); loaded && finalized.(bool) {
 		h.log.Debug("round already finalized", log.Uint16("round", uint16(r.Number())))
+		// Check if current round has actually advanced
+		currentWrapper := h.currentRound.Load().(*roundWrapper)
+		if currentWrapper.round.Number() > r.Number() {
+			h.log.Debug("current round already advanced",
+				log.Uint16("checking", uint16(r.Number())),
+				log.Uint16("current", uint16(currentWrapper.round.Number())))
+			return // We're already past this round
+		}
 		// Check if we need to advance to the next round that was stored by initializeRound
 		nextRoundNum := r.Number() + 1
 		if nextRoundObj, ok := h.rounds.Load(nextRoundNum); ok {
@@ -807,6 +817,9 @@ func (h *Handler) Listen() <-chan *Message {
 // Stop gracefully shuts down the handler
 func (h *Handler) Stop() {
 	h.log.Info("stopping protocol handler")
+	
+	// Mark as stopped first
+	h.stopped.Store(true)
 	
 	// Cancel context to stop all workers
 	h.cancel()
@@ -1041,6 +1054,12 @@ func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 		h.storeMessage(protocolMsg)
 	}
 	
+	// Check if handler is stopped before sending
+	if h.stopped.Load() {
+		h.log.Debug("skipping send - handler stopped")
+		return
+	}
+	
 	select {
 	case h.out <- protocolMsg:
 		h.log.Debug("sent message to output channel",
@@ -1186,7 +1205,10 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 		go func() {
 			// Give a small delay to allow any final messages to be sent
 			time.Sleep(10 * time.Millisecond)
-			close(h.out)
+			// Use sync.Once to ensure we only close once
+			h.closeOnce.Do(func() {
+				close(h.out)
+			})
 		}()
 		return nil
 		

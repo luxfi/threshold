@@ -230,7 +230,7 @@ func (p *Proof) Verify(public Public, hash *hash.Hash, pl *pool.Pool) bool {
 	}
 	n := public.N.Big()
 	nMod := public.N
-	// check if n is odd and prime
+	// check if n is odd and NOT prime (n should be composite)
 	if n.Bit(0) == 0 || n.ProbablyPrime(20) {
 		return false
 	}

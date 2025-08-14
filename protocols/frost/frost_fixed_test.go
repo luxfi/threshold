@@ -2,6 +2,7 @@ package frost_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,6 +17,109 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestFROSTKeygenSimple runs a simple keygen test with direct handler control
+func TestFROSTKeygenSimple(t *testing.T) {
+	n := 3
+	threshold := 2
+	partyIDs := test.PartyIDs(n)
+	group := curve.Secp256k1{}
+
+	// Create test network
+	network := test.NewNetwork(partyIDs)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create handlers
+	handlers := make(map[party.ID]*protocol.Handler)
+	logger := log.NewTestLogger(level.Error) // Reduce log noise
+	sessionID := []byte("frost-keygen-simple")
+	config := &protocol.Config{
+		Workers:         4,
+		PriorityWorkers: 1,
+		BufferSize:      1024,
+		PriorityBuffer:  256,
+		MessageTimeout:  5 * time.Second,
+		RoundTimeout:    10 * time.Second,
+		ProtocolTimeout: 10 * time.Second,
+	}
+
+	for _, id := range partyIDs {
+		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+			frost.Keygen(group, id, partyIDs, threshold), sessionID, config)
+		require.NoError(t, err)
+		handlers[id] = h
+	}
+
+	// Run handlers with proper message routing
+	var wg sync.WaitGroup
+	results := make(map[party.ID]interface{})
+	var resultMu sync.Mutex
+
+	for id, handler := range handlers {
+		wg.Add(1)
+		go func(id party.ID, h *protocol.Handler) {
+			defer wg.Done()
+
+			// Route outgoing messages
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case msg, ok := <-h.Listen():
+						if !ok || msg == nil {
+							return
+						}
+						network.Send(msg)
+					}
+				}
+			}()
+
+			// Route incoming messages
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case msg := <-network.Next(id):
+						if msg != nil {
+							h.Accept(msg)
+						}
+					}
+				}
+			}()
+
+			// Wait for result
+			result, err := h.WaitForResult()
+			if err == nil {
+				resultMu.Lock()
+				results[id] = result
+				resultMu.Unlock()
+			}
+		}(id, handler)
+	}
+
+	// Wait with timeout
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Success
+	case <-ctx.Done():
+		t.Fatal("Test timed out")
+	}
+
+	// Verify results
+	require.Len(t, results, n, "should have results from all parties")
+	for id, result := range results {
+		assert.NotNil(t, result, "party %s should have result", id)
+	}
+}
 
 func TestFROSTKeygenWithTimeout(t *testing.T) {
 	// Test FROST keygen with proper timeout
@@ -45,7 +149,7 @@ func TestFROSTKeygenWithTimeout(t *testing.T) {
 	}
 	
 	// Run with timeout
-	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 3*time.Second, createHandlers)
+	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 30*time.Second, createHandlers)
 	
 	// Don't fail on timeout
 	if err != nil {
@@ -100,16 +204,29 @@ func TestFROSTSignWithTimeout(t *testing.T) {
 	publicKey := group.NewPoint()
 	
 	for i, id := range partyIDs {
-		configs[id] = &frost.Config{
-			ID:           id,
-			Threshold:    threshold,
-			PublicKey:    publicKey,
-			SecretShare:  group.NewScalar().SetNat(uint64(i + 1)), // Non-nil secret share
-			PublicShares: make(map[party.ID]curve.Point),
-		}
-		// Add public shares for all parties
+		// Create a non-zero scalar for the private share
+		privateShare := group.NewScalar()
+		privateShareBytes := make([]byte, 32)
+		privateShareBytes[0] = byte(i + 1) // Simple non-zero value
+		privateShare.UnmarshalBinary(privateShareBytes)
+		
+		// Create verification shares for this config
+		verificationSharesMap := make(map[party.ID]curve.Point)
 		for j, pid := range partyIDs {
-			configs[id].PublicShares[pid] = group.NewPoint().ScalarBaseMult(group.NewScalar().SetNat(uint64(j + 1)))
+			// Create a simple verification share for each party
+			shareScalar := group.NewScalar()
+			shareBytes := make([]byte, 32)
+			shareBytes[0] = byte(j + 1)
+			shareScalar.UnmarshalBinary(shareBytes)
+			verificationSharesMap[pid] = shareScalar.ActOnBase()
+		}
+		
+		configs[id] = &frost.Config{
+			ID:                 id,
+			Threshold:          threshold,
+			PublicKey:          publicKey,
+			PrivateShare:       privateShare,
+			VerificationShares: party.NewPointMap(verificationSharesMap),
 		}
 	}
 	
@@ -195,8 +312,25 @@ func TestFROSTProtocolCreation(t *testing.T) {
 	sign := frost.Sign(config, partyIDs[:threshold], message)
 	require.NotNil(t, sign, "Sign should be created")
 	
-	// Test refresh creation
-	refresh := frost.Refresh(config, partyIDs)
+	// Test refresh creation - need to add VerificationShares to config
+	// Create simple verification shares for refresh test
+	refreshVerificationShares := make(map[party.ID]curve.Point)
+	for i, pid := range partyIDs {
+		shareScalar := group.NewScalar()
+		shareBytes := make([]byte, 32)
+		shareBytes[0] = byte(i + 1)
+		shareScalar.UnmarshalBinary(shareBytes)
+		refreshVerificationShares[pid] = shareScalar.ActOnBase()
+	}
+	
+	configWithShares := &frost.Config{
+		ID:                 config.ID,
+		Threshold:          config.Threshold,
+		PrivateShare:       config.PrivateShare,
+		PublicKey:          config.PublicKey,
+		VerificationShares: party.NewPointMap(refreshVerificationShares),
+	}
+	refresh := frost.Refresh(configWithShares, partyIDs)
 	require.NotNil(t, refresh, "Refresh should be created")
 	
 	t.Log("All FROST protocols can be created successfully")

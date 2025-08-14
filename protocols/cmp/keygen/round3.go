@@ -3,6 +3,7 @@ package keygen
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
@@ -12,7 +13,6 @@ import (
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/paillier"
-	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pedersen"
 	zkfac "github.com/luxfi/threshold/pkg/zk/fac"
 	zkmod "github.com/luxfi/threshold/pkg/zk/mod"
@@ -26,7 +26,8 @@ type round3 struct {
 	*round2
 	// SchnorrCommitments[j] = Aⱼ
 	// Commitment for proof of knowledge in the last round
-	SchnorrCommitments map[party.ID]*zksch.Commitment // Aⱼ
+	// Using sync.Map for thread-safe concurrent access
+	SchnorrCommitments sync.Map // map[party.ID]*zksch.Commitment
 }
 
 type broadcast3 struct {
@@ -106,17 +107,20 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 	}
 	// Verify decommit
 	// Use KeyID for stable cross-phase verification instead of sessionID-based hash
-	if !r.keyID.HashForParty(from).Decommit(r.Commitments[from], body.Decommitment,
+	commitmentValue, _ := r.Commitments.Load(from)
+	commitment, _ := commitmentValue.(hash.Commitment)
+	if !r.keyID.HashForParty(from).Decommit(commitment, body.Decommitment,
 		body.RID, body.C, VSSPolynomial, body.SchnorrCommitments, body.ElGamalPublic, body.N, body.S, body.T) {
 		return errors.New("failed to decommit")
 	}
-	r.RIDs[from] = body.RID
-	r.ChainKeys[from] = body.C
-	r.PaillierPublic[from] = paillier.NewPublicKey(body.N)
-	r.Pedersen[from] = pedersen.New(arith.ModulusFromN(body.N), body.S, body.T)
-	r.VSSPolynomials[from] = body.VSSPolynomial
-	r.SchnorrCommitments[from] = body.SchnorrCommitments
-	r.ElGamalPublic[from] = body.ElGamalPublic
+	// Store using sync.Map for thread-safe concurrent access
+	r.RIDs.Store(from, body.RID)
+	r.ChainKeys.Store(from, body.C)
+	r.PaillierPublic.Store(from, paillier.NewPublicKey(body.N))
+	r.Pedersen.Store(from, pedersen.New(arith.ModulusFromN(body.N), body.S, body.T))
+	r.VSSPolynomials.Store(from, body.VSSPolynomial)
+	r.SchnorrCommitments.Store(from, body.SchnorrCommitments)
+	r.ElGamalPublic.Store(from, body.ElGamalPublic)
 
 	return nil
 }
@@ -138,8 +142,18 @@ func (round3) StoreMessage(round.Message) error { return nil }
 // - send proofs and encryption of share for Pⱼ.
 func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Check if we have received all broadcasts before proceeding
-	// We need ChainKeys and RIDs from all N parties
-	if len(r.ChainKeys) < r.N() || len(r.RIDs) < r.N() {
+	// Count ChainKeys and RIDs in sync.Map
+	chainKeyCount := 0
+	r.ChainKeys.Range(func(_, _ interface{}) bool {
+		chainKeyCount++
+		return true
+	})
+	ridCount := 0
+	r.RIDs.Range(func(_, _ interface{}) bool {
+		ridCount++
+		return true
+	})
+	if chainKeyCount < r.N() || ridCount < r.N() {
 		// Not ready to advance yet - return ourselves to wait for more messages
 		return r, nil
 	}
@@ -149,28 +163,55 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	if chainKey == nil {
 		chainKey = types.EmptyRID()
 		for _, j := range r.PartyIDs() {
-			chainKey.XOR(r.ChainKeys[j])
+			ckValue, _ := r.ChainKeys.Load(j)
+			ck, _ := ckValue.(types.RID)
+			chainKey.XOR(ck)
 		}
 	}
 	// RID = ⊕ⱼ RIDⱼ
 	rid := types.EmptyRID()
 	for _, j := range r.PartyIDs() {
-		if r.RIDs[j] == nil {
+		ridValue, exists := r.RIDs.Load(j)
+		if !exists {
 			return r, fmt.Errorf("missing RID for party %s", j)
 		}
-		rid.XOR(r.RIDs[j])
+		ridJ, _ := ridValue.(types.RID)
+		if ridJ == nil {
+			return r, fmt.Errorf("missing RID for party %s", j)
+		}
+		rid.XOR(ridJ)
 	}
 
-	// temporary hash which does not modify the state
-	h := r.Hash()
-	_ = h.WriteAny(rid, r.SelfID())
+	// Use a fresh hash for proof generation to ensure consistency across parties
+	// All parties will use the same empty hash state for proof generation/verification
+	h := hash.New()
 
+	// Load Paillier public key for self
+	paillierValue, ok := r.PaillierPublic.Load(r.SelfID())
+	if !ok {
+		return r, errors.New("paillier public key not found for self")
+	}
+	paillierSelf, ok := paillierValue.(*paillier.PublicKey)
+	if !ok || paillierSelf == nil {
+		return r, errors.New("invalid paillier public key for self")
+	}
+	
+	// Load Pedersen parameters for self
+	pedersenValue, ok := r.Pedersen.Load(r.SelfID())
+	if !ok {
+		return r, errors.New("pedersen parameters not found for self")
+	}
+	pedersenSelf, ok := pedersenValue.(*pedersen.Parameters)
+	if !ok || pedersenSelf == nil {
+		return r, errors.New("invalid pedersen parameters for self")
+	}
+	
 	// Prove N is a blum prime with zkmod
 	mod := zkmod.NewProof(h.Clone(), zkmod.Private{
 		P:   r.PaillierSecret.P(),
 		Q:   r.PaillierSecret.Q(),
 		Phi: r.PaillierSecret.Phi(),
-	}, zkmod.Public{N: r.PaillierPublic[r.SelfID()].N()}, r.Pool)
+	}, zkmod.Public{N: paillierSelf.N()}, r.Pool)
 
 	// prove s, t are correct as aux parameters with zkprm
 	prm := zkprm.NewProof(zkprm.Private{
@@ -178,7 +219,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 		Phi:    r.PaillierSecret.Phi(),
 		P:      r.PaillierSecret.P(),
 		Q:      r.PaillierSecret.Q(),
-	}, h.Clone(), zkprm.Public{Aux: r.Pedersen[r.SelfID()]}, r.Pool)
+	}, h.Clone(), zkprm.Public{Aux: pedersenSelf}, r.Pool)
 
 	if err := r.BroadcastMessage(out, &broadcast4{
 		Mod: mod,
@@ -189,17 +230,35 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// create P2P messages with encrypted shares and zkfac proof
 	for _, j := range r.OtherPartyIDs() {
-
+		// Load Pedersen parameters for party j
+		pedersenJValue, ok := r.Pedersen.Load(j)
+		if !ok {
+			return r, fmt.Errorf("pedersen parameters not found for party %s", j)
+		}
+		pedersenJ, ok := pedersenJValue.(*pedersen.Parameters)
+		if !ok || pedersenJ == nil {
+			return r, fmt.Errorf("invalid pedersen parameters for party %s", j)
+		}
+		
 		// Prove that the factors of N are relatively large
 		fac := zkfac.NewProof(zkfac.Private{P: r.PaillierSecret.P(), Q: r.PaillierSecret.Q()}, h.Clone(), zkfac.Public{
-			N:   r.PaillierPublic[r.SelfID()].N(),
-			Aux: r.Pedersen[j],
+			N:   paillierSelf.N(),
+			Aux: pedersenJ,
 		})
 
 		// compute fᵢ(j)
 		share := r.VSSSecret.Evaluate(j.Scalar(r.Group()))
 		// Encrypt share
-		C, _ := r.PaillierPublic[j].Enc(curve.MakeInt(share))
+		// Load Paillier public key for party j
+		paillierJValue, ok := r.PaillierPublic.Load(j)
+		if !ok {
+			return r, fmt.Errorf("paillier public key not found for party %s", j)
+		}
+		paillierJ, ok := paillierJValue.(*paillier.PublicKey)
+		if !ok || paillierJ == nil {
+			return r, fmt.Errorf("invalid paillier public key for party %s", j)
+		}
+		C, _ := paillierJ.Enc(curve.MakeInt(share))
 
 		err := r.SendMessage(out, &message4{
 			Share: C,
@@ -210,8 +269,8 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 		}
 	}
 
-	// Write rid to the hash state
-	r.UpdateHashState(rid)
+	// Don't update hash state with RID here - it will be done in round4 after verification
+	// This ensures proofs created with pre-RID hash can be verified with pre-RID hash
 	return &round4{
 		round3:   r,
 		RID:      rid,
