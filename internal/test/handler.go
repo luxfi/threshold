@@ -13,8 +13,8 @@ func HandlerLoop(id party.ID, h *protocol.Handler, network *Network) {
 		// outgoing messages
 		case msg, ok := <-h.Listen():
 			if !ok {
-				<-network.Done(id)
 				// the channel was closed, indicating that the protocol is done executing.
+				// Don't wait on network.Done(id) as it may not be signaled properly
 				return
 			}
 			go network.Send(msg)

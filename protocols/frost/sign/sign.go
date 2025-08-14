@@ -19,19 +19,21 @@ const (
 
 func StartSignCommon(taproot bool, result *keygen.Config, signers []party.ID, messageHash []byte) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
-		// For signing in FROST, we use exactly threshold parties
-		// The threshold validation expects threshold < n, so we set threshold to n-1
-		// This is correct because all signers must participate in FROST signing
-		signThreshold := len(signers) - 1
-		if signThreshold < 1 {
-			signThreshold = 1
+		// For FROST signing, we use the original threshold from keygen
+		// The signers list should be at least threshold+1 parties
+		// but we still use the original threshold for protocol validation
+		signThreshold := result.Threshold
+		
+		// Validate we have enough signers - FROST requires exactly threshold (t) signers, not t+1
+		if len(signers) < signThreshold {
+			return nil, fmt.Errorf("insufficient signers: need at least %d, got %d", signThreshold, len(signers))
 		}
 		
 		info := round.Info{
 			FinalRoundNumber: protocolRounds,
 			SelfID:           result.ID,
 			PartyIDs:         signers,
-			Threshold:        signThreshold,
+			Threshold:        len(signers) - 1, // Session threshold is n-1 where n is number of participants
 			Group:            result.PublicKey.Curve(),
 		}
 		if taproot {

@@ -48,6 +48,29 @@ func RunMultipleProtocolTests(t *testing.T, tests []ProtocolTest) {
 	}
 }
 
+// RunSingleProtocol runs a single party's protocol instance for testing
+func RunSingleProtocol(t *testing.T, selfID party.ID, allParties []party.ID, sessionID []byte, startFunc protocol.StartFunc) (interface{}, error) {
+	// Run just this party's protocol
+	partyList := []party.ID{selfID}
+	results, err := RunProtocol(t, partyList, sessionID, func(id party.ID) protocol.StartFunc {
+		if id == selfID {
+			return startFunc
+		}
+		return nil
+	})
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	result, ok := results[selfID]
+	if !ok {
+		return nil, fmt.Errorf("no result for party %s", selfID)
+	}
+	
+	return result, nil
+}
+
 // KeygenAndSign performs keygen followed by signing for threshold protocols
 type KeygenAndSign struct {
 	Name          string
@@ -64,7 +87,11 @@ func (ks *KeygenAndSign) Run(t *testing.T) {
 	t.Run(ks.Name, func(t *testing.T) {
 		// Generate party IDs
 		partyIDs := PartyIDs(ks.PartyCount)
-		signers := partyIDs[:ks.Threshold]
+		// For threshold signatures, we need threshold+1 parties to sign
+		signers := partyIDs[:ks.Threshold+1]
+		if len(signers) > len(partyIDs) {
+			signers = partyIDs // Use all parties if threshold+1 > n
+		}
 		
 		// Run keygen
 		keygenResults, err := RunProtocol(t, partyIDs, []byte("keygen-session"), func(id party.ID) protocol.StartFunc {
@@ -91,7 +118,7 @@ func (ks *KeygenAndSign) Run(t *testing.T) {
 			return ks.CreateSign(config, signers, ks.Message)
 		})
 		require.NoError(t, err, "signing should complete without error")
-		require.Len(t, signResults, ks.Threshold, "all signers should have results")
+		require.Len(t, signResults, len(signers), "all signers should have results")
 		
 		// Validate signatures
 		for id, sig := range signResults {

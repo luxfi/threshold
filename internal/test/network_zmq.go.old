@@ -1,0 +1,345 @@
+package test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/protocol"
+	zmq "github.com/luxfi/zmq/v4"
+)
+
+// ZMQNetwork provides real network message passing for integration tests
+type ZMQNetwork struct {
+	mu        sync.RWMutex
+	parties   []party.ID
+	publisher *zmq.Socket
+	subscribers map[party.ID]*zmq.Socket
+	ports     map[party.ID]int
+	basePort  int
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+}
+
+// NewZMQNetwork creates a ZeroMQ-based test network
+func NewZMQNetwork(parties []party.ID, basePort int) (*ZMQNetwork, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	publisher, err := zmq.NewSocket(zmq.PUB)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+	
+	// Bind publisher to port
+	pubPort := basePort
+	err = publisher.Bind(fmt.Sprintf("tcp://127.0.0.1:%d", pubPort))
+	if err != nil {
+		publisher.Close()
+		cancel()
+		return nil, fmt.Errorf("failed to bind publisher: %w", err)
+	}
+	
+	n := &ZMQNetwork{
+		parties:     parties,
+		publisher:   publisher,
+		subscribers: make(map[party.ID]*zmq.Socket),
+		ports:       make(map[party.ID]int),
+		basePort:    basePort,
+		ctx:         ctx,
+		cancel:      cancel,
+	}
+	
+	// Create subscribers for each party
+	for i, id := range parties {
+		subscriber, err := zmq.NewSocket(zmq.SUB)
+		if err != nil {
+			n.Close()
+			return nil, fmt.Errorf("failed to create subscriber for %s: %w", id, err)
+		}
+		
+		// Connect to publisher
+		err = subscriber.Connect(fmt.Sprintf("tcp://127.0.0.1:%d", pubPort))
+		if err != nil {
+			subscriber.Close()
+			n.Close()
+			return nil, fmt.Errorf("failed to connect subscriber for %s: %w", id, err)
+		}
+		
+		// Subscribe to messages for this party (and broadcasts)
+		subscriber.SetSubscribe(string(id))
+		subscriber.SetSubscribe("BROADCAST")
+		
+		n.subscribers[id] = subscriber
+		n.ports[id] = basePort + i + 1
+	}
+	
+	// Allow time for connections to establish
+	time.Sleep(100 * time.Millisecond)
+	
+	return n, nil
+}
+
+// Send broadcasts a message through ZeroMQ
+func (n *ZMQNetwork) Send(msg *protocol.Message) {
+	if msg == nil {
+		return
+	}
+	
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	
+	// Serialize message
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	
+	// Determine routing
+	var topic string
+	if msg.To == "" {
+		topic = "BROADCAST"
+	} else {
+		topic = string(msg.To)
+	}
+	
+	// Send through ZeroMQ
+	_, err = n.publisher.Send(topic, zmq.SNDMORE)
+	if err != nil {
+		return
+	}
+	_, err = n.publisher.Send(string(data), 0)
+	if err != nil {
+		return
+	}
+}
+
+// Next returns a channel for receiving messages for a party
+func (n *ZMQNetwork) Next(id party.ID) <-chan *protocol.Message {
+	ch := make(chan *protocol.Message, 100)
+	
+	n.wg.Add(1)
+	go func() {
+		defer n.wg.Done()
+		defer close(ch)
+		
+		n.mu.RLock()
+		subscriber, ok := n.subscribers[id]
+		n.mu.RUnlock()
+		
+		if !ok {
+			return
+		}
+		
+		poller := zmq.NewPoller()
+		poller.Add(subscriber, zmq.POLLIN)
+		
+		for {
+			select {
+			case <-n.ctx.Done():
+				return
+			default:
+			}
+			
+			// Poll with timeout
+			sockets, err := poller.Poll(100 * time.Millisecond)
+			if err != nil || len(sockets) == 0 {
+				continue
+			}
+			
+			// Receive topic
+			topic, err := subscriber.Recv(0)
+			if err != nil {
+				continue
+			}
+			
+			// Receive data
+			data, err := subscriber.Recv(0)
+			if err != nil {
+				continue
+			}
+			
+			// Skip if not for us
+			if topic != string(id) && topic != "BROADCAST" {
+				continue
+			}
+			
+			// Deserialize message
+			var msg protocol.Message
+			err = json.Unmarshal([]byte(data), &msg)
+			if err != nil {
+				continue
+			}
+			
+			// Send to channel
+			select {
+			case ch <- &msg:
+			case <-n.ctx.Done():
+				return
+			}
+		}
+	}()
+	
+	return ch
+}
+
+// Close shuts down the ZeroMQ network
+func (n *ZMQNetwork) Close() {
+	n.cancel()
+	n.wg.Wait()
+	
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	
+	if n.publisher != nil {
+		n.publisher.Close()
+	}
+	
+	for _, subscriber := range n.subscribers {
+		if subscriber != nil {
+			subscriber.Close()
+		}
+	}
+}
+
+// MessageWrapper provides copy-by-value semantics for messages
+type MessageWrapper struct {
+	data []byte
+}
+
+// NewMessageWrapper creates a wrapper that ensures copy-by-value
+func NewMessageWrapper(msg *protocol.Message) (*MessageWrapper, error) {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	return &MessageWrapper{data: data}, nil
+}
+
+// Unwrap returns a copy of the message
+func (w *MessageWrapper) Unwrap() (*protocol.Message, error) {
+	var msg protocol.Message
+	err := json.Unmarshal(w.data, &msg)
+	if err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
+// FunctionalNetwork provides a functional, composable network interface
+type FunctionalNetwork struct {
+	mu       sync.RWMutex
+	parties  []party.ID
+	channels map[party.ID]chan *MessageWrapper
+	ctx      context.Context
+	cancel   context.CancelFunc
+}
+
+// NewFunctionalNetwork creates a functional message-passing network
+func NewFunctionalNetwork(parties []party.ID) *FunctionalNetwork {
+	ctx, cancel := context.WithCancel(context.Background())
+	channels := make(map[party.ID]chan *MessageWrapper)
+	
+	for _, id := range parties {
+		channels[id] = make(chan *MessageWrapper, 1000)
+	}
+	
+	return &FunctionalNetwork{
+		parties:  parties,
+		channels: channels,
+		ctx:      ctx,
+		cancel:   cancel,
+	}
+}
+
+// Send broadcasts a message with copy-by-value semantics
+func (n *FunctionalNetwork) Send(msg *protocol.Message) {
+	if msg == nil {
+		return
+	}
+	
+	// Create wrapper for copy-by-value
+	wrapper, err := NewMessageWrapper(msg)
+	if err != nil {
+		return
+	}
+	
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	
+	// Route message
+	if msg.To == "" {
+		// Broadcast to all except sender
+		for _, id := range n.parties {
+			if id == msg.From {
+				continue
+			}
+			select {
+			case n.channels[id] <- wrapper:
+			case <-n.ctx.Done():
+				return
+			default:
+				// Drop if channel full
+			}
+		}
+	} else {
+		// Send to specific party
+		if ch, ok := n.channels[msg.To]; ok {
+			select {
+			case ch <- wrapper:
+			case <-n.ctx.Done():
+			default:
+				// Drop if channel full
+			}
+		}
+	}
+}
+
+// Next returns a channel for receiving messages
+func (n *FunctionalNetwork) Next(id party.ID) <-chan *protocol.Message {
+	ch := make(chan *protocol.Message, 100)
+	
+	go func() {
+		defer close(ch)
+		
+		n.mu.RLock()
+		incoming, ok := n.channels[id]
+		n.mu.RUnlock()
+		
+		if !ok {
+			return
+		}
+		
+		for {
+			select {
+			case <-n.ctx.Done():
+				return
+			case wrapper := <-incoming:
+				if wrapper == nil {
+					continue
+				}
+				// Unwrap to get copy
+				msg, err := wrapper.Unwrap()
+				if err != nil {
+					continue
+				}
+				select {
+				case ch <- msg:
+				case <-n.ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	
+	return ch
+}
+
+// Close shuts down the network
+func (n *FunctionalNetwork) Close() {
+	n.cancel()
+}

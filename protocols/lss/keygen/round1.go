@@ -3,6 +3,7 @@ package keygen
 import (
 	"crypto/rand"
 	"errors"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -22,9 +23,9 @@ type round1 struct {
 	// Chain key for deriving randomness
 	chainKey types.RID
 	
-	// Storage for received broadcasts
-	receivedCommitments map[party.ID]map[party.ID]curve.Point
-	receivedChainKeys   map[party.ID]types.RID
+	// Storage for received broadcasts - using sync.Map for thread safety
+	receivedCommitments sync.Map // map[party.ID]map[party.ID]curve.Point
+	receivedChainKeys   sync.Map // map[party.ID]types.RID
 	
 	// Track if we've already generated our values to prevent regeneration
 	generated bool
@@ -136,30 +137,49 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 			return nil, err
 		}
 		
-		// Store our own commitments
-		if r.receivedCommitments == nil {
-			r.receivedCommitments = make(map[party.ID]map[party.ID]curve.Point)
-			r.receivedChainKeys = make(map[party.ID]types.RID)
-		}
-		r.receivedCommitments[r.SelfID()] = commitments
-		r.receivedChainKeys[r.SelfID()] = chainKey
+		// Store our own commitments using sync.Map
+		r.receivedCommitments.Store(r.SelfID(), commitments)
+		r.receivedChainKeys.Store(r.SelfID(), chainKey)
 	}
 
 	// Check if we have received all commitments
 	// We need commitments from all N parties (including ourselves)
-	if len(r.receivedCommitments) < r.N() {
+	// Count the number of stored entries
+	count := 0
+	r.receivedCommitments.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	
+	if count < r.N() {
 		// Not ready to advance yet - return ourselves
 		// This is called from finalizeInitial when we don't have all broadcasts yet
 		return r, nil
 	}
 
-	// We have all commitments, create round2 with complete data
+	// We have all commitments, convert sync.Map back to regular map for round2
+	commitments := make(map[party.ID]map[party.ID]curve.Point)
+	chainKeys := make(map[party.ID]types.RID)
+	
+	r.receivedCommitments.Range(func(key, value interface{}) bool {
+		id := key.(party.ID)
+		commitments[id] = value.(map[party.ID]curve.Point)
+		return true
+	})
+	
+	r.receivedChainKeys.Range(func(key, value interface{}) bool {
+		id := key.(party.ID)
+		chainKeys[id] = value.(types.RID)
+		return true
+	})
+	
+	// Create round2 with complete data
 	return &round2{
 		Helper:      r.Helper,
 		poly:        r.poly,
-		commitments: r.receivedCommitments,
-		chainKeys:   r.receivedChainKeys,
-		shares:      make(map[party.ID]curve.Scalar),
+		commitments: commitments,
+		chainKeys:   chainKeys,
+		shares:      sync.Map{}, // Initialize as sync.Map
 	}, nil
 }
 
@@ -176,19 +196,15 @@ func (r *round1) StoreBroadcastMessage(msg round.Message) error {
 		return errors.New("wrong number of commitments")
 	}
 	
-	// Initialize storage if needed
-	if r.receivedCommitments == nil {
-		r.receivedCommitments = make(map[party.ID]map[party.ID]curve.Point)
-		r.receivedChainKeys = make(map[party.ID]types.RID)
-	}
-	
 	// Convert back to map and store
 	commitments, err := body.GetCommitments(r.Group())
 	if err != nil {
 		return err
 	}
-	r.receivedCommitments[msg.From] = commitments
-	r.receivedChainKeys[msg.From] = body.ChainKey
+	
+	// Store using sync.Map for thread safety
+	r.receivedCommitments.Store(msg.From, commitments)
+	r.receivedChainKeys.Store(msg.From, body.ChainKey)
 	
 	return nil
 }
