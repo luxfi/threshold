@@ -155,10 +155,15 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// 5. "Each Pᵢ computes their response using their long-lived secret share sᵢ
 	// by computing zᵢ = dᵢ + (eᵢ ρᵢ) + λᵢ sᵢ c, using S to determine
 	// the ith lagrange coefficient λᵢ"
-	zI := r.Group().NewScalar().Set(Lambdas[r.SelfID()]).Mul(r.sI).Mul(c)
-	zI.Add(r.d_i)
-	ed := r.Group().NewScalar().Set(rho[r.SelfID()]).Mul(r.e_i)
-	zI.Add(ed)
+	
+	// Debug: log the computation
+	lambda_i := Lambdas[r.SelfID()]
+	lambda_s_c := r.Group().NewScalar().Set(lambda_i).Mul(r.sI).Mul(c)
+	e_rho := r.Group().NewScalar().Set(rho[r.SelfID()]).Mul(r.e_i)
+	
+	zI := r.Group().NewScalar().Set(r.d_i)
+	zI.Add(e_rho)
+	zI.Add(lambda_s_c)
 
 	// 6. "Each Pᵢ securely deletes ((dᵢ, Dᵢ), (eᵢ, Eᵢ)) from their local storage,
 	// and returns zᵢ to SA."
