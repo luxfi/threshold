@@ -1,6 +1,8 @@
 package frost_test
 
 import (
+	"fmt"
+	
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -63,13 +65,15 @@ var _ = Describe("FROST Protocol", func() {
 			Expect(configs[id].PublicKey.Equal(refreshedConfigs[id].PublicKey)).To(BeTrue())
 		}
 		
-		// Phase 3: Sign
-		harness3 := test.NewHarness(nil, partyIDs)
+		// Phase 3: Sign (with threshold signers - FROST uses exactly t, not t+1)
+		signers := partyIDs[:threshold]
+		harness3 := test.NewHarness(nil, signers)
 		defer harness3.Cleanup()
 		sessionID3 := []byte("test-sign")
 		
-		for id, config := range refreshedConfigs {
-			startFunc := frost.Sign(config, partyIDs, message)
+		for _, id := range signers {
+			config := refreshedConfigs[id]
+			startFunc := frost.Sign(config, signers, message)
 			_, err := harness3.CreateHandler(id, startFunc, sessionID3)
 			Expect(err).NotTo(HaveOccurred())
 		}
@@ -79,8 +83,17 @@ var _ = Describe("FROST Protocol", func() {
 		
 		results3 := harness3.Results()
 		for id, r := range results3 {
-			Expect(r).To(BeAssignableToTypeOf(&frost.Signature{}))
-			signature := r.(*frost.Signature)
+			// Handle both value and pointer types
+			var signature *frost.Signature
+			switch s := r.(type) {
+			case *frost.Signature:
+				signature = s
+			case frost.Signature:
+				signature = &s
+			default:
+				Fail(fmt.Sprintf("unexpected signature type for %s: %T", id, r))
+			}
+			Expect(signature).NotTo(BeNil())
 			Expect(signature.Verify(refreshedConfigs[id].PublicKey, message)).To(BeTrue())
 		}
 	}

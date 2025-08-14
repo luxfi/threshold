@@ -2,13 +2,16 @@ package keygen
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
+	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/paillier"
 	"github.com/luxfi/threshold/pkg/party"
+	"github.com/luxfi/threshold/pkg/pedersen"
 	zkfac "github.com/luxfi/threshold/pkg/zk/fac"
 	zkmod "github.com/luxfi/threshold/pkg/zk/mod"
 	zkprm "github.com/luxfi/threshold/pkg/zk/prm"
@@ -49,13 +52,36 @@ func (r *round4) StoreBroadcastMessage(msg round.Message) error {
 		return round.ErrInvalidContent
 	}
 
-	// verify zkmod
-	if !body.Mod.Verify(zkmod.Public{N: r.Pedersen[from].N()}, r.HashForID(from), r.Pool) {
-		return errors.New("failed to validate mod proof")
+	// Load Paillier public key for from party
+	paillierValue, ok := r.PaillierPublic.Load(from)
+	if !ok {
+		return errors.New("paillier public key not found for party")
+	}
+	paillierFrom, ok := paillierValue.(*paillier.PublicKey)
+	if !ok || paillierFrom == nil {
+		return errors.New("invalid paillier public key for party")
+	}
+	
+	// Load Pedersen parameters for from party
+	pedersenValue, ok := r.Pedersen.Load(from)
+	if !ok {
+		return errors.New("pedersen parameters not found for party")
+	}
+	pedersenFrom, ok := pedersenValue.(*pedersen.Parameters)
+	if !ok || pedersenFrom == nil {
+		return errors.New("invalid pedersen parameters for party")
+	}
+	
+	// verify zkmod - use Paillier N, not Pedersen N
+	// Use a fresh hash for verification to match proof generation
+	hMod := hash.New()
+	if !body.Mod.Verify(zkmod.Public{N: paillierFrom.N()}, hMod, r.Pool) {
+		return fmt.Errorf("failed to validate mod proof from %s", from)
 	}
 
 	// verify zkprm
-	if !body.Prm.Verify(zkprm.Public{Aux: r.Pedersen[from]}, r.HashForID(from), r.Pool) {
+	hPrm := hash.New()
+	if !body.Prm.Verify(zkprm.Public{Aux: pedersenFrom}, hPrm, r.Pool) {
 		return errors.New("failed to validate prm proof")
 	}
 
@@ -72,12 +98,45 @@ func (r *round4) VerifyMessage(msg round.Message) error {
 		return round.ErrInvalidContent
 	}
 
-	if !r.PaillierPublic[msg.To].ValidateCiphertexts(body.Share) {
+	// Load Paillier public key for recipient (ourselves)
+	// For P2P messages, msg.To is the recipient which is ourselves when verifying
+	paillierToValue, ok := r.PaillierPublic.Load(r.SelfID())
+	if !ok {
+		return errors.New("paillier public key not found for recipient")
+	}
+	paillierTo, ok := paillierToValue.(*paillier.PublicKey)
+	if !ok || paillierTo == nil {
+		return errors.New("invalid paillier public key for recipient")
+	}
+	
+	if !paillierTo.ValidateCiphertexts(body.Share) {
 		return errors.New("invalid ciphertext")
 	}
 
+	// Load Paillier public key for from party
+	paillierFromValue, ok := r.PaillierPublic.Load(from)
+	if !ok {
+		return errors.New("paillier public key not found for sender")
+	}
+	paillierFrom, ok := paillierFromValue.(*paillier.PublicKey)
+	if !ok || paillierFrom == nil {
+		return errors.New("invalid paillier public key for sender")
+	}
+	
+	// Load Pedersen parameters for recipient (ourselves)
+	pedersenToValue, ok := r.Pedersen.Load(r.SelfID())
+	if !ok {
+		return errors.New("pedersen parameters not found for recipient")
+	}
+	pedersenTo, ok := pedersenToValue.(*pedersen.Parameters)
+	if !ok || pedersenTo == nil {
+		return errors.New("invalid pedersen parameters for recipient")
+	}
+	
 	// verify zkfac
-	if !body.Fac.Verify(zkfac.Public{N: r.PaillierPublic[from].N(), Aux: r.Pedersen[msg.To]}, r.HashForID(from)) {
+	// Use a fresh hash for verification to match proof generation
+	hFac := hash.New()
+	if !body.Fac.Verify(zkfac.Public{N: paillierFrom.N(), Aux: pedersenTo}, hFac) {
 		return errors.New("failed to validate fac proof")
 	}
 
@@ -104,14 +163,23 @@ func (r *round4) StoreMessage(msg round.Message) error {
 	}
 
 	// verify share with VSS
-	ExpectedPublicShare := r.VSSPolynomials[from].Evaluate(r.SelfID().Scalar(r.Group())) // Fⱼ(i)
+	vssPolyValue, ok := r.VSSPolynomials.Load(from)
+	if !ok {
+		return errors.New("VSS polynomial not found for party")
+	}
+	vssPoly, ok := vssPolyValue.(*polynomial.Exponent)
+	if !ok || vssPoly == nil {
+		return errors.New("invalid VSS polynomial for party")
+	}
+	ExpectedPublicShare := vssPoly.Evaluate(r.SelfID().Scalar(r.Group())) // Fⱼ(i)
 	PublicShare := Share.ActOnBase()
 	// X == Fⱼ(i)
 	if !PublicShare.Equal(ExpectedPublicShare) {
 		return errors.New("failed to validate VSS share")
 	}
 
-	r.ShareReceived[from] = Share
+	// Store using sync.Map for thread-safe concurrent access
+	r.ShareReceived.Store(from, Share)
 	return nil
 }
 
@@ -125,11 +193,20 @@ func (r *round4) StoreMessage(msg round.Message) error {
 // - create proof of knowledge of secret.
 func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Check if we have received all shares before proceeding
-	// We need shares from all N parties
-	if len(r.ShareReceived) < r.N() {
+	// Count shares in sync.Map
+	shareCount := 0
+	r.ShareReceived.Range(func(_, _ interface{}) bool {
+		shareCount++
+		return true
+	})
+	if shareCount < r.N() {
 		// Not ready to advance yet - return ourselves to wait for more messages
 		return r, nil
 	}
+	
+	// Update hash state with RID now that all verifications are complete
+	// This was delayed from round3 to ensure proofs could be verified with pre-RID hash
+	r.UpdateHashState(r.RID)
 	
 	// add all shares to our secret
 	UpdatedSecretECDSA := r.Group().NewScalar()
@@ -137,14 +214,24 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		UpdatedSecretECDSA.Set(r.PreviousSecretECDSA)
 	}
 	for _, j := range r.PartyIDs() {
-		UpdatedSecretECDSA.Add(r.ShareReceived[j])
+		shareValue, ok := r.ShareReceived.Load(j)
+		if !ok {
+			return r, errors.New("share not received from party")
+		}
+		share, ok := shareValue.(curve.Scalar)
+		if !ok || share == nil {
+			return r, errors.New("invalid share from party")
+		}
+		UpdatedSecretECDSA.Add(share)
 	}
 
 	// [F₁(X), …, Fₙ(X)]
-	ShamirPublicPolynomials := make([]*polynomial.Exponent, 0, len(r.VSSPolynomials))
-	for _, VSSPolynomial := range r.VSSPolynomials {
-		ShamirPublicPolynomials = append(ShamirPublicPolynomials, VSSPolynomial)
-	}
+	ShamirPublicPolynomials := make([]*polynomial.Exponent, 0, r.N())
+	r.VSSPolynomials.Range(func(_, value interface{}) bool {
+		vssPoly, _ := value.(*polynomial.Exponent)
+		ShamirPublicPolynomials = append(ShamirPublicPolynomials, vssPoly)
+		return true
+	})
 
 	// ShamirPublicPolynomial = F(X) = ∑Fⱼ(X)
 	ShamirPublicPolynomial, err := polynomial.Sum(ShamirPublicPolynomials)
@@ -159,11 +246,40 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if r.PreviousPublicSharesECDSA != nil {
 			PublicECDSAShare = PublicECDSAShare.Add(r.PreviousPublicSharesECDSA[j])
 		}
+		
+		// Load from sync.Maps
+		elGamalValue, ok := r.ElGamalPublic.Load(j)
+		if !ok {
+			return r, errors.New("ElGamal public key not found for party")
+		}
+		elGamal, ok := elGamalValue.(curve.Point)
+		if !ok || elGamal == nil {
+			return r, errors.New("invalid ElGamal public key for party")
+		}
+		
+		paillierValue, ok := r.PaillierPublic.Load(j)
+		if !ok {
+			return r, errors.New("Paillier public key not found for party")
+		}
+		paillier, ok := paillierValue.(*paillier.PublicKey)
+		if !ok || paillier == nil {
+			return r, errors.New("invalid Paillier public key for party")
+		}
+		
+		pedersenValue, ok := r.Pedersen.Load(j)
+		if !ok {
+			return r, errors.New("Pedersen parameters not found for party")
+		}
+		pedersen, ok := pedersenValue.(*pedersen.Parameters)
+		if !ok || pedersen == nil {
+			return r, errors.New("invalid Pedersen parameters for party")
+		}
+		
 		PublicData[j] = &config.Public{
 			ECDSA:    PublicECDSAShare,
-			ElGamal:  r.ElGamalPublic[j],
-			Paillier: r.PaillierPublic[j],
-			Pedersen: r.Pedersen[j],
+			ElGamal:  elGamal,
+			Paillier: paillier,
+			Pedersen: pedersen,
 		}
 	}
 

@@ -97,6 +97,9 @@ type Pool struct {
 	commands chan command
 	// This holds the number of workers we've created
 	workerCount int
+	// closed indicates if the pool has been torn down
+	closed bool
+	mu     sync.Mutex
 }
 
 // NewPool creates a new pool, with a certain number of workers.
@@ -122,7 +125,12 @@ func NewPool(count int) *Pool {
 // TearDown cleanly tears down a pool, closing channels, etc.
 func (p *Pool) TearDown() {
 	if p != nil {
-		close(p.commands)
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if !p.closed {
+			p.closed = true
+			close(p.commands)
+		}
 	}
 }
 
@@ -132,15 +140,33 @@ func (p *Pool) TearDown() {
 // successful.
 //
 // The result will be an array containing the first count successes.
-func (p *Pool) Search(count int, f func() interface{}) []interface{} {
+func (p *Pool) Search(count int, f func() interface{}) (results []interface{}) {
 	if p == nil {
 		return searchAlone(f, count)
 	}
 
-	results := make([]interface{}, count)
+	// Check if pool is closed
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		// Fall back to serial execution if pool is closed
+		return searchAlone(f, count)
+	}
+	p.mu.Unlock()
+
+	// Recover from panic if channel is closed during execution
+	defer func() {
+		if r := recover(); r != nil {
+			// If we panic due to closed channel, execute remaining work serially
+			results = searchAlone(f, count)
+		}
+	}()
+
+	results = make([]interface{}, count)
 
 	ctr := int64(count)
-	ctrChanged := make(chan struct{})
+	// Buffer the channel with count size since each result sends a signal
+	ctrChanged := make(chan struct{}, count)
 	mu := &sync.Mutex{}
 	cmd := command{
 		search:     true,
@@ -150,13 +176,9 @@ func (p *Pool) Search(count int, f func() interface{}) []interface{} {
 		results:    results,
 		mu:         mu,
 	}
-	cmdI := 0
-	for cmdI < p.workerCount {
-		select {
-		case p.commands <- cmd:
-			cmdI++
-		case <-ctrChanged:
-		}
+	// Send command to all workers
+	for i := 0; i < p.workerCount; i++ {
+		p.commands <- cmd
 	}
 	for atomic.LoadInt64(&ctr) > 0 {
 		<-ctrChanged
@@ -168,15 +190,40 @@ func (p *Pool) Search(count int, f func() interface{}) []interface{} {
 // Parallelize calls a function count times, passing in indices from 0..count-1.
 //
 // The result will be a slice containing [f(0), f(1), ..., f(count - 1)].
-func (p *Pool) Parallelize(count int, f func(int) interface{}) []interface{} {
+func (p *Pool) Parallelize(count int, f func(int) interface{}) (results []interface{}) {
 	if p == nil {
 		return parallelizeAlone(f, count)
 	}
 
-	results := make([]interface{}, count)
+	// Check if pool is closed
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		// Fall back to serial execution if pool is closed
+		return parallelizeAlone(f, count)
+	}
+	p.mu.Unlock()
+
+	// Recover from panic if channel is closed during execution
+	defer func() {
+		if r := recover(); r != nil {
+			// If we panic due to closed channel, execute remaining work serially
+			if results == nil {
+				results = make([]interface{}, count)
+			}
+			for i := 0; i < count; i++ {
+				if results[i] == nil {
+					results[i] = f(i)
+				}
+			}
+		}
+	}()
+
+	results = make([]interface{}, count)
 
 	ctr := int64(count)
-	ctrChanged := make(chan struct{})
+	// Buffer the channel with count size since each task sends a signal
+	ctrChanged := make(chan struct{}, count)
 	cmdI := 0
 	for cmdI < count {
 		cmd := command{

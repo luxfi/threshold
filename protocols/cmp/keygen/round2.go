@@ -1,6 +1,8 @@
 package keygen
 
 import (
+	"sync"
+
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -8,7 +10,6 @@ import (
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/paillier"
-	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pedersen"
 	zksch "github.com/luxfi/threshold/pkg/zk/sch"
 )
@@ -19,26 +20,34 @@ type round2 struct {
 	*round1
 
 	// VSSPolynomials[j] = Fⱼ(X) = fⱼ(X)•G
-	VSSPolynomials map[party.ID]*polynomial.Exponent
+	// Using sync.Map for thread-safe concurrent access
+	VSSPolynomials sync.Map // map[party.ID]*polynomial.Exponent
 
 	// Commitments[j] = H(Keygen3ⱼ ∥ Decommitments[j])
-	Commitments map[party.ID]hash.Commitment
+	// Using sync.Map for thread-safe concurrent access
+	Commitments sync.Map // map[party.ID]hash.Commitment
 
 	// RIDs[j] = ridⱼ
-	RIDs map[party.ID]types.RID
+	// Using sync.Map for thread-safe concurrent access
+	RIDs sync.Map // map[party.ID]types.RID
 	// ChainKeys[j] = cⱼ
-	ChainKeys map[party.ID]types.RID
+	// Using sync.Map for thread-safe concurrent access
+	ChainKeys sync.Map // map[party.ID]types.RID
 
 	// ShareReceived[j] = xʲᵢ
 	// share received from party j
-	ShareReceived map[party.ID]curve.Scalar
+	// Using sync.Map for thread-safe concurrent access
+	ShareReceived sync.Map // map[party.ID]curve.Scalar
 
-	ElGamalPublic map[party.ID]curve.Point
+	// Using sync.Map for thread-safe concurrent access
+	ElGamalPublic sync.Map // map[party.ID]curve.Point
 	// PaillierPublic[j] = Nⱼ
-	PaillierPublic map[party.ID]*paillier.PublicKey
+	// Using sync.Map for thread-safe concurrent access
+	PaillierPublic sync.Map // map[party.ID]*paillier.PublicKey
 
 	// Pedersen[j] = (Nⱼ,Sⱼ,Tⱼ)
-	Pedersen map[party.ID]*pedersen.Parameters
+	// Using sync.Map for thread-safe concurrent access
+	Pedersen sync.Map // map[party.ID]*pedersen.Parameters
 
 	ElGamalSecret curve.Scalar
 
@@ -73,7 +82,8 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	if err := body.Commitment.Validate(); err != nil {
 		return err
 	}
-	r.Commitments[msg.From] = body.Commitment
+	// Store using sync.Map for thread-safe concurrent access
+	r.Commitments.Store(msg.From, body.Commitment)
 	return nil
 }
 
@@ -87,25 +97,42 @@ func (round2) StoreMessage(round.Message) error { return nil }
 //
 // - send all committed data.
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
+	// Load values from sync.Map for self ID
+	ridValue, _ := r.RIDs.Load(r.SelfID())
+	rid, _ := ridValue.(types.RID)
+	
+	chainKeyValue, _ := r.ChainKeys.Load(r.SelfID())
+	chainKey, _ := chainKeyValue.(types.RID)
+	
+	vssPolyValue, _ := r.VSSPolynomials.Load(r.SelfID())
+	vssPoly, _ := vssPolyValue.(*polynomial.Exponent)
+	
+	elGamalValue, _ := r.ElGamalPublic.Load(r.SelfID())
+	elGamal, _ := elGamalValue.(curve.Point)
+	
+	pedersenValue, _ := r.Pedersen.Load(r.SelfID())
+	pedersen, _ := pedersenValue.(*pedersen.Parameters)
+	
 	// Send the message we created in Round1 to all
 	err := r.BroadcastMessage(out, &broadcast3{
-		RID:                r.RIDs[r.SelfID()],
-		C:                  r.ChainKeys[r.SelfID()],
-		VSSPolynomial:      r.VSSPolynomials[r.SelfID()],
+		RID:                rid,
+		C:                  chainKey,
+		VSSPolynomial:      vssPoly,
 		SchnorrCommitments: r.SchnorrRand.Commitment(),
-		ElGamalPublic:      r.ElGamalPublic[r.SelfID()],
-		N:                  r.Pedersen[r.SelfID()].N(),
-		S:                  r.Pedersen[r.SelfID()].S(),
-		T:                  r.Pedersen[r.SelfID()].T(),
+		ElGamalPublic:      elGamal,
+		N:                  pedersen.N(),
+		S:                  pedersen.S(),
+		T:                  pedersen.T(),
 		Decommitment:       r.Decommitment,
 	})
 	if err != nil {
 		return r, err
 	}
-	return &round3{
-		round2:             r,
-		SchnorrCommitments: map[party.ID]*zksch.Commitment{},
-	}, nil
+	nextRound := &round3{
+		round2: r,
+	}
+	// SchnorrCommitments sync.Map is already initialized (zero value)
+	return nextRound, nil
 }
 
 // PreviousRound implements round.Round.

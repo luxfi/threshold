@@ -2,7 +2,6 @@ package frost_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -27,10 +26,9 @@ func TestFROSTKeygenPhased(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			partyIDs := test.PartyIDs(tt.partyCount)
-			h := test.NewPhaseHarness(t, partyIDs)
 
-			// Phase 1: Keygen
-			keygenRes, err := h.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+			// Use simpler RunProtocol instead of PhaseHarness
+			keygenRes, err := test.RunProtocol(t, partyIDs, []byte("frost-keygen-phased"), func(id party.ID) protocol.StartFunc {
 				return frost.Keygen(curve.Secp256k1{}, id, partyIDs, tt.threshold)
 			})
 			require.NoError(t, err, "keygen should complete without error")
@@ -69,10 +67,9 @@ func TestFROSTKeygenRefreshSignPhased(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			partyIDs := test.PartyIDs(tt.partyCount)
-			h := test.NewPhaseHarness(t, partyIDs)
 
-			// Phase 1: Keygen
-			keygenRes, err := h.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+			// Phase 1: Keygen using simpler RunProtocol
+			keygenRes, err := test.RunProtocol(t, partyIDs, []byte("frost-krs-keygen"), func(id party.ID) protocol.StartFunc {
 				return frost.Keygen(curve.Secp256k1{}, id, partyIDs, tt.threshold)
 			})
 			require.NoError(t, err, "keygen should complete without error")
@@ -82,9 +79,8 @@ func TestFROSTKeygenRefreshSignPhased(t *testing.T) {
 			firstConfig := keygenRes[partyIDs[0]].(*frost.Config)
 			originalPubKey := firstConfig.PublicKey
 
-			// Phase 2: Refresh (new session)
-			h.Reset() // Optional: fresh network for clean separation
-			refreshRes, err := h.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+			// Phase 2: Refresh using simpler RunProtocol
+			refreshRes, err := test.RunProtocol(t, partyIDs, []byte("frost-krs-refresh"), func(id party.ID) protocol.StartFunc {
 				config := keygenRes[id].(*frost.Config)
 				return frost.Refresh(config, partyIDs)
 			})
@@ -99,11 +95,10 @@ func TestFROSTKeygenRefreshSignPhased(t *testing.T) {
 					"party %s should have same public key after refresh", id)
 			}
 
-			// Phase 3: Sign (subset signers, new session)
+			// Phase 3: Sign (subset signers - FROST needs exactly threshold)
 			signers := partyIDs[:tt.threshold]
-			h2 := test.NewPhaseHarness(t, signers) // New harness with just signers
 			
-			signRes, err := h2.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+			signRes, err := test.RunProtocol(t, signers, []byte("frost-krs-sign"), func(id party.ID) protocol.StartFunc {
 				config := refreshRes[id].(*frost.Config)
 				return frost.Sign(config, signers, tt.message)
 			})
@@ -113,8 +108,16 @@ func TestFROSTKeygenRefreshSignPhased(t *testing.T) {
 			// Verify all parties produced the same signature
 			var firstSig *frost.Signature
 			for id, res := range signRes {
-				sig, ok := res.(*frost.Signature)
-				require.True(t, ok, "result should be *frost.Signature for party %s", id)
+				// Handle both value and pointer types
+				var sig *frost.Signature
+				switch s := res.(type) {
+				case *frost.Signature:
+					sig = s
+				case frost.Signature:
+					sig = &s
+				default:
+					t.Fatalf("unexpected signature type for %s: %T", id, res)
+				}
 				require.NotNil(t, sig)
 				
 				if firstSig == nil {
@@ -146,9 +149,7 @@ func BenchmarkFROSTKeygenPhased(b *testing.B) {
 			
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				h := test.NewPhaseHarness(b, partyIDs)
-				
-				_, err := h.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+				_, err := test.RunProtocol(b, partyIDs, []byte("frost-bench-keygen"), func(id party.ID) protocol.StartFunc {
 					return frost.Keygen(curve.Secp256k1{}, id, partyIDs, bm.threshold)
 				})
 				if err != nil {
@@ -166,8 +167,7 @@ func BenchmarkFROSTSignPhased(b *testing.B) {
 	signers := partyIDs[:threshold]
 	message := []byte("benchmark message")
 	
-	h := test.NewPhaseHarness(b, partyIDs)
-	keygenRes, err := h.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+	keygenRes, err := test.RunProtocol(b, partyIDs, []byte("frost-bench-setup"), func(id party.ID) protocol.StartFunc {
 		return frost.Keygen(curve.Secp256k1{}, id, partyIDs, threshold)
 	})
 	require.NoError(b, err)
@@ -175,8 +175,7 @@ func BenchmarkFROSTSignPhased(b *testing.B) {
 	// Benchmark signing
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		h2 := test.NewPhaseHarness(b, signers)
-		_, err := h2.RunPhase(60*time.Second, func(id party.ID) protocol.StartFunc {
+		_, err := test.RunProtocol(b, signers, []byte("frost-bench-sign"), func(id party.ID) protocol.StartFunc {
 			config := keygenRes[id].(*frost.Config)
 			return frost.Sign(config, signers, message)
 		})

@@ -3,6 +3,7 @@ package keygen
 import (
 	"crypto/rand"
 	"fmt"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -155,13 +156,22 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		copy(commitmentCopy, commitment)
 	}
 	
+	// Initialize sync.Maps with initial values
+	phi := &sync.Map{}
+	phi.Store(r.SelfID(), PhiI)
+	
+	chainKeys := &sync.Map{}
+	chainKeys.Store(r.SelfID(), cI)
+	
+	chainKeyCommitments := &sync.Map{}
+	
 	return &round2{
 		round1:               r,
 		fI:                   fI,
-		Phi:                  map[party.ID]*polynomial.Exponent{r.SelfID(): PhiI},
-		ChainKeys:            map[party.ID]types.RID{r.SelfID(): cI},
+		Phi:                  *phi,
+		ChainKeys:            *chainKeys,
 		ChainKeyDecommitment: decommitment,
-		ChainKeyCommitments:  make(map[party.ID]hash.Commitment),
+		ChainKeyCommitments:  *chainKeyCommitments,
 	}, nil
 }
 
