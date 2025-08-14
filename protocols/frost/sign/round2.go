@@ -69,8 +69,33 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		return fmt.Errorf("nonce commitment is the identity point")
 	}
 
-	r.D[msg.From] = body.D_i
-	r.E[msg.From] = body.E_i
+	// Only skip if we already have BOTH; otherwise we could drop one
+	if r.D[msg.From] != nil && r.E[msg.From] != nil {
+		// Already have both values for this party, skip
+		return nil
+	}
+
+	// Deep copy points to avoid aliasing issues - use marshal/unmarshal for clean copy
+	dBytes, err := body.D_i.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to marshal D_i: %w", err)
+	}
+	eBytes, err := body.E_i.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to marshal E_i: %w", err)
+	}
+	
+	dCopy := r.Group().NewPoint()
+	if err := dCopy.UnmarshalBinary(dBytes); err != nil {
+		return fmt.Errorf("failed to unmarshal D_i: %w", err)
+	}
+	eCopy := r.Group().NewPoint()
+	if err := eCopy.UnmarshalBinary(eBytes); err != nil {
+		return fmt.Errorf("failed to unmarshal E_i: %w", err)
+	}
+	
+	r.D[msg.From] = dCopy
+	r.E[msg.From] = eCopy
 	return nil
 }
 
@@ -82,12 +107,26 @@ func (round2) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round.
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
-	// Check if we have all D and E values - if not, return self to wait for more broadcasts
-	for _, l := range r.PartyIDs() {
+	// Check if we have all D and E values from ALL signers
+	// This is critical - we MUST have D,E from every signer before proceeding
+	signers := r.PartyIDs()
+	missingCount := 0
+	for _, l := range signers {
 		if r.D[l] == nil || r.E[l] == nil {
-			// Not ready yet, return self to continue waiting for broadcasts
-			return r, nil
+			missingCount++
 		}
+		// Also verify they're not identity points (shouldn't happen but double-check)
+		if r.D[l] != nil && r.D[l].IsIdentity() {
+			return r, fmt.Errorf("party %s has identity point for D", l)
+		}
+		if r.E[l] != nil && r.E[l].IsIdentity() {
+			return r, fmt.Errorf("party %s has identity point for E", l)
+		}
+	}
+	
+	if missingCount > 0 {
+		// Not ready yet, return self to continue waiting for broadcasts
+		return r, nil
 	}
 	
 	// This essentially follows parts of Figure 3.
@@ -104,32 +143,52 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	rho := make(map[party.ID]curve.Scalar)
 	// This calculates H(m, B), allowing us to avoid re-hashing this data for
 	// each extra party l.
-	// IMPORTANT: We must hash D and E values in a consistent order across all parties
-	// to ensure everyone computes the same binding values
+	// IMPORTANT: We must hash CANONICAL BYTES of D and E values to ensure
+	// all parties compute identical binding values
 	rhoPreHash := hash.New()
-	_ = rhoPreHash.WriteAny(r.M)
-	// Sort party IDs to ensure consistent ordering
-	sortedPartyIDs := make([]party.ID, 0, len(r.PartyIDs()))
-	for _, id := range r.PartyIDs() {
-		sortedPartyIDs = append(sortedPartyIDs, id)
+	_ = rhoPreHash.WriteAny(messageHash(r.M)) // Use the messageHash wrapper
+	// Sort signer IDs to ensure consistent ordering (use only signers in this session)
+	sortedSigners := make([]party.ID, 0, len(signers))
+	for _, id := range signers {
+		sortedSigners = append(sortedSigners, id)
 	}
-	sort.Slice(sortedPartyIDs, func(i, j int) bool {
-		return sortedPartyIDs[i] < sortedPartyIDs[j]
+	sort.Slice(sortedSigners, func(i, j int) bool {
+		return sortedSigners[i] < sortedSigners[j]
 	})
 	
-	for _, l := range sortedPartyIDs {
-		_ = rhoPreHash.WriteAny(r.D[l], r.E[l])
+	// Hash canonical bytes of points, not the points themselves
+	for _, l := range sortedSigners {
+		// Write party ID as canonical bytes
+		_ = rhoPreHash.WriteAny(&hash.BytesWithDomain{
+			TheDomain: "PartyID",
+			Bytes:     []byte(l),
+		})
+		// Write canonical encoding of D[l]
+		dBytes, _ := r.D[l].MarshalBinary()
+		_ = rhoPreHash.WriteAny(&hash.BytesWithDomain{
+			TheDomain: "D",
+			Bytes:     dBytes,
+		})
+		// Write canonical encoding of E[l]
+		eBytes, _ := r.E[l].MarshalBinary()
+		_ = rhoPreHash.WriteAny(&hash.BytesWithDomain{
+			TheDomain: "E",
+			Bytes:     eBytes,
+		})
 	}
-	for _, l := range sortedPartyIDs {
+	for _, l := range sortedSigners {
 		rhoHash := rhoPreHash.Clone()
-		_ = rhoHash.WriteAny(l)
+		_ = rhoHash.WriteAny(&hash.BytesWithDomain{
+			TheDomain: "PartyID",
+			Bytes:     []byte(l),
+		})
 		rho[l] = sample.Scalar(rhoHash.Digest(), r.Group())
 	}
 
 	R := r.Group().NewPoint()
 	RShares := make(map[party.ID]curve.Point)
 	// Use sorted order to ensure consistent R computation
-	for _, l := range sortedPartyIDs {
+	for _, l := range sortedSigners {
 		RShares[l] = rho[l].Act(r.E[l])
 		RShares[l] = RShares[l].Add(r.D[l])
 		R = R.Add(RShares[l])
@@ -156,8 +215,19 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		cHash := taproot.TaggedHash("BIP0340/challenge", RBytes, PBytes, r.M)
 		c = r.Group().NewScalar().SetNat(new(saferith.Nat).SetBytes(cHash))
 	} else {
+		// Use canonical bytes for challenge computation
 		cHash := hash.New()
-		_ = cHash.WriteAny(R, r.Y, r.M)
+		rBytes, _ := R.MarshalBinary()
+		_ = cHash.WriteAny(&hash.BytesWithDomain{
+			TheDomain: "R",
+			Bytes:     rBytes,
+		})
+		yBytes, _ := r.Y.MarshalBinary()
+		_ = cHash.WriteAny(&hash.BytesWithDomain{
+			TheDomain: "Y",
+			Bytes:     yBytes,
+		})
+		_ = cHash.WriteAny(messageHash(r.M))
 		c = sample.Scalar(cHash.Digest(), r.Group())
 	}
 
@@ -185,8 +255,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// TODO: Securely delete the nonces.
 
-	// Debug: Log what we computed
-	// fmt.Printf("Party %s round2: R=%v, c=%v\n", r.SelfID(), R, c)
+	// Debug: Log what we computed (commented out)
+	// fmt.Printf("Party %s round2: R=%v, signers=%v\n", r.SelfID(), R, sortedSigners)
 	
 	// Broadcast our response
 	err := r.BroadcastMessage(out, &broadcast3{ZI: zI})
