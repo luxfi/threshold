@@ -127,22 +127,6 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 			cY := r.c.Act(r.Y)
 			RplusCY := cY.Add(r.R)
 			
-			// Log the values for debugging
-			fmt.Printf("DEBUG: Signature verification failed\n")
-			fmt.Printf("  z = %v\n", z)
-			fmt.Printf("  z*G = %v\n", zG)
-			fmt.Printf("  R = %v\n", r.R)
-			fmt.Printf("  c = %v\n", r.c)
-			fmt.Printf("  Y = %v\n", r.Y)
-			fmt.Printf("  c*Y = %v\n", cY)
-			fmt.Printf("  R + c*Y = %v\n", RplusCY)
-			fmt.Printf("  z*G == R + c*Y: %v\n", zG.Equal(RplusCY))
-			
-			// Also log the individual z_i contributions
-			fmt.Printf("  Individual z_i contributions:\n")
-			for id, zi := range r.z {
-				fmt.Printf("    Party %s: z_i = %v\n", id, zi)
-			}
 			
 			return r.AbortRound(fmt.Errorf("signature verification failed")), nil
 		}

@@ -2,6 +2,7 @@ package sign
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
@@ -103,12 +104,23 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	rho := make(map[party.ID]curve.Scalar)
 	// This calculates H(m, B), allowing us to avoid re-hashing this data for
 	// each extra party l.
+	// IMPORTANT: We must hash D and E values in a consistent order across all parties
+	// to ensure everyone computes the same binding values
 	rhoPreHash := hash.New()
 	_ = rhoPreHash.WriteAny(r.M)
-	for _, l := range r.PartyIDs() {
+	// Sort party IDs to ensure consistent ordering
+	sortedPartyIDs := make([]party.ID, 0, len(r.PartyIDs()))
+	for _, id := range r.PartyIDs() {
+		sortedPartyIDs = append(sortedPartyIDs, id)
+	}
+	sort.Slice(sortedPartyIDs, func(i, j int) bool {
+		return sortedPartyIDs[i] < sortedPartyIDs[j]
+	})
+	
+	for _, l := range sortedPartyIDs {
 		_ = rhoPreHash.WriteAny(r.D[l], r.E[l])
 	}
-	for _, l := range r.PartyIDs() {
+	for _, l := range sortedPartyIDs {
 		rhoHash := rhoPreHash.Clone()
 		_ = rhoHash.WriteAny(l)
 		rho[l] = sample.Scalar(rhoHash.Digest(), r.Group())
@@ -116,7 +128,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	R := r.Group().NewPoint()
 	RShares := make(map[party.ID]curve.Point)
-	for _, l := range r.PartyIDs() {
+	// Use sorted order to ensure consistent R computation
+	for _, l := range sortedPartyIDs {
 		RShares[l] = rho[l].Act(r.E[l])
 		RShares[l] = RShares[l].Add(r.D[l])
 		R = R.Add(RShares[l])
@@ -172,6 +185,9 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// TODO: Securely delete the nonces.
 
+	// Debug: Log what we computed
+	// fmt.Printf("Party %s round2: R=%v, c=%v\n", r.SelfID(), R, c)
+	
 	// Broadcast our response
 	err := r.BroadcastMessage(out, &broadcast3{ZI: zI})
 	if err != nil {
