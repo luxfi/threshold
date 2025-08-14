@@ -121,13 +121,6 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 
 		// Check if signature verifies
 		if !sig.Verify(r.Y, r.M) {
-			// Debug: let's check the signature equation manually
-			// z*G should equal R + c*Y
-			zG := z.ActOnBase()
-			cY := r.c.Act(r.Y)
-			RplusCY := cY.Add(r.R)
-			
-			
 			return r.AbortRound(fmt.Errorf("signature verification failed")), nil
 		}
 

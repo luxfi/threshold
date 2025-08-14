@@ -45,8 +45,19 @@ type Signature struct {
 func (sig Signature) Verify(public curve.Point, m []byte) bool {
 	group := public.Curve()
 
+	// Use canonical bytes for challenge computation - must match round2
 	challengeHash := hash.New()
-	_ = challengeHash.WriteAny(sig.R, public, messageHash(m))
+	rBytes, _ := sig.R.MarshalBinary()
+	_ = challengeHash.WriteAny(&hash.BytesWithDomain{
+		TheDomain: "R",
+		Bytes:     rBytes,
+	})
+	yBytes, _ := public.MarshalBinary()
+	_ = challengeHash.WriteAny(&hash.BytesWithDomain{
+		TheDomain: "Y",
+		Bytes:     yBytes,
+	})
+	_ = challengeHash.WriteAny(messageHash(m))
 	challenge := sample.Scalar(challengeHash.Digest(), group)
 
 	expected := challenge.Act(public)
