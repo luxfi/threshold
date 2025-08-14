@@ -14,15 +14,11 @@ import (
 
 // TestCMPQuickSuite runs quick validation tests for CMP
 func TestCMPQuickSuite(t *testing.T) {
-	if testing.Short() {
-		// In short mode, run quick tests
-		t.Run("QuickKeygen", testCMPQuickKeygen)
-		t.Run("QuickSign", testCMPQuickSign)
-		t.Run("QuickPresign", testCMPQuickPresign)
-		t.Run("QuickRefresh", testCMPQuickRefresh)
-	} else {
-		t.Skip("Skipping long-running CMP tests in short mode")
-	}
+	// Always run quick tests - they're designed to be fast
+	t.Run("QuickKeygen", testCMPQuickKeygen)
+	t.Run("QuickSign", testCMPQuickSign)
+	t.Run("QuickPresign", testCMPQuickPresign)
+	t.Run("QuickRefresh", testCMPQuickRefresh)
 }
 
 func testCMPQuickKeygen(t *testing.T) {
