@@ -35,9 +35,27 @@ func (r *round5) StoreBroadcastMessage(msg round.Message) error {
 		return round.ErrNilFields
 	}
 
+	// Load Schnorr commitment from sync.Map
+	schnorrCommitValue, ok := r.SchnorrCommitments.Load(from)
+	if !ok {
+		return errors.New("schnorr commitment not found for party")
+	}
+	schnorrCommit, ok := schnorrCommitValue.(*sch.Commitment)
+	if !ok || schnorrCommit == nil {
+		return errors.New("invalid schnorr commitment for party")
+	}
+	
+	// Check if public key exists for party
+	if r.UpdatedConfig == nil || r.UpdatedConfig.Public == nil {
+		return errors.New("updated config not initialized")
+	}
+	if _, ok := r.UpdatedConfig.Public[from]; !ok {
+		return errors.New("public key not found in updated config for party")
+	}
+	
 	if !body.SchnorrResponse.Verify(r.HashForID(from),
 		r.UpdatedConfig.Public[from].ECDSA,
-		r.SchnorrCommitments[from], nil) {
+		schnorrCommit, nil) {
 		return errors.New("failed to validate schnorr proof for received share")
 	}
 	return nil

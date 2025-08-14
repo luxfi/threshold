@@ -23,7 +23,7 @@ import (
 
 // BenchmarkHandler compares original vs optimized handler
 func BenchmarkHandler(b *testing.B) {
-	b.Skip("Skipping benchmark that times out")
+	// Benchmark enabled with proper timeout
 	tests := []struct {
 		name      string
 		n         int

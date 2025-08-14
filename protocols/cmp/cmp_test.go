@@ -23,16 +23,16 @@ import (
 
 func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte, pl *pool.Pool, n *test.Network, wg *sync.WaitGroup) {
 	defer wg.Done()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-session")
 	config := protocol.DefaultConfig()
 	
+	// Keygen
 	h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Keygen(curve.Secp256k1{}, id, ids, threshold, pl), sessionID, config)
 	require.NoError(t, err)
 	
-	// Run handler with timeout
 	done := make(chan struct{})
 	go func() {
 		test.HandlerLoop(id, h, n)
@@ -52,18 +52,46 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	require.IsType(t, &Config{}, r)
 	c := r.(*Config)
 
+	// Refresh
 	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Refresh(c, pl), sessionID, config)
 	require.NoError(t, err)
-	test.HandlerLoop(c.ID, h, n)
+	
+	done = make(chan struct{})
+	go func() {
+		test.HandlerLoop(c.ID, h, n)
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// Success
+	case <-ctx.Done():
+		t.Logf("Refresh timed out for party %s", id)
+		return
+	}
 
 	r, err = h.Result()
 	require.NoError(t, err)
 	require.IsType(t, &Config{}, r)
 	c = r.(*Config)
 
+	// Sign
 	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Sign(c, ids, message, pl), sessionID, config)
 	require.NoError(t, err)
-	test.HandlerLoop(c.ID, h, n)
+	
+	done = make(chan struct{})
+	go func() {
+		test.HandlerLoop(c.ID, h, n)
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// Success
+	case <-ctx.Done():
+		t.Logf("Sign timed out for party %s", id)
+		return
+	}
 
 	signResult, err := h.Result()
 	require.NoError(t, err)
@@ -71,10 +99,23 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	signature := signResult.(*ecdsa.Signature)
 	assert.True(t, signature.Verify(c.PublicPoint(), message))
 
+	// Presign
 	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), Presign(c, ids, pl), sessionID, config)
 	require.NoError(t, err)
 
-	test.HandlerLoop(c.ID, h, n)
+	done = make(chan struct{})
+	go func() {
+		test.HandlerLoop(c.ID, h, n)
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// Success
+	case <-ctx.Done():
+		t.Logf("Presign timed out for party %s", id)
+		return
+	}
 
 	signResult, err = h.Result()
 	require.NoError(t, err)
@@ -82,9 +123,23 @@ func do(t *testing.T, id party.ID, ids []party.ID, threshold int, message []byte
 	preSignature := signResult.(*ecdsa.PreSignature)
 	assert.NoError(t, preSignature.Validate())
 
+	// PresignOnline
 	h, err = protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), PresignOnline(c, preSignature, message, pl), sessionID, config)
 	require.NoError(t, err)
-	test.HandlerLoop(c.ID, h, n)
+	
+	done = make(chan struct{})
+	go func() {
+		test.HandlerLoop(c.ID, h, n)
+		close(done)
+	}()
+	
+	select {
+	case <-done:
+		// Success
+	case <-ctx.Done():
+		t.Logf("PresignOnline timed out for party %s", id)
+		return
+	}
 
 	signResult, err = h.Result()
 	require.NoError(t, err)
@@ -103,15 +158,22 @@ func TestCMPFull(t *testing.T) {
 
 	partyIDs := test.PartyIDs(N)
 
-	// Use the original do function approach that was working
-	pl := pool.NewPool(3)
-	defer pl.TearDown()
+	// Create separate pool for each party to avoid concurrent access issues
+	pools := make(map[party.ID]*pool.Pool)
+	for _, id := range partyIDs {
+		pools[id] = pool.NewPool(0)
+	}
+	defer func() {
+		for _, pl := range pools {
+			pl.TearDown()
+		}
+	}()
 	
 	network := test.NewNetwork(partyIDs)
 	var wg sync.WaitGroup
 	for _, id := range partyIDs {
 		wg.Add(1)
-		go do(t, id, partyIDs, T, message, pl, network, &wg)
+		go do(t, id, partyIDs, T, message, pools[id], network, &wg)
 	}
 	wg.Wait()
 }

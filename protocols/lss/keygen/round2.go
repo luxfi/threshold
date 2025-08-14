@@ -2,6 +2,7 @@ package keygen
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -23,8 +24,8 @@ type round2 struct {
 	// Chain keys from all parties
 	chainKeys map[party.ID]types.RID
 
-	// Shares we receive
-	shares map[party.ID]curve.Scalar
+	// Shares we receive - using sync.Map for thread safety
+	shares sync.Map // map[party.ID]curve.Scalar
 }
 
 // message2 contains the secret share for a party
@@ -100,19 +101,18 @@ func (r *round2) StoreMessage(msg round.Message) error {
 		return errors.New("invalid share encoding")
 	}
 
-	r.shares[from] = share
+	// Store using sync.Map for thread safety
+	r.shares.Store(from, share)
 	return nil
 }
 
 // Finalize implements round.Round
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
-	// Initialize shares map if needed
-	if r.shares == nil {
-		r.shares = make(map[party.ID]curve.Scalar)
-	}
+	// Check if we've already sent shares
+	_, hasSelfShare := r.shares.Load(r.SelfID())
 	
 	// First time: Send shares to each party
-	if r.shares[r.SelfID()] == nil {
+	if !hasSelfShare {
 		for _, id := range r.OtherPartyIDs() {
 			x := id.Scalar(r.Group())
 			share := r.poly.Evaluate(x)
@@ -132,24 +132,39 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 		// Our own share
 		ownX := r.SelfID().Scalar(r.Group())
-		r.shares[r.SelfID()] = r.poly.Evaluate(ownX)
+		r.shares.Store(r.SelfID(), r.poly.Evaluate(ownX))
 		
 		// Return self to wait for incoming shares
 		return r, nil
 	}
 
-	// Second time: Check if we have all shares before advancing
-	if len(r.shares) < r.N() {
+	// Count the number of shares we have
+	shareCount := 0
+	r.shares.Range(func(_, _ interface{}) bool {
+		shareCount++
+		return true
+	})
+	
+	// Check if we have all shares before advancing
+	if shareCount < r.N() {
 		// Still waiting for shares
 		return r, nil
 	}
+
+	// Convert sync.Map back to regular map for round3
+	shares := make(map[party.ID]curve.Scalar)
+	r.shares.Range(func(key, value interface{}) bool {
+		id := key.(party.ID)
+		shares[id] = value.(curve.Scalar)
+		return true
+	})
 
 	// We have all shares, advance to round3
 	return &round3{
 		Helper:      r.Helper,
 		commitments: r.commitments,
 		chainKeys:   r.chainKeys,
-		shares:      r.shares,
+		shares:      shares,
 	}, nil
 }
 

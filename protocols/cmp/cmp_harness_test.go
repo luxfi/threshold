@@ -16,8 +16,8 @@ import (
 )
 
 func TestCMPKeygen(t *testing.T) {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
+	// Create pools map for each party
+	pools := make(map[party.ID]*pool.Pool)
 	
 	tests := []test.ProtocolTest{
 		{
@@ -26,7 +26,10 @@ func TestCMPKeygen(t *testing.T) {
 			Threshold:  2,
 			SessionID:  []byte("cmp-keygen-2-of-3"),
 			CreateStart: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
-				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl)
+				if pools[id] == nil {
+					pools[id] = pool.NewPool(0)
+				}
+				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pools[id])
 			},
 			Validate: func(t *testing.T, results map[party.ID]interface{}) {
 				require.Len(t, results, 3)
@@ -55,7 +58,10 @@ func TestCMPKeygen(t *testing.T) {
 			Threshold:  3,
 			SessionID:  []byte("cmp-keygen-3-of-5"),
 			CreateStart: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
-				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl)
+				if pools[id] == nil {
+					pools[id] = pool.NewPool(0)
+				}
+				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pools[id])
 			},
 			Validate: func(t *testing.T, results map[party.ID]interface{}) {
 				require.Len(t, results, 5)
@@ -79,11 +85,21 @@ func TestCMPKeygen(t *testing.T) {
 	}
 	
 	test.RunMultipleProtocolTests(t, tests)
+	
+	// Clean up pools
+	for _, pl := range pools {
+		pl.TearDown()
+	}
 }
 
 func TestCMPKeygenAndSign(t *testing.T) {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
+	// Create pools map for each party
+	pools := make(map[party.ID]*pool.Pool)
+	defer func() {
+		for _, pl := range pools {
+			pl.TearDown()
+		}
+	}()
 	
 	tests := []test.KeygenAndSign{
 		{
@@ -92,13 +108,19 @@ func TestCMPKeygenAndSign(t *testing.T) {
 			Threshold:  2,
 			Message:    []byte("test message for 2-of-3"),
 			CreateKeygen: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
-				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl)
+				if pools[id] == nil {
+					pools[id] = pool.NewPool(0)
+				}
+				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pools[id])
 			},
 			CreateSign: func(config interface{}, signers []party.ID, message []byte) protocol.StartFunc {
 				cmpConfig := config.(*cmp.Config)
 				messageHash := make([]byte, 32)
 				_, _ = rand.Read(messageHash)
-				return cmp.Sign(cmpConfig, signers, messageHash, pl)
+				if pools[cmpConfig.ID] == nil {
+					pools[cmpConfig.ID] = pool.NewPool(0)
+				}
+				return cmp.Sign(cmpConfig, signers, messageHash, pools[cmpConfig.ID])
 			},
 			ValidateSign: func(t *testing.T, config interface{}, signature interface{}, message []byte) {
 				cmpConfig := config.(*cmp.Config)
@@ -119,13 +141,19 @@ func TestCMPKeygenAndSign(t *testing.T) {
 			Threshold:  3,
 			Message:    []byte("test message for 3-of-5"),
 			CreateKeygen: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
-				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl)
+				if pools[id] == nil {
+					pools[id] = pool.NewPool(0)
+				}
+				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pools[id])
 			},
 			CreateSign: func(config interface{}, signers []party.ID, message []byte) protocol.StartFunc {
 				cmpConfig := config.(*cmp.Config)
 				messageHash := make([]byte, 32)
 				_, _ = rand.Read(messageHash)
-				return cmp.Sign(cmpConfig, signers, messageHash, pl)
+				if pools[cmpConfig.ID] == nil {
+					pools[cmpConfig.ID] = pool.NewPool(0)
+				}
+				return cmp.Sign(cmpConfig, signers, messageHash, pools[cmpConfig.ID])
 			},
 			ValidateSign: func(t *testing.T, config interface{}, signature interface{}, message []byte) {
 				cmpConfig := config.(*cmp.Config)
@@ -146,15 +174,23 @@ func TestCMPKeygenAndSign(t *testing.T) {
 }
 
 func TestCMPRefresh(t *testing.T) {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
+	// Create pools map for each party
+	pools := make(map[party.ID]*pool.Pool)
+	defer func() {
+		for _, pl := range pools {
+			pl.TearDown()
+		}
+	}()
 	
 	// First run keygen
 	partyIDs := test.PartyIDs(5)
 	threshold := 3
 	
 	keygenResults, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
-		return cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pl)
+		if pools[id] == nil {
+			pools[id] = pool.NewPool(0)
+		}
+		return cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pools[id])
 	})
 	require.NoError(t, err)
 	require.Len(t, keygenResults, 5)
@@ -166,7 +202,10 @@ func TestCMPRefresh(t *testing.T) {
 	// Run refresh with a new session ID
 	refreshResults, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
 		config := keygenResults[id].(*cmp.Config)
-		return cmp.Refresh(config, pl)
+		if pools[id] == nil {
+			pools[id] = pool.NewPool(0)
+		}
+		return cmp.Refresh(config, pools[id])
 	})
 	require.NoError(t, err)
 	require.Len(t, refreshResults, 5)
@@ -181,8 +220,13 @@ func TestCMPRefresh(t *testing.T) {
 }
 
 func TestCMPPresign(t *testing.T) {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
+	// Create pools map for each party
+	pools := make(map[party.ID]*pool.Pool)
+	defer func() {
+		for _, pl := range pools {
+			pl.TearDown()
+		}
+	}()
 	
 	// First run keygen
 	partyIDs := test.PartyIDs(5)
@@ -190,7 +234,10 @@ func TestCMPPresign(t *testing.T) {
 	signers := partyIDs[:threshold]
 	
 	keygenResults, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
-		return cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pl)
+		if pools[id] == nil {
+			pools[id] = pool.NewPool(0)
+		}
+		return cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pools[id])
 	})
 	require.NoError(t, err)
 	require.Len(t, keygenResults, 5)
@@ -198,7 +245,10 @@ func TestCMPPresign(t *testing.T) {
 	// Run presign with a new session ID
 	presignResults, err := test.RunProtocol(t, signers, nil, func(id party.ID) protocol.StartFunc {
 		config := keygenResults[id].(*cmp.Config)
-		return cmp.Presign(config, signers, pl)
+		if pools[id] == nil {
+			pools[id] = pool.NewPool(0)
+		}
+		return cmp.Presign(config, signers, pools[id])
 	})
 	require.NoError(t, err)
 	require.Len(t, presignResults, threshold)
@@ -219,7 +269,10 @@ func TestCMPPresign(t *testing.T) {
 	onlineResults, err := test.RunProtocol(t, signers, nil, func(id party.ID) protocol.StartFunc {
 		config := keygenResults[id].(*cmp.Config)
 		presig := presignResults[id].(*ecdsa.PreSignature)
-		return cmp.PresignOnline(config, presig, messageHash, pl)
+		if pools[id] == nil {
+			pools[id] = pool.NewPool(0)
+		}
+		return cmp.PresignOnline(config, presig, messageHash, pools[id])
 	})
 	require.NoError(t, err)
 	require.Len(t, onlineResults, threshold)
@@ -235,8 +288,13 @@ func TestCMPPresign(t *testing.T) {
 }
 
 func BenchmarkCMPKeygen(b *testing.B) {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
+	// Create pools map for each party
+	pools := make(map[party.ID]*pool.Pool)
+	defer func() {
+		for _, pl := range pools {
+			pl.TearDown()
+		}
+	}()
 	
 	benchmarks := []test.ProtocolBenchmark{
 		{
@@ -244,7 +302,10 @@ func BenchmarkCMPKeygen(b *testing.B) {
 			PartyCount: 3,
 			Threshold:  2,
 			CreateStart: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
-				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl)
+				if pools[id] == nil {
+					pools[id] = pool.NewPool(0)
+				}
+				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pools[id])
 			},
 		},
 		{
@@ -252,7 +313,10 @@ func BenchmarkCMPKeygen(b *testing.B) {
 			PartyCount: 5,
 			Threshold:  3,
 			CreateStart: func(id party.ID, ids []party.ID, threshold int) protocol.StartFunc {
-				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl)
+				if pools[id] == nil {
+					pools[id] = pool.NewPool(0)
+				}
+				return cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pools[id])
 			},
 		},
 	}
@@ -261,8 +325,13 @@ func BenchmarkCMPKeygen(b *testing.B) {
 }
 
 func BenchmarkCMPSign(b *testing.B) {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
+	// Create pools map for each party
+	pools := make(map[party.ID]*pool.Pool)
+	defer func() {
+		for _, pl := range pools {
+			pl.TearDown()
+		}
+	}()
 	
 	// Setup: Run keygen once
 	partyIDs := test.PartyIDs(5)
@@ -270,7 +339,10 @@ func BenchmarkCMPSign(b *testing.B) {
 	signers := partyIDs[:threshold]
 	
 	keygenResults, err := test.RunProtocol(b, partyIDs, nil, func(id party.ID) protocol.StartFunc {
-		return cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pl)
+		if pools[id] == nil {
+			pools[id] = pool.NewPool(0)
+		}
+		return cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pools[id])
 	})
 	require.NoError(b, err)
 	
@@ -282,7 +354,10 @@ func BenchmarkCMPSign(b *testing.B) {
 		
 		signResults, err := test.RunProtocol(b, signers, nil, func(id party.ID) protocol.StartFunc {
 			config := keygenResults[id].(*cmp.Config)
-			return cmp.Sign(config, signers, messageHash, pl)
+			if pools[id] == nil {
+				pools[id] = pool.NewPool(0)
+			}
+			return cmp.Sign(config, signers, messageHash, pools[id])
 		})
 		require.NoError(b, err)
 		require.Len(b, signResults, threshold)

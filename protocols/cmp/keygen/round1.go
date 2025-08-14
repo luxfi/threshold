@@ -6,13 +6,11 @@ import (
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
-	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/math/sample"
 	"github.com/luxfi/threshold/pkg/paillier"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/pkg/pedersen"
 	"github.com/luxfi/threshold/pkg/protocol"
 	zksch "github.com/luxfi/threshold/pkg/zk/sch"
 )
@@ -66,7 +64,7 @@ func (r *round1) StoreMessage(round.Message) error { return nil }
 // - commit to message.
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// generate Paillier and Pedersen
-	PaillierSecret := paillier.NewSecretKey(nil)
+	PaillierSecret := paillier.NewSecretKey(r.Pool)
 	SelfPaillierPublic := PaillierSecret.PublicKey
 	SelfPedersenPublic, PedersenSecret := PaillierSecret.GeneratePedersen()
 
@@ -109,20 +107,21 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	nextRound := &round2{
 		round1:         r,
-		VSSPolynomials: map[party.ID]*polynomial.Exponent{r.SelfID(): SelfVSSPolynomial},
-		Commitments:    map[party.ID]hash.Commitment{r.SelfID(): SelfCommitment},
-		RIDs:           map[party.ID]types.RID{r.SelfID(): SelfRID},
-		ChainKeys:      map[party.ID]types.RID{r.SelfID(): chainKey},
-		ShareReceived:  map[party.ID]curve.Scalar{r.SelfID(): SelfShare},
-		ElGamalPublic:  map[party.ID]curve.Point{r.SelfID(): ElGamalPublic},
-		PaillierPublic: map[party.ID]*paillier.PublicKey{r.SelfID(): SelfPaillierPublic},
-		Pedersen:       map[party.ID]*pedersen.Parameters{r.SelfID(): SelfPedersenPublic},
 		ElGamalSecret:  ElGamalSecret,
 		PaillierSecret: PaillierSecret,
 		PedersenSecret: PedersenSecret,
 		SchnorrRand:    SchnorrRand,
 		Decommitment:   Decommitment,
 	}
+	// Initialize sync.Maps with self values
+	nextRound.VSSPolynomials.Store(r.SelfID(), SelfVSSPolynomial)
+	nextRound.Commitments.Store(r.SelfID(), SelfCommitment)
+	nextRound.RIDs.Store(r.SelfID(), SelfRID)
+	nextRound.ChainKeys.Store(r.SelfID(), chainKey)
+	nextRound.ShareReceived.Store(r.SelfID(), SelfShare)
+	nextRound.ElGamalPublic.Store(r.SelfID(), ElGamalPublic)
+	nextRound.PaillierPublic.Store(r.SelfID(), SelfPaillierPublic)
+	nextRound.Pedersen.Store(r.SelfID(), SelfPedersenPublic)
 	return nextRound, nil
 }
 
@@ -134,16 +133,3 @@ func (round1) MessageContent() round.Content { return nil }
 
 // Number implements round.Round.
 func (round1) Number() round.Number { return 1 }
-
-// BroadcastContent implements round.BroadcastRound.
-// Note: Round1 sends broadcast2 messages in Finalize but must implement 
-// BroadcastContent to avoid the handler thinking no broadcasts are expected
-// and finalizing immediately (handler.go line 364-365).
-func (round1) BroadcastContent() round.BroadcastContent { return &broadcast2{} }
-
-// StoreBroadcastMessage implements round.BroadcastRound.
-// Round1 doesn't receive broadcasts, but must implement this to satisfy the interface.
-func (r *round1) StoreBroadcastMessage(msg round.Message) error {
-	// Round1 doesn't receive broadcasts
-	return nil
-}
