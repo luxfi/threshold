@@ -55,7 +55,8 @@ func checkOutput(t *testing.T, rounds []round.Session) {
 }
 
 func TestKeygen(t *testing.T) {
-	t.Skip("Skipping CMP keygen test - protocol synchronization issues")
+	// Test basic CMP keygen with 2 parties, threshold 1
+	// Validates key generation, config creation, and serialization
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -88,7 +89,8 @@ func TestKeygen(t *testing.T) {
 }
 
 func TestRefresh(t *testing.T) {
-	// Enable refresh test to match upstream parity
+	// Test CMP refresh protocol with 4 parties, threshold 3
+	// Validates share refresh maintains same public key while updating private shares
 
 	pl := pool.NewPool(0)
 	defer pl.TearDown()

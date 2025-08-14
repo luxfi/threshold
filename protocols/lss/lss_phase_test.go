@@ -44,9 +44,8 @@ func TestLSSKeygenMultipleConfigs(t *testing.T) {
 }
 
 func TestLSSKeygenReshareSignPhased(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping complex reshare test in short mode")
-	}
+	// Test complete LSS protocol flow: keygen → dynamic reshare → sign
+	// Validates LSS's unique dynamic resharing capability where parties can change
 
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
