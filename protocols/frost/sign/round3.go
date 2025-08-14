@@ -119,33 +119,32 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 			z: z,
 		}
 
-		// Debug: Check if signature verifies
+		// Check if signature verifies
 		if !sig.Verify(r.Y, r.M) {
-			// The issue is that z was computed using Lagrange coefficients for the subset of signers
-			// But the verification is checking against the full public key Y
-			// In FROST, the signature should still verify against the full public key
-			// because z = sum(z_i) where z_i = d_i + e_i*rho_i + lambda_i*s_i*c
-			// and the Lagrange coefficients lambda_i ensure correct interpolation
-			
-			// Let's reconstruct what the public key should be from the participating signers
-			YReconstructed := r.Group().NewPoint()
-			signersList := make([]party.ID, 0, len(r.z))
-			for id := range r.z {
-				signersList = append(signersList, id)
-				// Y = sum(lambda_i * Y_i) for participating signers
-				YReconstructed = YReconstructed.Add(r.Lambda[id].Act(r.YShares[id]))
-			}
-			
-			// Check if reconstructed Y matches the original Y
-			YMatch := YReconstructed.Equal(r.Y)
-			
-			// Compute the expected and actual for debugging
+			// Debug: let's check the signature equation manually
+			// z*G should equal R + c*Y
 			zG := z.ActOnBase()
 			cY := r.c.Act(r.Y)
 			RplusCY := cY.Add(r.R)
 			
-			return r.AbortRound(fmt.Errorf("signature verification failed (signers=%v, Y_match=%v, z*G=%v, R+c*Y=%v)", 
-				signersList, YMatch, zG, RplusCY)), nil
+			// Log the values for debugging
+			fmt.Printf("DEBUG: Signature verification failed\n")
+			fmt.Printf("  z = %v\n", z)
+			fmt.Printf("  z*G = %v\n", zG)
+			fmt.Printf("  R = %v\n", r.R)
+			fmt.Printf("  c = %v\n", r.c)
+			fmt.Printf("  Y = %v\n", r.Y)
+			fmt.Printf("  c*Y = %v\n", cY)
+			fmt.Printf("  R + c*Y = %v\n", RplusCY)
+			fmt.Printf("  z*G == R + c*Y: %v\n", zG.Equal(RplusCY))
+			
+			// Also log the individual z_i contributions
+			fmt.Printf("  Individual z_i contributions:\n")
+			for id, zi := range r.z {
+				fmt.Printf("    Party %s: z_i = %v\n", id, zi)
+			}
+			
+			return r.AbortRound(fmt.Errorf("signature verification failed")), nil
 		}
 
 		return r.ResultRound(sig), nil
