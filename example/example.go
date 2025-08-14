@@ -213,7 +213,7 @@ func All(id party.ID, ids party.IDSlice, threshold int, message []byte, n *test.
 
 	signers := ids[:threshold+1]
 	if !signers.Contains(id) {
-		n.Quit(id)
+		// Non-signers can exit early
 		return nil
 	}
 

@@ -66,6 +66,7 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 	// Note that step 7.a is an artifact of having a signing authority. In our case,
 	// we've already computed everything that step computes.
 
+	// Verify: zᵢ • G = Rᵢ + c * λᵢ * Yᵢ
 	expected := r.c.Act(r.Lambda[from].Act(r.YShares[from])).Add(r.RShares[from])
 
 	actual := body.ZI.ActOnBase()
@@ -118,8 +119,33 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 			z: z,
 		}
 
+		// Debug: Check if signature verifies
 		if !sig.Verify(r.Y, r.M) {
-			return r.AbortRound(fmt.Errorf("generated signature failed to verify")), nil
+			// The issue is that z was computed using Lagrange coefficients for the subset of signers
+			// But the verification is checking against the full public key Y
+			// In FROST, the signature should still verify against the full public key
+			// because z = sum(z_i) where z_i = d_i + e_i*rho_i + lambda_i*s_i*c
+			// and the Lagrange coefficients lambda_i ensure correct interpolation
+			
+			// Let's reconstruct what the public key should be from the participating signers
+			YReconstructed := r.Group().NewPoint()
+			signersList := make([]party.ID, 0, len(r.z))
+			for id := range r.z {
+				signersList = append(signersList, id)
+				// Y = sum(lambda_i * Y_i) for participating signers
+				YReconstructed = YReconstructed.Add(r.Lambda[id].Act(r.YShares[id]))
+			}
+			
+			// Check if reconstructed Y matches the original Y
+			YMatch := YReconstructed.Equal(r.Y)
+			
+			// Compute the expected and actual for debugging
+			zG := z.ActOnBase()
+			cY := r.c.Act(r.Y)
+			RplusCY := cY.Add(r.R)
+			
+			return r.AbortRound(fmt.Errorf("signature verification failed (signers=%v, Y_match=%v, z*G=%v, R+c*Y=%v)", 
+				signersList, YMatch, zG, RplusCY)), nil
 		}
 
 		return r.ResultRound(sig), nil

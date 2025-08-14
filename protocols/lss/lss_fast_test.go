@@ -5,7 +5,6 @@ import (
 
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
-	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss"
@@ -27,7 +26,8 @@ func TestLSSFastKeygen(t *testing.T) {
 		require.NotNil(t, startFunc, "Keygen start function should not be nil for party %s", id)
 		
 		// Verify the start function creates a valid round
-		round := startFunc()
+		round, err := startFunc(nil)
+		require.NoError(t, err, "Keygen should not error for party %s", id)
 		require.NotNil(t, round, "Keygen should create initial round for party %s", id)
 	}
 	
@@ -45,8 +45,11 @@ func TestLSSFastSign(t *testing.T) {
 	// Create mock configs
 	configs := test.CreateMockLSSConfigs(partyIDs, T)
 	
-	message := []byte("test message")
-	signers := partyIDs[:T]
+	// Create a 32-byte message hash (LSS requires exactly 32 bytes)
+	message := make([]byte, 32)
+	copy(message, []byte("test message"))
+	// For signing, we need at least T+1 parties
+	signers := partyIDs[:T+1]
 	
 	// Test sign initialization for each signer
 	for _, id := range signers {
@@ -64,7 +67,8 @@ func TestLSSFastSign(t *testing.T) {
 		require.NotNil(t, startFunc, "Sign start function should not be nil for party %s", id)
 		
 		// Verify the start function creates a valid round
-		round := startFunc()
+		round, err := startFunc(nil)
+		require.NoError(t, err, "Sign should not error for party %s", id)
 		require.NotNil(t, round, "Sign should create initial round for party %s", id)
 	}
 	
@@ -87,7 +91,8 @@ func TestLSSFastRefresh(t *testing.T) {
 		startFunc := lss.Refresh(cfg, pl)
 		// Refresh may return nil if not fully implemented
 		if startFunc != nil {
-			round := startFunc()
+			round, err := startFunc(nil)
+			require.NoError(t, err, "Refresh should not error for party %d", i)
 			require.NotNil(t, round, "Refresh should create initial round for party %d", i)
 		}
 	}

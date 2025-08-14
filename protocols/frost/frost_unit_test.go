@@ -92,12 +92,22 @@ func TestFROSTRefreshInitialization(t *testing.T) {
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
 	
-	// Create mock config
+	// Create mock config with required fields
 	publicKey := group.NewPoint()
+	privateShare := group.NewScalar()
+	vsMap := make(map[party.ID]curve.Point)
+	for _, id := range partyIDs {
+		vsMap[id] = group.NewPoint()
+	}
+	verificationShares := party.NewPointMap(vsMap)
+	
 	config := &frost.Config{
-		ID:        partyIDs[0],
-		Threshold: threshold,
-		PublicKey: publicKey,
+		ID:                 partyIDs[0],
+		Threshold:          threshold,
+		PublicKey:          publicKey,
+		PrivateShare:       privateShare,
+		VerificationShares: verificationShares,
+		ChainKey:           []byte("test-chain-key"),
 	}
 	
 	// Test that refresh can be initialized
@@ -159,8 +169,9 @@ func TestFROSTSignerSelection(t *testing.T) {
 		signerCount int
 		valid       bool
 	}{
-		{"exact threshold", threshold, true},
+		{"exact threshold", threshold, true},  // FROST needs exactly t
 		{"more than threshold", threshold + 1, true},
+		{"even more than threshold", threshold + 2, true},
 		{"less than threshold", threshold - 1, false},
 		{"all parties", n, true},
 		{"single party", 1, false},
@@ -172,6 +183,7 @@ func TestFROSTSignerSelection(t *testing.T) {
 				tc.signerCount = n
 			}
 			signers := partyIDs[:tc.signerCount]
+			// FROST requires at least threshold signers
 			isValid := len(signers) >= threshold
 			assert.Equal(t, tc.valid, isValid, tc.name)
 		})

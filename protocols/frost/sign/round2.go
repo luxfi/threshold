@@ -149,6 +149,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	// Lambdas[i] = λᵢ
+	// IMPORTANT: Lagrange coefficients must be computed for the set of signers participating in this session
+	// r.PartyIDs() returns the signers for this session, not all parties from keygen
 	Lambdas := polynomial.Lagrange(r.Group(), r.PartyIDs())
 	// 5. "Each Pᵢ computes their response using their long-lived secret share sᵢ
 	// by computing zᵢ = dᵢ + (eᵢ ρᵢ) + λᵢ sᵢ c, using S to determine
