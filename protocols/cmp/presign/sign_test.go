@@ -44,7 +44,8 @@ func init() {
 }
 
 func TestRound(t *testing.T) {
-	t.Skip("Skipping CMP presign test - protocol synchronization issues")
+	// Test CMP presign protocol rounds
+	// Validates presignature generation that can be used for fast online signing
 
 	rounds := make([]round.Session, 0, N)
 	for _, c := range configs {
