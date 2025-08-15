@@ -2,7 +2,6 @@
 package adapters
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
