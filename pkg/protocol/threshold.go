@@ -13,16 +13,16 @@ type ThresholdConfig interface {
 	GetID() party.ID
 	GetThreshold() int
 	GetGroup() curve.Curve
-	
+
 	// Key material
 	GetPrivateShare() curve.Scalar
 	GetPublicKey() (curve.Point, error)
 	GetPublicShare(id party.ID) (curve.Point, error)
-	
+
 	// Protocol-specific data
 	GetChainKey() []byte
 	GetRID() []byte
-	
+
 	// Validation
 	Validate() error
 	IsCompatible(other ThresholdConfig) bool
@@ -41,16 +41,16 @@ const (
 type ThresholdProtocol interface {
 	// Keygen creates a new distributed key
 	Keygen(group curve.Curve, selfID party.ID, participants []party.ID, threshold int) (StartFunc, error)
-	
+
 	// Sign creates a signature with the given signers
 	Sign(config ThresholdConfig, signers []party.ID, message []byte) (StartFunc, error)
-	
+
 	// Refresh updates shares without changing the key
 	Refresh(config ThresholdConfig) (StartFunc, error)
-	
+
 	// GetScheme returns the signature scheme this protocol implements
 	GetScheme() SignatureScheme
-	
+
 	// SupportsResharing indicates if the protocol supports dynamic resharing
 	SupportsResharing() bool
 }
@@ -59,7 +59,7 @@ type ThresholdProtocol interface {
 type ThresholdSigner[S any] interface {
 	// Sign produces a signature of type S
 	Sign(config ThresholdConfig, signers []party.ID, message []byte) (S, error)
-	
+
 	// Verify checks if a signature is valid
 	Verify(signature S, publicKey curve.Point, message []byte) bool
 }
@@ -67,13 +67,13 @@ type ThresholdSigner[S any] interface {
 // ReshareableProtocol extends ThresholdProtocol with resharing capabilities
 type ReshareableProtocol interface {
 	ThresholdProtocol
-	
+
 	// Reshare changes the participant set
 	Reshare(config ThresholdConfig, newParticipants []party.ID, newThreshold int) (StartFunc, error)
-	
+
 	// AddParties adds new participants
 	AddParties(config ThresholdConfig, newParties []party.ID) (StartFunc, error)
-	
+
 	// RemoveParties removes participants
 	RemoveParties(config ThresholdConfig, partiesToRemove []party.ID) (StartFunc, error)
 }

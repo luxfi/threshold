@@ -25,11 +25,11 @@ func testCMPQuickKeygen(t *testing.T) {
 	N := 3
 	T := 2
 	partyIDs := test.PartyIDs(N)
-	
+
 	// Quick initialization test
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	for _, id := range partyIDs {
 		startFunc, err := cmp.Keygen(curve.Secp256k1{}, id, partyIDs, T, pl)(nil)
 		if err != nil {
@@ -48,23 +48,23 @@ func testCMPQuickSign(t *testing.T) {
 	T := 2
 	partyIDs := test.PartyIDs(N)
 	configs := make(map[party.ID]*cmp.Config)
-	
+
 	for _, id := range partyIDs {
 		configs[id] = &cmp.Config{
 			ID:        id,
 			Threshold: T,
 		}
 	}
-	
+
 	// Test sign initialization with timeout
 	signers := partyIDs[:T+1]
 	message := []byte("test message")
-	
+
 	done := make(chan bool, 1)
 	go func() {
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
-		
+
 		for _, signer := range signers {
 			if cfg, ok := configs[signer]; ok {
 				startFunc := cmp.Sign(cfg, signers, message, pl)
@@ -75,7 +75,7 @@ func testCMPQuickSign(t *testing.T) {
 		}
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Quick sign test completed")
@@ -89,20 +89,20 @@ func testCMPQuickPresign(t *testing.T) {
 	T := 2
 	partyIDs := test.PartyIDs(N)
 	configs := make(map[party.ID]*cmp.Config)
-	
+
 	for _, id := range partyIDs {
 		configs[id] = &cmp.Config{
 			ID:        id,
 			Threshold: T,
 		}
 	}
-	
+
 	// Test presign initialization
 	signers := partyIDs[:T+1]
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	for _, signer := range signers {
 		if cfg, ok := configs[signer]; ok {
 			startFunc := cmp.Presign(cfg, signers, pl)
@@ -118,7 +118,7 @@ func testCMPQuickRefresh(t *testing.T) {
 	N := 3
 	T := 2
 	partyIDs := test.PartyIDs(N)
-	
+
 	// Create mock configs
 	configs := make(map[party.ID]*cmp.Config)
 	for _, id := range partyIDs {
@@ -127,11 +127,11 @@ func testCMPQuickRefresh(t *testing.T) {
 			Threshold: T,
 		}
 	}
-	
+
 	// Test refresh initialization
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	for _, id := range partyIDs {
 		if cfg, ok := configs[id]; ok {
 			startFunc, err := cmp.Refresh(cfg, pl)(nil)

@@ -17,16 +17,16 @@ import (
 type Config struct {
 	// ID is this party's identifier
 	ID party.ID
-	
+
 	// Threshold is the minimum number of parties needed to sign
 	Threshold int
-	
+
 	// PublicKey is the aggregate public key
 	PublicKey *bls.PublicKey
-	
+
 	// SecretShare is this party's secret key share
 	SecretShare *bls.SecretKey
-	
+
 	// VerificationKeys are the public keys for each party's share
 	VerificationKeys map[party.ID]*bls.PublicKey
 }
@@ -36,7 +36,7 @@ func (c *Config) Sign(message []byte) (*bls.Signature, error) {
 	if c.SecretShare == nil {
 		return nil, errors.New("no secret share available")
 	}
-	
+
 	// Sign with our share
 	sig := bls.Sign(c.SecretShare, message)
 	return sig, nil
@@ -47,7 +47,7 @@ func AggregateSignatures(signatures []*bls.Signature, threshold int) (*bls.Signa
 	if len(signatures) < threshold {
 		return nil, fmt.Errorf("insufficient signatures: have %d, need %d", len(signatures), threshold)
 	}
-	
+
 	// Aggregate the threshold signatures
 	aggregated, err := bls.AggregateSignatures(signatures[:threshold])
 	if err != nil {
@@ -62,7 +62,7 @@ func (c *Config) VerifyPartialSignature(from party.ID, message []byte, sig *bls.
 	if !ok {
 		return false
 	}
-	
+
 	return bls.Verify(pubKey, sig, message)
 }
 

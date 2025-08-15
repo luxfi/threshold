@@ -3,8 +3,8 @@ package frost_test
 import (
 	"testing"
 
-	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/protocols/frost"
 )
 
@@ -14,10 +14,10 @@ func TestFROSTConfigCreation(t *testing.T) {
 	threshold := 3
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	
+
 	configs := make([]*frost.Config, n)
 	publicKey := group.NewPoint()
-	
+
 	for i, id := range partyIDs {
 		configs[i] = &frost.Config{
 			ID:        id,
@@ -25,11 +25,11 @@ func TestFROSTConfigCreation(t *testing.T) {
 			PublicKey: publicKey,
 		}
 	}
-	
+
 	if len(configs) != n {
 		t.Errorf("Expected %d configs, got %d", n, len(configs))
 	}
-	
+
 	// Test that all configs share the same public key
 	for i := 1; i < n; i++ {
 		if !configs[i].PublicKey.Equal(configs[0].PublicKey) {
@@ -51,7 +51,7 @@ func TestFROSTThresholdValidation(t *testing.T) {
 		{7, 0, false}, // threshold = 0
 		{3, 2, true},
 	}
-	
+
 	for _, tc := range testCases {
 		if tc.expectOK {
 			if tc.threshold > tc.n || tc.threshold < 1 {
@@ -67,23 +67,23 @@ func TestFROSTThresholdValidation(t *testing.T) {
 
 func TestFROSTGroupOperations(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	// Test point operations
 	p1 := group.NewPoint()
 	p2 := group.NewPoint()
-	
+
 	if p1 == nil || p2 == nil {
 		t.Error("Failed to create points")
 	}
-	
+
 	// Test scalar operations
 	s1 := group.NewScalar()
 	s2 := group.NewScalar()
-	
+
 	if s1 == nil || s2 == nil {
 		t.Error("Failed to create scalars")
 	}
-	
+
 	// Test identity element
 	identity := group.NewPoint()
 	if identity == nil {

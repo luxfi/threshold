@@ -35,7 +35,7 @@ type round2 struct {
 	// ChainKeyCommitments holds the commitments for the chain key contributions
 	// Using sync.Map for thread-safe concurrent access
 	ChainKeyCommitments sync.Map // map[party.ID]hash.Commitment
-	
+
 	// finalized indicates whether this round has been finalized
 	finalized     bool
 	finalizedLock sync.Mutex
@@ -60,7 +60,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		return nil // Ignore messages after finalization
 	}
 	r.finalizedLock.Unlock()
-	
+
 	from := msg.From
 	body, ok := msg.Content.(*broadcast2)
 	if !ok || body == nil {
@@ -107,7 +107,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 
 	// Store using sync.Map for thread-safe concurrent access
 	r.Phi.Store(from, body.PhiI)
-	
+
 	// Store chain key commitments - make a defensive copy to avoid issues with shared slices
 	var commitmentCopy []byte
 	if body.Commitment != nil {
@@ -115,7 +115,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		copy(commitmentCopy, body.Commitment)
 	}
 	r.ChainKeyCommitments.Store(from, commitmentCopy)
-	
+
 	return nil
 }
 
@@ -135,7 +135,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Load our chain key from sync.Map
 	ckValue, _ := r.ChainKeys.Load(r.SelfID())
 	ck, _ := ckValue.(types.RID)
-	
+
 	if err := r.BroadcastMessage(out, &broadcast3{
 		CL:           ck,
 		Decommitment: r.ChainKeyDecommitment,
@@ -152,28 +152,28 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	selfShare := r.fI.Evaluate(r.SelfID().Scalar(r.Group()))
-	
+
 	// Mark as finalized to prevent further modifications
 	r.finalizedLock.Lock()
 	r.finalized = true
 	r.finalizedLock.Unlock()
-	
+
 	// Count commitments in sync.Map
 	commitmentCount := 0
 	r.ChainKeyCommitments.Range(func(_, _ interface{}) bool {
 		commitmentCount++
 		return true
 	})
-	
+
 	// We should have commitments from all other parties (not including ourselves)
 	if !r.refresh && commitmentCount != r.PartyIDs().Len()-1 {
 		return r, fmt.Errorf("missing chain key commitments: have %d, need %d", commitmentCount, r.PartyIDs().Len()-1)
 	}
-	
+
 	// Create shareFrom as sync.Map and store self share
 	shareFrom := &sync.Map{}
 	shareFrom.Store(r.SelfID(), selfShare)
-	
+
 	return &round3{
 		round2:    r,
 		shareFrom: shareFrom,

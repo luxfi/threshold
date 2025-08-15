@@ -3,7 +3,7 @@ package sign
 
 import (
 	"fmt"
-	
+
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/party"
@@ -21,7 +21,7 @@ func Start(c *config.Config, signers []party.ID, messageHash []byte, pl *pool.Po
 				return nil, fmt.Errorf("unknown signer: %s", signer)
 			}
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "lss/sign",
 			FinalRoundNumber: 3,

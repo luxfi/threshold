@@ -15,15 +15,15 @@ import (
 func TestFrostKeygenStandard(t *testing.T) {
 	N := 5
 	T := 3
-	
+
 	partyIDs := test.PartyIDs(N)
-	
+
 	// Run the protocol
 	results, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
 		return frost.Keygen(curve.Secp256k1{}, id, partyIDs, T)
 	})
 	require.NoError(t, err)
-	
+
 	// Verify results
 	configs := make([]*frost.Config, 0, N)
 	for _, result := range results {
@@ -32,7 +32,7 @@ func TestFrostKeygenStandard(t *testing.T) {
 		require.NotNil(t, config)
 		configs = append(configs, config)
 	}
-	
+
 	// Verify all have same public key
 	require.NotNil(t, configs[0].PublicKey)
 	for i := 1; i < len(configs); i++ {

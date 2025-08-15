@@ -21,17 +21,17 @@ import (
 // This is the REAL implementation of Section 4 of the LSS paper
 type DynamicLSS struct {
 	mu sync.RWMutex
-	
+
 	// Current generation of shares (incremented on each reshare)
 	generation uint32
-	
+
 	// History of configurations for rollback
 	configHistory map[uint32][]*config.Config
-	
+
 	// Current network state (dealer functionality embedded)
-	currentThreshold  int
-	currentParties    []party.ID
-	
+	currentThreshold int
+	currentParties   []party.ID
+
 	// Pool for goroutine management
 	pool *pool.Pool
 }
@@ -54,25 +54,25 @@ func (d *DynamicLSS) LiveReshare(
 ) ([]*config.Config, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	// Step 1: Initiation and Auxiliary Secret Generation
 	// All N+1 parties generate shares for temporary secrets w and q using JVSS
-	
+
 	oldParties := getPartyIDs(oldConfigs)
 	allParties := combineParties(oldParties, newParticipants)
-	
+
 	// Generate auxiliary secret w (for blinding)
 	wShares, err := d.generateAuxiliarySecret(allParties, newThreshold, "w")
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate w shares: %w", err)
 	}
-	
+
 	// Generate auxiliary secret q (for inverse computation)
 	qShares, err := d.generateAuxiliarySecret(allParties, newThreshold, "q")
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate q shares: %w", err)
 	}
-	
+
 	// Step 2: Distributed Computation of Blinded Secret (a·w)
 	// Original N parties compute ai·wi and send to dealer
 	blindedProducts := make(map[party.ID]curve.Scalar)
@@ -82,10 +82,10 @@ func (d *DynamicLSS) LiveReshare(
 		product.Mul(wShares[oldParties[i]])
 		blindedProducts[cfg.ID] = product
 	}
-	
+
 	// Dealer interpolates to get a·w
 	aTimesW := d.interpolate(blindedProducts, oldParties, oldConfigs[0].Threshold)
-	
+
 	// Step 3: Secure Computation of Inverse Blinding Factor (w^-1)
 	// Compute q·w through similar process
 	qwProducts := make(map[party.ID]curve.Scalar)
@@ -96,15 +96,15 @@ func (d *DynamicLSS) LiveReshare(
 			qwProducts[id] = product
 		}
 	}
-	
+
 	// Dealer computes (q·w)^-1
 	qTimesW := d.interpolate(qwProducts, allParties, newThreshold)
 	qwInverse := oldConfigs[0].Group.NewScalar().Set(qTimesW)
 	qwInverse.Invert()
-	
+
 	// Dealer creates shares of z = (q·w)^-1
 	zShares := d.createShares(qwInverse, allParties, newThreshold, oldConfigs[0].Group)
-	
+
 	// Step 4: Final Share Derivation
 	// Each party computes: a_new = (a·w)·q·z
 	newConfigs := make([]*config.Config, len(allParties))
@@ -113,7 +113,7 @@ func (d *DynamicLSS) LiveReshare(
 		newShare := oldConfigs[0].Group.NewScalar().Set(aTimesW)
 		newShare.Mul(qShares[id])
 		newShare.Mul(zShares[id])
-		
+
 		// Create new config with incremented generation
 		newConfigs[i] = &config.Config{
 			ID:         id,
@@ -126,11 +126,11 @@ func (d *DynamicLSS) LiveReshare(
 			RID:        generateNewRID(),
 		}
 	}
-	
+
 	// Save to history for rollback capability
 	d.generation++
 	d.configHistory[d.generation] = newConfigs
-	
+
 	return newConfigs, nil
 }
 
@@ -138,12 +138,12 @@ func (d *DynamicLSS) LiveReshare(
 func (d *DynamicLSS) Rollback(targetGeneration uint32) ([]*config.Config, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	if configs, ok := d.configHistory[targetGeneration]; ok {
 		d.generation = targetGeneration
 		return configs, nil
 	}
-	
+
 	return nil, fmt.Errorf("generation %d not found in history", targetGeneration)
 }
 
@@ -156,7 +156,7 @@ func (d *DynamicLSS) generateAuxiliarySecret(
 	// Use JVSS protocol to generate verifiable shares
 	group := curve.Secp256k1{}
 	shares := make(map[party.ID]curve.Scalar)
-	
+
 	// Each party contributes to the random secret
 	for _, id := range parties {
 		// In real implementation, this would be done through JVSS protocol
@@ -168,7 +168,7 @@ func (d *DynamicLSS) generateAuxiliarySecret(
 		share.UnmarshalBinary(bytes)
 		shares[id] = share
 	}
-	
+
 	return shares, nil
 }
 
@@ -182,7 +182,7 @@ func (d *DynamicLSS) interpolate(
 	// This is a simplified version - real implementation would use proper Lagrange
 	group := curve.Secp256k1{}
 	result := group.NewScalar()
-	
+
 	// Take first threshold shares for interpolation
 	count := 0
 	for _, id := range parties {
@@ -194,7 +194,7 @@ func (d *DynamicLSS) interpolate(
 			}
 		}
 	}
-	
+
 	return result
 }
 
@@ -208,13 +208,13 @@ func (d *DynamicLSS) createShares(
 	// Create polynomial with secret as constant term
 	poly := polynomial.NewPolynomial(group, threshold-1, secret)
 	shares := make(map[party.ID]curve.Scalar)
-	
+
 	for _, id := range parties {
 		x := id.Scalar(group)
 		share := poly.Evaluate(x)
 		shares[id] = share
 	}
-	
+
 	return shares
 }
 
@@ -225,13 +225,13 @@ func (d *DynamicLSS) computePublicShares(
 	group curve.Curve,
 ) map[party.ID]*config.Public {
 	public := make(map[party.ID]*config.Public)
-	
+
 	for _, id := range parties {
 		public[id] = &config.Public{
 			ECDSA: privateShare.ActOnBase(),
 		}
 	}
-	
+
 	return public
 }
 
@@ -248,21 +248,21 @@ func getPartyIDs(configs []*config.Config) []party.ID {
 func combineParties(old, new []party.ID) []party.ID {
 	seen := make(map[party.ID]bool)
 	combined := make([]party.ID, 0)
-	
+
 	for _, id := range old {
 		if !seen[id] {
 			combined = append(combined, id)
 			seen[id] = true
 		}
 	}
-	
+
 	for _, id := range new {
 		if !seen[id] {
 			combined = append(combined, id)
 			seen[id] = true
 		}
 	}
-	
+
 	return combined
 }
 
@@ -295,12 +295,12 @@ func (s *SigningProtocol) SignWithBlinding(
 	return func(sessionID []byte) (round.Session, error) {
 		// Implement the actual LSS signing protocol with blinding
 		// This follows Section 5.1 of the paper
-		
+
 		// 1. Compute blended private key share: ai = u·(bi)^-1
 		// 2. Generate blended message share: mi = H(m)·bi
 		// 3. Generate blended nonce share: ki = u2i·bi
 		// 4. Compute partial signature: si = ki^-1(mi + ai·r)
-		
+
 		return nil, fmt.Errorf("signing protocol implementation in progress")
 	}
 }

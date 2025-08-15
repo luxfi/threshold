@@ -22,11 +22,11 @@ type round1 struct {
 
 	// Chain key for deriving randomness
 	chainKey types.RID
-	
+
 	// Storage for received broadcasts - using sync.Map for thread safety
 	receivedCommitments sync.Map // map[party.ID]map[party.ID]curve.Point
 	receivedChainKeys   sync.Map // map[party.ID]types.RID
-	
+
 	// Track if we've already generated our values to prevent regeneration
 	generated bool
 }
@@ -107,7 +107,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Only generate values once to prevent different values on repeated calls
 	if !r.generated {
 		r.generated = true
-		
+
 		// Generate our polynomial with random secret
 		secret := sample.Scalar(rand.Reader, r.Group())
 		r.poly = polynomial.NewPolynomial(r.Group(), r.Threshold()-1, secret)
@@ -136,7 +136,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if err := r.BroadcastMessage(out, broadcast); err != nil {
 			return nil, err
 		}
-		
+
 		// Store our own commitments using sync.Map
 		r.receivedCommitments.Store(r.SelfID(), commitments)
 		r.receivedChainKeys.Store(r.SelfID(), chainKey)
@@ -150,7 +150,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		count++
 		return true
 	})
-	
+
 	if count < r.N() {
 		// Not ready to advance yet - return ourselves
 		// This is called from finalizeInitial when we don't have all broadcasts yet
@@ -160,19 +160,19 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// We have all commitments, convert sync.Map back to regular map for round2
 	commitments := make(map[party.ID]map[party.ID]curve.Point)
 	chainKeys := make(map[party.ID]types.RID)
-	
+
 	r.receivedCommitments.Range(func(key, value interface{}) bool {
 		id := key.(party.ID)
 		commitments[id] = value.(map[party.ID]curve.Point)
 		return true
 	})
-	
+
 	r.receivedChainKeys.Range(func(key, value interface{}) bool {
 		id := key.(party.ID)
 		chainKeys[id] = value.(types.RID)
 		return true
 	})
-	
+
 	// Create round2 with complete data
 	return &round2{
 		Helper:      r.Helper,
@@ -190,21 +190,21 @@ func (r *round1) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	// Basic validation
 	if len(body.Commitments) != r.N() {
 		return errors.New("wrong number of commitments")
 	}
-	
+
 	// Convert back to map and store
 	commitments, err := body.GetCommitments(r.Group())
 	if err != nil {
 		return err
 	}
-	
+
 	// Store using sync.Map for thread safety
 	r.receivedCommitments.Store(msg.From, commitments)
 	r.receivedChainKeys.Store(msg.From, body.ChainKey)
-	
+
 	return nil
 }

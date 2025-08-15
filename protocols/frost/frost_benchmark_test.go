@@ -31,7 +31,7 @@ func BenchmarkFROSTKeygenComprehensive(b *testing.B) {
 	for _, cfg := range configs {
 		b.Run(cfg.name, func(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runFROSTKeygen(b, partyIDs, cfg.threshold)
@@ -64,7 +64,7 @@ func BenchmarkFROSTSignComprehensive(b *testing.B) {
 			configs := setupFROSTConfigs(b, partyIDs, cfg.threshold)
 			message := hashMessage([]byte("benchmark message"))
 			signers := partyIDs[:cfg.signers]
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runFROSTSign(b, configs, signers, message)
@@ -91,7 +91,7 @@ func BenchmarkFROSTRefresh(b *testing.B) {
 			// Setup: generate configs once
 			partyIDs := test.PartyIDs(cfg.parties)
 			configs := setupFROSTConfigs(b, partyIDs, cfg.threshold)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runFROSTRefresh(b, configs, partyIDs)
@@ -115,7 +115,7 @@ func BenchmarkFROSTTaproot(b *testing.B) {
 	for _, cfg := range configs {
 		b.Run(cfg.name+"-keygen", func(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runFROSTKeygenTaproot(b, partyIDs, cfg.threshold)
@@ -126,7 +126,7 @@ func BenchmarkFROSTTaproot(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
 			configs := setupFROSTTaprootConfigs(b, partyIDs, cfg.threshold)
 			message := hashMessage([]byte("taproot benchmark"))
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runFROSTSignTaproot(b, configs, partyIDs[:cfg.threshold+1], message)
@@ -151,7 +151,7 @@ func BenchmarkFROSTFullProtocol(b *testing.B) {
 		b.Run(cfg.name, func(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
 			message := hashMessage([]byte("full protocol benchmark"))
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				// Full protocol: Keygen -> Refresh -> Sign
@@ -168,7 +168,7 @@ func BenchmarkFROSTFullProtocol(b *testing.B) {
 func BenchmarkFROSTCanonicalHashing(b *testing.B) {
 	group := curve.Secp256k1{}
 	point := group.NewBasePoint()
-	
+
 	b.Run("MarshalBinary", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -178,11 +178,11 @@ func BenchmarkFROSTCanonicalHashing(b *testing.B) {
 			}
 		}
 	})
-	
+
 	b.Run("UnmarshalBinary", func(b *testing.B) {
 		data, _ := point.MarshalBinary()
 		newPoint := group.NewPoint()
-		
+
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			err := newPoint.UnmarshalBinary(data)
@@ -208,11 +208,11 @@ func BenchmarkFROSTLagrangeCoefficients(b *testing.B) {
 	}
 
 	group := curve.Secp256k1{}
-	
+
 	for _, cfg := range configs {
 		b.Run(cfg.name, func(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				coeffs := computeLagrangeCoefficients(group, partyIDs)
@@ -244,13 +244,13 @@ func runFROSTKeygen(b *testing.B, partyIDs []party.ID, threshold int) map[party.
 	b.Helper()
 	network := test.NewNetwork(partyIDs)
 	results := make(map[party.ID]*frost.Config)
-	
+
 	for _, id := range partyIDs {
 		h, err := protocol.NewMultiHandler(frost.Keygen(curve.Secp256k1{}, id, partyIDs, threshold), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		test.HandlerLoop(id, h, network)
 		r, err := h.Result()
 		if err != nil {
@@ -258,7 +258,7 @@ func runFROSTKeygen(b *testing.B, partyIDs []party.ID, threshold int) map[party.
 		}
 		results[id] = r.(*frost.Config)
 	}
-	
+
 	return results
 }
 
@@ -266,13 +266,13 @@ func runFROSTKeygenTaproot(b *testing.B, partyIDs []party.ID, threshold int) map
 	b.Helper()
 	network := test.NewNetwork(partyIDs)
 	results := make(map[party.ID]*frost.TaprootConfig)
-	
+
 	for _, id := range partyIDs {
 		h, err := protocol.NewMultiHandler(frost.KeygenTaproot(id, partyIDs, threshold), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		test.HandlerLoop(id, h, network)
 		r, err := h.Result()
 		if err != nil {
@@ -280,14 +280,14 @@ func runFROSTKeygenTaproot(b *testing.B, partyIDs []party.ID, threshold int) map
 		}
 		results[id] = r.(*frost.TaprootConfig)
 	}
-	
+
 	return results
 }
 
 func runFROSTSign(b *testing.B, configs map[party.ID]*frost.Config, signers []party.ID, message []byte) frost.Signature {
 	b.Helper()
 	network := test.NewNetwork(signers)
-	
+
 	var signature frost.Signature
 	for _, id := range signers {
 		if cfg, ok := configs[id]; ok {
@@ -295,7 +295,7 @@ func runFROSTSign(b *testing.B, configs map[party.ID]*frost.Config, signers []pa
 			if err != nil {
 				b.Fatal(err)
 			}
-			
+
 			test.HandlerLoop(id, h, network)
 			r, err := h.Result()
 			if err != nil {
@@ -305,14 +305,14 @@ func runFROSTSign(b *testing.B, configs map[party.ID]*frost.Config, signers []pa
 			break
 		}
 	}
-	
+
 	return signature
 }
 
 func runFROSTSignTaproot(b *testing.B, configs map[party.ID]*frost.TaprootConfig, signers []party.ID, message []byte) taproot.Signature {
 	b.Helper()
 	network := test.NewNetwork(signers)
-	
+
 	var signature taproot.Signature
 	for _, id := range signers {
 		if cfg, ok := configs[id]; ok {
@@ -320,7 +320,7 @@ func runFROSTSignTaproot(b *testing.B, configs map[party.ID]*frost.TaprootConfig
 			if err != nil {
 				b.Fatal(err)
 			}
-			
+
 			test.HandlerLoop(id, h, network)
 			r, err := h.Result()
 			if err != nil {
@@ -330,7 +330,7 @@ func runFROSTSignTaproot(b *testing.B, configs map[party.ID]*frost.TaprootConfig
 			break
 		}
 	}
-	
+
 	return signature
 }
 
@@ -338,13 +338,13 @@ func runFROSTRefresh(b *testing.B, configs map[party.ID]*frost.Config, partyIDs 
 	b.Helper()
 	network := test.NewNetwork(partyIDs)
 	refreshed := make(map[party.ID]*frost.Config)
-	
+
 	for id, cfg := range configs {
 		h, err := protocol.NewMultiHandler(frost.Refresh(cfg, partyIDs), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		test.HandlerLoop(id, h, network)
 		r, err := h.Result()
 		if err != nil {
@@ -352,7 +352,7 @@ func runFROSTRefresh(b *testing.B, configs map[party.ID]*frost.Config, partyIDs 
 		}
 		refreshed[id] = r.(*frost.Config)
 	}
-	
+
 	return refreshed
 }
 

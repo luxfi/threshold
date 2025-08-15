@@ -218,6 +218,10 @@ func (f *AdapterFactory) NewAdapter(chain string, sigType SignatureType) SignerA
 		return NewBitcoinAdapter(sigType)
 	case "solana":
 		return NewSolanaAdapter()
+	case "ton":
+		return NewTONAdapter(0) // basechain by default
+	case "cardano":
+		return NewCardanoAdapter(sigType, 0x01, EraBabbage) // mainnet, current era
 	case "cosmos":
 		// TODO: Implement Cosmos adapter
 		return nil

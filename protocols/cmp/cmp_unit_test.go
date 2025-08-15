@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/internal/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,14 +16,14 @@ func TestCMPBasicConfig(t *testing.T) {
 	threshold := 2
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	
+
 	for _, id := range partyIDs {
 		config := &Config{
 			Group:     group,
 			ID:        id,
 			Threshold: threshold,
 		}
-		
+
 		assert.NotNil(t, config)
 		assert.Equal(t, id, config.ID)
 		assert.Equal(t, threshold, config.Threshold)
@@ -45,7 +45,7 @@ func TestCMPThresholdValidation(t *testing.T) {
 		{5, 0, false, "threshold = 0"},
 		{7, 7, true, "threshold = n"},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			isValid := tc.threshold > 0 && tc.threshold <= tc.n
@@ -57,14 +57,14 @@ func TestCMPThresholdValidation(t *testing.T) {
 func TestCMPPartyOperations(t *testing.T) {
 	// Test party operations
 	partyIDs := test.PartyIDs(5)
-	
+
 	// Test party ID uniqueness
 	seen := make(map[party.ID]bool)
 	for _, id := range partyIDs {
 		assert.False(t, seen[id], "Duplicate party ID")
 		seen[id] = true
 	}
-	
+
 	// Test party count
 	assert.Equal(t, 5, len(partyIDs))
 }
@@ -72,12 +72,12 @@ func TestCMPPartyOperations(t *testing.T) {
 func TestCMPKeygenTimeout(t *testing.T) {
 	// Test that keygen respects timeout
 	done := make(chan bool, 1)
-	
+
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Success - completed within timeout
@@ -91,13 +91,13 @@ func TestCMPConfigPublicPoint(t *testing.T) {
 	// Test PublicPoint method
 	group := curve.Secp256k1{}
 	id := party.ID("test")
-	
+
 	config := &Config{
 		Group:     group,
 		ID:        id,
 		Threshold: 2,
 	}
-	
+
 	// Set public point through the method if available
 	point := group.NewPoint()
 	assert.NotNil(t, point)
@@ -139,7 +139,7 @@ func TestCMPConfigValidation(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectErr {

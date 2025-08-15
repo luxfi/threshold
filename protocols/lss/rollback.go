@@ -11,10 +11,10 @@ import (
 
 // RollbackManager manages configuration history and rollback operations
 type RollbackManager struct {
-	mu              sync.RWMutex
-	history         []*GenerationSnapshot
-	maxGenerations  int
-	currentGen      uint64
+	mu             sync.RWMutex
+	history        []*GenerationSnapshot
+	maxGenerations int
+	currentGen     uint64
 }
 
 // GenerationSnapshot represents a point-in-time configuration state
@@ -72,7 +72,7 @@ func (rm *RollbackManager) Rollback(targetGeneration uint64) (*config.Config, er
 	defer rm.mu.Unlock()
 
 	if targetGeneration >= rm.currentGen {
-		return nil, fmt.Errorf("cannot rollback to future generation %d (current: %d)", 
+		return nil, fmt.Errorf("cannot rollback to future generation %d (current: %d)",
 			targetGeneration, rm.currentGen)
 	}
 
@@ -91,7 +91,7 @@ func (rm *RollbackManager) Rollback(targetGeneration uint64) (*config.Config, er
 
 	// Create a new config from the snapshot
 	restoredConfig := targetSnapshot.Config.Copy()
-	
+
 	// Mark this as a rollback by incrementing the generation
 	// This ensures we can track that a rollback occurred
 	restoredConfig.Generation = rm.currentGen + 1
@@ -118,19 +118,19 @@ func (rm *RollbackManager) RollbackOnFailure(failureThreshold int) (*config.Conf
 	if currentSnapshot.FailureCount >= failureThreshold {
 		// Roll back to previous generation
 		previousSnapshot := rm.history[len(rm.history)-2]
-		
+
 		restoredConfig := previousSnapshot.Config.Copy()
 		restoredConfig.Generation = rm.currentGen + 1
 		restoredConfig.RollbackFrom = rm.currentGen
-		
+
 		// Reset failure count after rollback
 		previousSnapshot.FailureCount = 0
-		
+
 		rm.currentGen = restoredConfig.Generation
 		return restoredConfig, nil
 	}
 
-	return nil, fmt.Errorf("failure count %d below threshold %d", 
+	return nil, fmt.Errorf("failure count %d below threshold %d",
 		currentSnapshot.FailureCount, failureThreshold)
 }
 
@@ -174,7 +174,7 @@ func (rm *RollbackManager) EvictParties(cfg *config.Config, evictedParties []par
 
 	// Ensure we still have enough parties for the threshold
 	if len(newParties) < cfg.Threshold {
-		return nil, fmt.Errorf("eviction would leave %d parties, below threshold %d", 
+		return nil, fmt.Errorf("eviction would leave %d parties, below threshold %d",
 			len(newParties), cfg.Threshold)
 	}
 
@@ -182,7 +182,7 @@ func (rm *RollbackManager) EvictParties(cfg *config.Config, evictedParties []par
 	// This would trigger a resharing protocol in practice
 	newConfig := cfg.Copy()
 	newConfig.Generation++
-	
+
 	// Update public keys map to remove evicted parties
 	for p := range evicted {
 		delete(newConfig.Public, p)
@@ -209,7 +209,7 @@ func Rollback(cfg *config.Config, targetGeneration uint64) (*config.Config, erro
 	if err := defaultRollbackManager.SaveSnapshot(cfg); err != nil {
 		return nil, fmt.Errorf("failed to save current state: %w", err)
 	}
-	
+
 	return defaultRollbackManager.Rollback(targetGeneration)
 }
 
@@ -218,7 +218,7 @@ func RollbackOnFailure(cfg *config.Config, failureThreshold int) (*config.Config
 	if err := defaultRollbackManager.SaveSnapshot(cfg); err != nil {
 		return nil, fmt.Errorf("failed to save current state: %w", err)
 	}
-	
+
 	return defaultRollbackManager.RollbackOnFailure(failureThreshold)
 }
 
@@ -230,11 +230,11 @@ func EvictAndRollback(cfg *config.Config, evictedParties []party.ID) (*config.Co
 		// If eviction fails, rollback to previous generation
 		return defaultRollbackManager.Rollback(cfg.Generation - 1)
 	}
-	
+
 	// Save the new configuration
 	if err := defaultRollbackManager.SaveSnapshot(newConfig); err != nil {
 		return nil, fmt.Errorf("failed to save eviction state: %w", err)
 	}
-	
+
 	return newConfig, nil
 }

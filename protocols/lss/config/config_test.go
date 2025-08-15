@@ -14,7 +14,7 @@ func TestConfigCreation(t *testing.T) {
 	group := curve.Secp256k1{}
 	id := party.ID("test")
 	threshold := 3
-	
+
 	cfg := &config.Config{
 		ID:        id,
 		Group:     group,
@@ -24,7 +24,7 @@ func TestConfigCreation(t *testing.T) {
 		ChainKey:  []byte("chainkey"),
 		RID:       []byte("rid"),
 	}
-	
+
 	assert.Equal(t, id, cfg.ID)
 	assert.Equal(t, threshold, cfg.Threshold)
 	assert.NotNil(t, cfg.ECDSA)
@@ -32,7 +32,7 @@ func TestConfigCreation(t *testing.T) {
 
 func TestConfigValidation(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	testCases := []struct {
 		name      string
 		config    *config.Config
@@ -78,7 +78,7 @@ func TestConfigValidation(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.config.Validate()
@@ -93,7 +93,7 @@ func TestConfigValidation(t *testing.T) {
 
 func TestPublicKeyRecovery(t *testing.T) {
 	group := curve.Secp256k1{}
-	
+
 	// Create shares
 	shares := make(map[party.ID]*config.Public)
 	for i := 1; i <= 3; i++ {
@@ -106,7 +106,7 @@ func TestPublicKeyRecovery(t *testing.T) {
 			ECDSA: scalar.ActOnBase(),
 		}
 	}
-	
+
 	cfg := &config.Config{
 		ID:        party.ID("1"),
 		Group:     group,
@@ -114,7 +114,7 @@ func TestPublicKeyRecovery(t *testing.T) {
 		ECDSA:     group.NewScalar(),
 		Public:    shares,
 	}
-	
+
 	pubKey, err := cfg.PublicKey()
 	require.NoError(t, err)
 	assert.NotNil(t, pubKey)
@@ -125,14 +125,14 @@ func TestPartyIDs(t *testing.T) {
 	shares["alice"] = &config.Public{}
 	shares["bob"] = &config.Public{}
 	shares["charlie"] = &config.Public{}
-	
+
 	cfg := &config.Config{
 		Public: shares,
 	}
-	
+
 	ids := cfg.PartyIDs()
 	assert.Len(t, ids, 3)
-	
+
 	// Check all IDs are present
 	idMap := make(map[party.ID]bool)
 	for _, id := range ids {
