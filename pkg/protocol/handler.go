@@ -62,6 +62,8 @@ type Handler struct {
 	cancel    context.CancelFunc
 	done      chan struct{}
 	closeOnce sync.Once
+	stopOnce  sync.Once
+	closeDoneOnce sync.Once
 
 	// Worker pool
 	workers     int
@@ -822,26 +824,34 @@ func (h *Handler) Listen() <-chan *Message {
 
 // Stop gracefully shuts down the handler
 func (h *Handler) Stop() {
-	h.log.Info("stopping protocol handler")
+	h.stopOnce.Do(func() {
+		h.log.Info("stopping protocol handler")
 
-	// Mark as stopped first
-	h.stopped.Store(true)
+		// Mark as stopped
+		h.stopped.Store(true)
 
-	// Cancel context to stop all workers
-	h.cancel()
+		// Cancel context to stop all workers
+		h.cancel()
 
-	// Wait for workers to finish
-	h.workerGroup.Wait()
+		// Wait for workers to finish
+		h.workerGroup.Wait()
 
-	// Close channels
-	close(h.out)
-	close(h.incoming)
-	close(h.priority)
-	close(h.done)
+		// Close channels safely (out may already be closed by protocol completion)
+		h.closeOnce.Do(func() {
+			close(h.out)
+		})
+		
+		// Close other channels
+		close(h.incoming)
+		close(h.priority)
+		h.closeDoneOnce.Do(func() {
+			close(h.done)
+		})
 
-	h.log.Info("protocol handler stopped",
-		log.Uint64("messages_processed", h.messagesProcessed),
-		log.Uint64("rounds_completed", h.roundsCompleted))
+		h.log.Info("protocol handler stopped",
+			log.Uint64("messages_processed", h.messagesProcessed),
+			log.Uint64("rounds_completed", h.roundsCompleted))
+	})
 }
 
 // CanAccept checks if a message can be accepted
@@ -1122,12 +1132,9 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 		// Close output channel after delay to signal protocol end
 		go func() {
 			time.Sleep(50 * time.Millisecond)
-			select {
-			case <-h.out:
-				// Already closed
-			default:
+			h.closeOnce.Do(func() {
 				close(h.out)
-			}
+			})
 		}()
 	}
 }
@@ -1205,7 +1212,9 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 			log.String("self", string(r.SelfID())),
 			log.Uint16("final_round", uint16(r.Number())))
 		// Close done channel to signal completion to workers
-		close(h.done)
+		h.closeDoneOnce.Do(func() {
+			close(h.done)
+		})
 		// Close output channel to signal HandlerLoop that protocol is complete
 		// This is safe because we're done sending messages
 		go func() {
