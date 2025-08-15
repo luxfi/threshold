@@ -400,6 +400,9 @@ func TestCoronaAdapter(t *testing.T) {
 				SignatureScheme: SignatureCorona,
 				Threshold:       3,
 				PartyIDs:        []party.ID{"alice", "bob", "charlie", "dave", "eve"},
+				CoronaConfig: &CoronaExtensions{
+					SecurityLevel: level,
+				},
 			}
 
 			err := adapter.ValidateConfig(config)

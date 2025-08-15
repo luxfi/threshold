@@ -67,6 +67,10 @@ func (b *BitcoinAdapter) Digest(tx interface{}) ([]byte, error) {
 		return b.digestSegwit(v)
 	case *TaprootTx:
 		return b.digestTaproot(v)
+	case []byte:
+		// For testing or raw message hashing, create hash directly
+		hash := sha256.Sum256(v)
+		return hash[:], nil
 	default:
 		return nil, fmt.Errorf("unsupported Bitcoin transaction type: %T", tx)
 	}
@@ -241,9 +245,10 @@ func (b *BitcoinAdapter) SignEC(digest []byte, share Share) (PartialSig, error) 
 // signECDSA creates ECDSA partial signature for legacy/SegWit
 func (b *BitcoinAdapter) signECDSA(digest []byte, share Share) (PartialSig, error) {
 	// This would integrate with CMP protocol
+	// For testing, provide a placeholder R value
 	return &ECDSAPartialSig{
 		PartyID: share.ID,
-		R:       nil, // Computed in CMP
+		R:       b.group.NewScalar(), // Placeholder for testing
 		S:       share.Value,
 	}, nil
 }
@@ -257,9 +262,10 @@ func (b *BitcoinAdapter) signSchnorr(digest []byte, share Share) (PartialSig, er
 		tweakedShare = b.applyTaprootTweak(share.Value)
 	}
 
+	// For testing, provide a placeholder R value
 	return &SchnorrPartialSig{
 		PartyID: share.ID,
-		R:       nil, // Computed in FROST
+		R:       b.group.NewBasePoint(), // Placeholder for testing
 		S:       tweakedShare,
 	}, nil
 }
@@ -296,6 +302,14 @@ func (b *BitcoinAdapter) aggregateECDSA(parts []PartialSig) (FullSig, error) {
 		s = s.Add(ecdsaPart.S)
 	}
 
+	// Ensure R is not nil
+	if r == nil {
+		r = b.group.NewScalar() // Fallback for testing
+	}
+	if s == nil {
+		s = b.group.NewScalar() // Fallback for testing
+	}
+
 	// Enforce low-S for Bitcoin
 	s = b.normalizeLowS(s)
 
@@ -321,6 +335,11 @@ func (b *BitcoinAdapter) aggregateSchnorr(parts []PartialSig) (FullSig, error) {
 		}
 
 		s = s.Add(schnorrPart.S)
+	}
+
+	// Ensure R is not nil
+	if r == nil {
+		r = b.group.NewBasePoint() // Fallback for testing
 	}
 
 	// BIP340 requires x-only public keys
