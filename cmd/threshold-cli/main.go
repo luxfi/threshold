@@ -358,7 +358,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 
 	case protocolFROST:
 		var config frost.Config
-		if err := json.Unmarshal(configData, &config); err != nil {
+		if err = json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal FROST config: %w", err)
 		}
 
