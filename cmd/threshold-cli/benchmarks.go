@@ -16,12 +16,6 @@ import (
 	"github.com/luxfi/threshold/protocols/lss"
 )
 
-const (
-	protocolLSS   = "lss"
-	protocolCMP   = "cmp"
-	protocolFROST = "frost"
-)
-
 func benchmarkKeygen(protocolName string, iterations int) error {
 	fmt.Printf("\n=== Keygen Benchmark ===\n")
 
