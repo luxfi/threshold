@@ -326,7 +326,8 @@ func extractPartyIDs(protocolName string, configs []interface{}) []party.ID {
 	return partyIDs
 }
 
-func createSignHandler(protocolName string, cfg interface{}, partyIDs []party.ID, message []byte, pl *pool.Pool) (*protocol.Handler, error) {
+func createSignHandler(protocolName string, cfg interface{}, partyIDs []party.ID,
+	message []byte, pl *pool.Pool) (*protocol.Handler, error) {
 	switch protocolName {
 	case protocolLSS:
 		c, ok := cfg.(*lss.Config)
