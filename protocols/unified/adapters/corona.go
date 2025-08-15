@@ -32,12 +32,12 @@ type CoronaParams struct {
 
 // CoronaState maintains the current state of the Corona instance
 type CoronaState struct {
-	Generation          uint64
-	Threshold           int
-	Parties             []party.ID
-	PublicKey           *CoronaPublicKey
-	PreprocessingStore  map[string]*CoronaOfflineData
-	ConsumedPreproc     map[string]bool
+	Generation         uint64
+	Threshold          int
+	Parties            []party.ID
+	PublicKey          *CoronaPublicKey
+	PreprocessingStore map[string]*CoronaOfflineData
+	ConsumedPreproc    map[string]bool
 }
 
 // CoronaPublicKey represents a lattice-based public key
@@ -50,30 +50,30 @@ type CoronaPublicKey struct {
 // CoronaSecretShare represents a party's share of the secret key
 type CoronaSecretShare struct {
 	PartyID party.ID
-	S       []int64   // Secret share vector
-	E       []int64   // Error share vector
+	S       []int64 // Secret share vector
+	E       []int64 // Error share vector
 	Index   int
 }
 
 // CoronaOfflineData stores precomputed data for the offline phase
 type CoronaOfflineData struct {
-	ID           string
-	Round1Data   *OfflineRound1
-	Round2Data   *OfflineRound2
-	Consumed     bool
+	ID         string
+	Round1Data *OfflineRound1
+	Round2Data *OfflineRound2
+	Consumed   bool
 }
 
 // OfflineRound1 contains first round offline preprocessing data
 type OfflineRound1 struct {
-	Commitments [][]byte  // Commitments to shares
-	Nonces      []int64   // Random nonces
+	Commitments [][]byte // Commitments to shares
+	Nonces      []int64  // Random nonces
 	Timestamp   int64
 }
 
 // OfflineRound2 contains second round offline preprocessing data
 type OfflineRound2 struct {
-	MaskedShares []int64   // Masked secret shares
-	Proofs       [][]byte  // Zero-knowledge proofs
+	MaskedShares []int64  // Masked secret shares
+	Proofs       [][]byte // Zero-knowledge proofs
 }
 
 // GetRecommendedParams returns recommended parameters for a security level
@@ -122,7 +122,7 @@ func NewCoronaAdapter(securityLevel int, maxParties int) *CoronaAdapter {
 	if maxParties > 1024 {
 		maxParties = 1024 // Cap at tested maximum
 	}
-	
+
 	return &CoronaAdapter{
 		params: GetRecommendedParams(securityLevel, maxParties),
 		state: &CoronaState{
@@ -138,56 +138,56 @@ func (r *CoronaAdapter) CoronaDKG(parties []party.ID, threshold int) (*CoronaPub
 	if threshold < 1 || threshold > len(parties) {
 		return nil, nil, fmt.Errorf("invalid threshold %d for %d parties", threshold, len(parties))
 	}
-	
+
 	if len(parties) > r.params.MaxParties {
 		return nil, nil, fmt.Errorf("too many parties: %d > %d", len(parties), r.params.MaxParties)
 	}
-	
+
 	// Generate public matrix A
 	A := r.generatePublicMatrix()
-	
+
 	// Each party generates a secret share
 	shares := make(map[party.ID]*CoronaSecretShare)
 	combinedS := make([]int64, r.params.N)
 	combinedE := make([]int64, r.params.N)
-	
+
 	for i, pid := range parties {
 		// Generate secret and error vectors from Gaussian distribution
 		s := r.sampleGaussianVector(r.params.N)
 		e := r.sampleGaussianVector(r.params.N)
-		
+
 		shares[pid] = &CoronaSecretShare{
 			PartyID: pid,
 			S:       s,
 			E:       e,
 			Index:   i,
 		}
-		
+
 		// Accumulate for public key
 		for j := 0; j < r.params.N; j++ {
 			combinedS[j] = (combinedS[j] + s[j]) % r.params.Q
 			combinedE[j] = (combinedE[j] + e[j]) % r.params.Q
 		}
 	}
-	
+
 	// Compute public key B = A*s + e
 	B := r.matrixVectorMultiply(A, combinedS)
 	for i := range B {
 		B[i] = (B[i] + combinedE[i]) % r.params.Q
 	}
-	
+
 	publicKey := &CoronaPublicKey{
 		A:      A,
 		B:      B,
 		Params: r.params,
 	}
-	
+
 	// Update state
 	r.state.Threshold = threshold
 	r.state.Parties = parties
 	r.state.PublicKey = publicKey
 	r.state.Generation++
-	
+
 	return publicKey, shares, nil
 }
 
@@ -196,23 +196,23 @@ func (r *CoronaAdapter) PreprocessOffline(numSessions int) error {
 	if r.state.PublicKey == nil {
 		return errors.New("no public key generated")
 	}
-	
+
 	for i := 0; i < numSessions; i++ {
 		sessionID := fmt.Sprintf("session_%d_%d", r.state.Generation, i)
-		
+
 		// Generate offline round 1 data
 		round1 := &OfflineRound1{
 			Commitments: r.generateCommitments(r.state.Threshold),
 			Nonces:      r.sampleGaussianVector(r.params.M),
 			Timestamp:   int64(i),
 		}
-		
+
 		// Generate offline round 2 data
 		round2 := &OfflineRound2{
 			MaskedShares: r.sampleGaussianVector(r.params.N),
 			Proofs:       r.generateProofs(r.state.Threshold),
 		}
-		
+
 		r.state.PreprocessingStore[sessionID] = &CoronaOfflineData{
 			ID:         sessionID,
 			Round1Data: round1,
@@ -220,7 +220,7 @@ func (r *CoronaAdapter) PreprocessOffline(numSessions int) error {
 			Consumed:   false,
 		}
 	}
-	
+
 	return nil
 }
 
@@ -250,11 +250,11 @@ func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 			break
 		}
 	}
-	
+
 	if offlineData == nil {
 		return nil, errors.New("no available preprocessing data")
 	}
-	
+
 	// For now, create a placeholder Corona secret share from scalar
 	// TODO: Properly convert curve.Scalar to CoronaSecretShare
 	coronaShare := &CoronaSecretShare{
@@ -262,11 +262,11 @@ func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 		Index:   share.Index,
 		// Value would be the lattice element derived from share.Value
 	}
-	
+
 	// Online round 1: Use preprocessed nonces
 	// Online round 2: Compute signature share using masked shares
 	sigShare := r.computeSignatureShare(digest, coronaShare, offlineData)
-	
+
 	return &CoronaPartialSig{
 		PartyID: share.ID,
 		Share:   sigShare,
@@ -276,13 +276,13 @@ func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 // AggregateEC combines Corona partial signatures
 func (r *CoronaAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	if len(parts) < r.state.Threshold {
-		return nil, fmt.Errorf("insufficient partial signatures: %d < %d", 
+		return nil, fmt.Errorf("insufficient partial signatures: %d < %d",
 			len(parts), r.state.Threshold)
 	}
-	
+
 	// Aggregate lattice signatures
 	aggregated := r.aggregateLatticeSignatures(parts)
-	
+
 	return &CoronaFullSig{
 		Signature: aggregated,
 		Size:      r.params.SignatureSize,
@@ -295,23 +295,23 @@ func (r *CoronaAdapter) Encode(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid signature type for Corona")
 	}
-	
+
 	// Encode lattice signature
 	encoded := r.encodeLatticeSignature(coronaSig.Signature)
-	
+
 	// Ensure size matches expected
 	if len(encoded) > r.params.SignatureSize {
-		return nil, fmt.Errorf("signature too large: %d > %d", 
+		return nil, fmt.Errorf("signature too large: %d > %d",
 			len(encoded), r.params.SignatureSize)
 	}
-	
+
 	// Pad if necessary
 	if len(encoded) < r.params.SignatureSize {
 		padded := make([]byte, r.params.SignatureSize)
 		copy(padded, encoded)
 		return padded, nil
 	}
-	
+
 	return encoded, nil
 }
 
@@ -320,21 +320,21 @@ func (r *CoronaAdapter) ValidateConfig(config *UnifiedConfig) error {
 	if config.SignatureScheme != SignatureCorona {
 		return errors.New("config not for Corona signature")
 	}
-	
+
 	if config.CoronaConfig == nil {
 		return errors.New("missing Corona configuration")
 	}
-	
+
 	// Validate security parameters
 	if config.CoronaConfig.SecurityLevel < 128 || config.CoronaConfig.SecurityLevel > 256 {
 		return fmt.Errorf("invalid security level: %d", config.CoronaConfig.SecurityLevel)
 	}
-	
+
 	// Check lattice dimensions
 	if config.CoronaConfig.N < 256 || config.CoronaConfig.N > 2048 {
 		return fmt.Errorf("invalid lattice dimension: %d", config.CoronaConfig.N)
 	}
-	
+
 	return nil
 }
 
@@ -363,13 +363,13 @@ func (r *CoronaAdapter) sampleGaussian() int64 {
 	// Box-Muller transform for Gaussian sampling
 	u1, _ := rand.Int(rand.Reader, big.NewInt(r.params.Q))
 	u2, _ := rand.Int(rand.Reader, big.NewInt(r.params.Q))
-	
+
 	f1 := float64(u1.Int64()) / float64(r.params.Q)
 	f2 := float64(u2.Int64()) / float64(r.params.Q)
-	
+
 	z := math.Sqrt(-2*math.Log(f1)) * math.Cos(2*math.Pi*f2)
 	sample := int64(z * r.params.Sigma)
-	
+
 	return sample % r.params.Q
 }
 
@@ -416,7 +416,7 @@ func (r *CoronaAdapter) computeSignatureShare(message []byte, share *CoronaSecre
 	// Simplified signature share computation
 	// Actual implementation would follow Corona protocol specification
 	sigShare := make([]int64, r.params.N)
-	
+
 	// Use offline data and secret share to compute signature share
 	for i := 0; i < r.params.N; i++ {
 		// Combine secret share with nonce and message
@@ -424,10 +424,10 @@ func (r *CoronaAdapter) computeSignatureShare(message []byte, share *CoronaSecre
 		for j := 0; j < len(message) && j < r.params.M; j++ {
 			h = (h + int64(message[j])*offline.Round1Data.Nonces[j]) % r.params.Q
 		}
-		
+
 		sigShare[i] = (share.S[i] + h + offline.Round2Data.MaskedShares[i]) % r.params.Q
 	}
-	
+
 	return sigShare
 }
 
@@ -435,11 +435,11 @@ func (r *CoronaAdapter) aggregateLatticeSignatures(parts []PartialSig) []int64 {
 	if len(parts) == 0 {
 		return nil
 	}
-	
+
 	// Get first signature share to determine size
 	first := parts[0].(*CoronaPartialSig).Share.([]int64)
 	aggregated := make([]int64, len(first))
-	
+
 	// Sum all signature shares
 	for _, part := range parts {
 		share := part.(*CoronaPartialSig).Share.([]int64)
@@ -447,13 +447,13 @@ func (r *CoronaAdapter) aggregateLatticeSignatures(parts []PartialSig) []int64 {
 			aggregated[i] = (aggregated[i] + share[i]) % r.params.Q
 		}
 	}
-	
+
 	return aggregated
 }
 
 func (r *CoronaAdapter) encodeLatticeSignature(sig interface{}) []byte {
 	lattice := sig.([]int64)
-	
+
 	// Encode each coefficient as bytes
 	encoded := make([]byte, 0, len(lattice)*8)
 	for _, coeff := range lattice {
@@ -464,7 +464,7 @@ func (r *CoronaAdapter) encodeLatticeSignature(sig interface{}) []byte {
 		}
 		encoded = append(encoded, bytes...)
 	}
-	
+
 	return encoded
 }
 
@@ -483,10 +483,10 @@ func (r *CoronaAdapter) Benchmark(parties int, threshold int) *CoronaBenchmark {
 	// This would run actual benchmarks
 	// Placeholder values based on paper's reported results
 	return &CoronaBenchmark{
-		DKGTime:           1000000,              // 1 second for DKG
-		PreprocessingTime: 50000,                // 50ms per session
-		SigningTime:       5000,                 // 5ms online signing
-		VerificationTime:  2000,                 // 2ms verification
+		DKGTime:           1000000, // 1 second for DKG
+		PreprocessingTime: 50000,   // 50ms per session
+		SigningTime:       5000,    // 5ms online signing
+		VerificationTime:  2000,    // 2ms verification
 		SignatureSize:     r.params.SignatureSize,
 		CommunicationSize: parties * threshold * 1024, // Estimated
 	}
