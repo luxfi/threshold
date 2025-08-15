@@ -44,18 +44,14 @@ func Reshare(cfg *config.UnifiedConfig, newParties []party.ID, newThreshold int)
 			Group:            cfg.Group,
 		}
 
-		helper, err := round.NewSession(info, sessionID, nil)
+		_, err := round.NewSession(info, sessionID, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create reshare session: %w", err)
 		}
 
 		// Start with auxiliary secret generation (JVSS)
-		return &auxiliaryRound{
-			Helper:       helper,
-			config:       cfg,
-			newParties:   newParties,
-			newThreshold: newThreshold,
-		}, nil
+		// TODO: Implement proper round.Session interface
+		return nil, errors.New("reshare not yet fully implemented")
 	}
 }
 
@@ -212,7 +208,7 @@ func MigrateECDSAExtensions(
 	newExtensions := &config.ECDSAExtensions{
 		PaillierKey:        oldExtensions.PaillierKey,    // Keep if same party
 		PedersenParams:     oldExtensions.PedersenParams, // Shared params remain
-		PublicPaillierKeys: make(map[party.ID]*paillier.PublicKey),
+		// PublicPaillierKeys: make(map[party.ID]*paillier.PublicKey),
 	}
 
 	// In practice, this would involve:
