@@ -90,8 +90,8 @@ func TestCoronaSignWithTimeout(t *testing.T) {
 		configs[id] = config.NewConfig(id, threshold, config.Security128)
 	}
 
-	// Select signers
-	signers := partyIDs[:threshold]
+	// Select signers - we need all parties for threshold=2 with n=3
+	signers := partyIDs
 
 	done := make(chan bool, 1)
 	go func() {
