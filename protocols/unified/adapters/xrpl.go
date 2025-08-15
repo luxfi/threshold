@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/luxfi/threshold/pkg/math/curve"
-	"github.com/luxfi/threshold/pkg/party"
 )
 
 // XRPLHashPrefix defines XRPL transaction hash prefixes
@@ -40,7 +39,8 @@ func NewXRPLAdapter(sigType SignatureType, multiSign bool) *XRPLAdapter {
 	case SignatureECDSA:
 		group = curve.Secp256k1{}
 	case SignatureEdDSA:
-		group = curve.Ed25519{}
+		// TODO: Add Ed25519 curve support when available
+		group = curve.Secp256k1{} // Placeholder until Ed25519 is available
 	default:
 		panic("unsupported signature type for XRPL")
 	}
@@ -270,8 +270,9 @@ func (x *XRPLAdapter) encodeEd25519(full FullSig) ([]byte, error) {
 // normalizeLowS ensures S value is in the lower half of the order
 func (x *XRPLAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 	// Get the curve order
-	order := x.group.Order()
-	halfOrder := new(big.Int).Div(order, big.NewInt(2))
+	orderModulus := x.group.Order()
+	orderBig := orderModulus.Big()
+	halfOrder := new(big.Int).Div(orderBig, big.NewInt(2))
 	
 	// Convert s to big.Int
 	sBytes, _ := s.MarshalBinary()
@@ -279,9 +280,11 @@ func (x *XRPLAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 	
 	// If s > n/2, set s = n - s
 	if sInt.Cmp(halfOrder) > 0 {
-		sInt = new(big.Int).Sub(order, sInt)
+		sInt = new(big.Int).Sub(orderBig, sInt)
 		// Convert back to scalar
-		s = x.group.NewScalar().SetNat(sInt.MarshalBinary())
+		sNat := sInt.Bytes()
+		s = x.group.NewScalar()
+		s.UnmarshalBinary(sNat)
 	}
 	
 	return s
@@ -331,7 +334,11 @@ func (x *XRPLAdapter) GetSignerListEntry(config *UnifiedConfig, weight uint16) m
 	signers := make([]map[string]interface{}, 0, len(config.PartyIDs))
 	
 	for _, pid := range config.PartyIDs {
-		verificationShare := config.VerificationShares[pid]
+		verificationShare, ok := config.VerificationShares[pid].(curve.Point)
+		if !ok {
+			// Skip if not a curve point
+			continue
+		}
 		signers = append(signers, map[string]interface{}{
 			"SignerEntry": map[string]interface{}{
 				"Account":      x.deriveXRPLAddress(verificationShare),
