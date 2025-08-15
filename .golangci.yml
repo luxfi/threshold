@@ -109,6 +109,16 @@ linters-settings:
 
   revive:
     confidence: 0
+    rules:
+      - name: context-as-arg
+        severity: error
+        disabled: false
+      - name: context-keys-type
+        severity: warning
+        disabled: false
+      - name: time-equal
+        severity: warning
+        disabled: false
 
   gosec:
     excludes:
