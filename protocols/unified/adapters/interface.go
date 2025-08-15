@@ -40,16 +40,16 @@ type FullSig interface {
 type SignerAdapter interface {
 	// Digest computes chain-specific message digest
 	Digest(tx interface{}) ([]byte, error)
-	
+
 	// SignEC creates a partial signature with a party's share
 	SignEC(digest []byte, share Share) (PartialSig, error)
-	
+
 	// AggregateEC combines partial signatures into a full signature
 	AggregateEC(parts []PartialSig) (FullSig, error)
-	
+
 	// Encode converts signature to chain-specific wire format
 	Encode(full FullSig) ([]byte, error)
-	
+
 	// ValidateConfig checks if configuration is valid for this chain
 	ValidateConfig(config *UnifiedConfig) error
 }
@@ -61,22 +61,22 @@ type UnifiedConfig struct {
 	Threshold  int
 	Generation uint64
 	PartyIDs   []party.ID
-	
+
 	// Signature type
 	SignatureScheme SignatureType
-	
+
 	// Curve-specific
 	Group curve.Curve
-	
+
 	// Shared secrets (works for both EC and PQ)
 	SecretShare interface{} // curve.Scalar for EC, lattice element for PQ
 	PublicKey   interface{} // curve.Point for EC, lattice public key for PQ
-	
+
 	// Additional scheme-specific data
 	ECDSAConfig    *ECDSAExtensions
 	EdDSAConfig    *EdDSAExtensions
 	RingtailConfig *RingtailExtensions
-	
+
 	// Verification shares for all parties
 	VerificationShares map[party.ID]interface{}
 }
@@ -96,24 +96,24 @@ type EdDSAExtensions struct {
 // RingtailExtensions holds Ringtail PQ-specific configuration
 type RingtailExtensions struct {
 	// Lattice parameters
-	N         int     // Lattice dimension
-	Q         int     // Modulus
-	Sigma     float64 // Gaussian parameter
-	SecurityLevel int // 128, 192, or 256 bits
-	
+	N             int     // Lattice dimension
+	Q             int     // Modulus
+	Sigma         float64 // Gaussian parameter
+	SecurityLevel int     // 128, 192, or 256 bits
+
 	// Offline preprocessing store
 	PreprocessingShares []RingtailPreprocessing
-	
+
 	// Public parameters
 	PublicMatrix interface{} // A matrix for LWE
 }
 
 // RingtailPreprocessing represents offline preprocessing for Ringtail
 type RingtailPreprocessing struct {
-	ID        string
-	Round1    interface{} // Offline round 1 data
-	Round2    interface{} // Offline round 2 data
-	Consumed  bool
+	ID       string
+	Round1   interface{} // Offline round 1 data
+	Round2   interface{} // Offline round 2 data
+	Consumed bool
 }
 
 // ECDSA signature components
@@ -278,12 +278,12 @@ func GetChainRequirements(chain string) map[string]interface{} {
 			"program_verify":  true,
 		},
 		"polkadot": {
-			"signature_types": []SignatureType{SignatureSchnorr},
-			"sr25519_native":  true,
+			"signature_types":   []SignatureType{SignatureSchnorr},
+			"sr25519_native":    true,
 			"merlin_transcript": true,
 		},
 	}
-	
+
 	if req, exists := requirements[chain]; exists {
 		return req
 	}

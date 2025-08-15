@@ -51,7 +51,7 @@ func (e *EthereumAdapter) Digest(tx interface{}) ([]byte, error) {
 func (e *EthereumAdapter) digestLegacy(tx *LegacyTransaction) ([]byte, error) {
 	// RLP encode with EIP-155 chain ID
 	encoded := e.rlpEncodeLegacy(tx, true)
-	
+
 	// Keccak256 hash
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(encoded)
@@ -62,7 +62,7 @@ func (e *EthereumAdapter) digestLegacy(tx *LegacyTransaction) ([]byte, error) {
 func (e *EthereumAdapter) digestEIP1559(tx *EIP1559Transaction) ([]byte, error) {
 	// Type 2 transaction: 0x02 || rlp([...])
 	encoded := append([]byte{0x02}, e.rlpEncodeEIP1559(tx)...)
-	
+
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(encoded)
 	return hash.Sum(nil), nil
@@ -72,7 +72,7 @@ func (e *EthereumAdapter) digestEIP1559(tx *EIP1559Transaction) ([]byte, error) 
 func (e *EthereumAdapter) digestEIP4844(tx *EIP4844Transaction) ([]byte, error) {
 	// Type 3 transaction: 0x03 || rlp([...])
 	encoded := append([]byte{0x03}, e.rlpEncodeEIP4844(tx)...)
-	
+
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(encoded)
 	return hash.Sum(nil), nil
@@ -93,28 +93,28 @@ func (e *EthereumAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	if len(parts) == 0 {
 		return nil, errors.New("no partial signatures")
 	}
-	
+
 	var r, s curve.Scalar
-	
+
 	for _, part := range parts {
 		ecdsaPart, ok := part.(*ECDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid ECDSA partial signature")
 		}
-		
+
 		if r == nil && ecdsaPart.R != nil {
 			r = ecdsaPart.R
 		}
-		
+
 		if s == nil {
 			s = e.group.NewScalar()
 		}
 		s = s.Add(ecdsaPart.S)
 	}
-	
+
 	// Enforce EIP-2 low-S
 	s = e.normalizeLowS(s)
-	
+
 	return &ECDSAFullSig{
 		R: r,
 		S: s,
@@ -127,22 +127,22 @@ func (e *EthereumAdapter) Encode(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid ECDSA signature")
 	}
-	
+
 	// Ethereum signature format: r (32 bytes) || s (32 bytes) || v (1 byte)
 	sig := make([]byte, 65)
-	
+
 	// Copy R (32 bytes)
 	rBytes, _ := ecdsaSig.R.MarshalBinary()
 	copy(sig[32-len(rBytes):32], rBytes)
-	
+
 	// Copy S (32 bytes)
 	sBytes, _ := ecdsaSig.S.MarshalBinary()
 	copy(sig[64-len(sBytes):64], sBytes)
-	
+
 	// Compute V value for EIP-155
 	v := e.computeV(ecdsaSig)
 	sig[64] = v
-	
+
 	return sig, nil
 }
 
@@ -151,12 +151,12 @@ func (e *EthereumAdapter) ValidateConfig(config *UnifiedConfig) error {
 	if config.SignatureScheme != SignatureECDSA {
 		return errors.New("Ethereum requires ECDSA signatures")
 	}
-	
+
 	// Verify secp256k1 curve
 	if _, ok := config.Group.(curve.Secp256k1); !ok {
 		return errors.New("Ethereum requires secp256k1 curve")
 	}
-	
+
 	return nil
 }
 
@@ -166,14 +166,14 @@ func (e *EthereumAdapter) computeV(sig *ECDSAFullSig) byte {
 	// For now, return placeholder
 	// Actual implementation would recover from public key
 	recoveryID := byte(0) // 0 or 1
-	
+
 	if e.chainID != nil {
 		v := new(big.Int).SetUint64(uint64(recoveryID))
 		v.Add(v, new(big.Int).Mul(e.chainID, big.NewInt(2)))
 		v.Add(v, big.NewInt(35))
 		return byte(v.Uint64())
 	}
-	
+
 	return 27 + recoveryID // Pre-EIP-155
 }
 
@@ -188,7 +188,7 @@ func (e *EthereumAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 func (e *EthereumAdapter) hashMessage(message []byte) []byte {
 	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(message))
 	prefixed := append([]byte(prefix), message...)
-	
+
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(prefixed)
 	return hash.Sum(nil)
@@ -200,7 +200,7 @@ func (e *EthereumAdapter) rlpEncodeLegacy(tx *LegacyTransaction, forSigning bool
 	// Simplified RLP encoding
 	// Actual implementation would use proper RLP library
 	var encoded []byte
-	
+
 	// Include fields based on whether for signing or not
 	if forSigning {
 		// For signing: include chainId, 0, 0 at the end
@@ -213,14 +213,14 @@ func (e *EthereumAdapter) rlpEncodeLegacy(tx *LegacyTransaction, forSigning bool
 		encoded = append(encoded, e.encodeUint(e.chainID.Uint64())...)
 		encoded = append(encoded, 0, 0)
 	}
-	
+
 	return encoded
 }
 
 func (e *EthereumAdapter) rlpEncodeEIP1559(tx *EIP1559Transaction) []byte {
 	// Simplified RLP encoding for EIP-1559
 	var encoded []byte
-	
+
 	encoded = append(encoded, e.encodeUint(e.chainID.Uint64())...)
 	encoded = append(encoded, e.encodeUint(tx.Nonce)...)
 	encoded = append(encoded, e.encodeUint(tx.MaxPriorityFeePerGas.Uint64())...)
@@ -230,14 +230,14 @@ func (e *EthereumAdapter) rlpEncodeEIP1559(tx *EIP1559Transaction) []byte {
 	encoded = append(encoded, e.encodeUint(tx.Value.Uint64())...)
 	encoded = append(encoded, tx.Data...)
 	// Access list would go here
-	
+
 	return encoded
 }
 
 func (e *EthereumAdapter) rlpEncodeEIP4844(tx *EIP4844Transaction) []byte {
 	// Simplified RLP encoding for EIP-4844
 	var encoded []byte
-	
+
 	encoded = append(encoded, e.encodeUint(e.chainID.Uint64())...)
 	encoded = append(encoded, e.encodeUint(tx.Nonce)...)
 	encoded = append(encoded, e.encodeUint(tx.MaxPriorityFeePerGas.Uint64())...)
@@ -252,7 +252,7 @@ func (e *EthereumAdapter) rlpEncodeEIP4844(tx *EIP4844Transaction) []byte {
 	for _, hash := range tx.BlobVersionedHashes {
 		encoded = append(encoded, hash[:]...)
 	}
-	
+
 	return encoded
 }
 
@@ -314,14 +314,14 @@ type AccessListEntry struct {
 func (e *EthereumAdapter) GetContractCallData(method string, params ...interface{}) ([]byte, error) {
 	// Generate ABI-encoded calldata
 	// This would use actual ABI encoding
-	
+
 	// Method selector (first 4 bytes of keccak256(signature))
 	selector := e.methodSelector(method)
-	
+
 	// Encode parameters
 	data := make([]byte, 4)
 	copy(data, selector)
-	
+
 	// Add encoded parameters
 	for _, param := range params {
 		// Simplified encoding
@@ -335,7 +335,7 @@ func (e *EthereumAdapter) GetContractCallData(method string, params ...interface
 			data = append(data, bytes...)
 		}
 	}
-	
+
 	return data, nil
 }
 
@@ -357,7 +357,7 @@ func (e *EthereumAdapter) CreateMultisigWallet(owners []string, threshold int) (
 func (e *EthereumAdapter) EstimateGas(tx interface{}) (uint64, error) {
 	// Base cost for ECDSA verification
 	baseCost := uint64(3000)
-	
+
 	// Additional cost based on transaction type
 	switch tx.(type) {
 	case *LegacyTransaction:
