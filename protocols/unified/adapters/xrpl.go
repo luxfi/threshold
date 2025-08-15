@@ -17,10 +17,10 @@ type XRPLHashPrefix [4]byte
 var (
 	// STX is the single-signing prefix (0x53545800)
 	STX = XRPLHashPrefix{0x53, 0x54, 0x58, 0x00}
-	
+
 	// SMT is the multi-signing prefix (0x534D5400)
 	SMT = XRPLHashPrefix{0x53, 0x4D, 0x54, 0x00}
-	
+
 	// Ed25519Prefix is the XRPL Ed25519 public key prefix
 	Ed25519Prefix = byte(0xED)
 )
@@ -44,7 +44,7 @@ func NewXRPLAdapter(sigType SignatureType, multiSign bool) *XRPLAdapter {
 	default:
 		panic("unsupported signature type for XRPL")
 	}
-	
+
 	return &XRPLAdapter{
 		sigType:   sigType,
 		multiSign: multiSign,
@@ -58,7 +58,7 @@ func (x *XRPLAdapter) Digest(tx interface{}) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("XRPL: tx must be []byte (binary-serialized transaction)")
 	}
-	
+
 	// Select prefix based on signing mode
 	var prefix XRPLHashPrefix
 	if x.multiSign {
@@ -66,13 +66,13 @@ func (x *XRPLAdapter) Digest(tx interface{}) ([]byte, error) {
 	} else {
 		prefix = STX
 	}
-	
+
 	// Compute SHA-512Half (first 256 bits of SHA-512)
 	h := sha512.New()
 	h.Write(prefix[:])
 	h.Write(txBlob)
 	fullHash := h.Sum(nil)
-	
+
 	// Return first 32 bytes (256 bits)
 	return fullHash[:32], nil
 }
@@ -116,7 +116,7 @@ func (x *XRPLAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	if len(parts) == 0 {
 		return nil, errors.New("no partial signatures to aggregate")
 	}
-	
+
 	switch x.sigType {
 	case SignatureECDSA:
 		return x.aggregateECDSA(parts)
@@ -131,26 +131,26 @@ func (x *XRPLAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 func (x *XRPLAdapter) aggregateECDSA(parts []PartialSig) (FullSig, error) {
 	// Aggregate R and S values from partial signatures
 	var r, s curve.Scalar
-	
+
 	for _, part := range parts {
 		ecdsaPart, ok := part.(*ECDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid ECDSA partial signature")
 		}
-		
+
 		if r == nil && ecdsaPart.R != nil {
 			r = ecdsaPart.R
 		}
-		
+
 		if s == nil {
 			s = x.group.NewScalar()
 		}
 		s = s.Add(ecdsaPart.S)
 	}
-	
+
 	// Enforce low-S normalization for XRPL canonical signatures
 	s = x.normalizeLowS(s)
-	
+
 	return &ECDSAFullSig{
 		R: r,
 		S: s,
@@ -162,20 +162,20 @@ func (x *XRPLAdapter) aggregateEd25519(parts []PartialSig) (FullSig, error) {
 	// Aggregate R and z values from partial signatures
 	var r curve.Point
 	z := x.group.NewScalar()
-	
+
 	for _, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
 		}
-		
+
 		if r == nil && eddsaPart.R != nil {
 			r = eddsaPart.R
 		}
-		
+
 		z = z.Add(eddsaPart.Z)
 	}
-	
+
 	return &EdDSAFullSig{
 		R: r,
 		Z: z,
@@ -200,15 +200,15 @@ func (x *XRPLAdapter) encodeECDSA(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid ECDSA full signature")
 	}
-	
+
 	// Convert to DER format
 	rBytes, _ := ecdsaSig.R.MarshalBinary()
 	sBytes, _ := ecdsaSig.S.MarshalBinary()
-	
+
 	// DER encoding
 	der := make([]byte, 0, 72)
 	der = append(der, 0x30) // SEQUENCE tag
-	
+
 	// Calculate total length
 	rLen := len(rBytes)
 	sLen := len(sBytes)
@@ -218,24 +218,24 @@ func (x *XRPLAdapter) encodeECDSA(full FullSig) ([]byte, error) {
 	if sBytes[0]&0x80 != 0 {
 		sLen++ // Need padding for positive number
 	}
-	
+
 	totalLen := 2 + rLen + 2 + sLen
 	der = append(der, byte(totalLen))
-	
+
 	// Encode R
 	der = append(der, 0x02, byte(rLen))
 	if rBytes[0]&0x80 != 0 {
 		der = append(der, 0x00)
 	}
 	der = append(der, rBytes...)
-	
+
 	// Encode S
 	der = append(der, 0x02, byte(sLen))
 	if sBytes[0]&0x80 != 0 {
 		der = append(der, 0x00)
 	}
 	der = append(der, sBytes...)
-	
+
 	return der, nil
 }
 
@@ -245,17 +245,17 @@ func (x *XRPLAdapter) encodeEd25519(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid Ed25519 full signature")
 	}
-	
+
 	// Ed25519 signature is R || z (64 bytes total)
 	sig := make([]byte, 64)
-	
+
 	// Copy R (32 bytes)
 	rBytes, _ := eddsaSig.R.MarshalBinary()
 	if len(rBytes) != 32 {
 		return nil, fmt.Errorf("invalid R length: %d", len(rBytes))
 	}
 	copy(sig[:32], rBytes)
-	
+
 	// Copy z (32 bytes)
 	zBytes, _ := eddsaSig.Z.MarshalBinary()
 	if len(zBytes) > 32 {
@@ -263,7 +263,7 @@ func (x *XRPLAdapter) encodeEd25519(full FullSig) ([]byte, error) {
 	}
 	// Pad z if necessary
 	copy(sig[32+(32-len(zBytes)):], zBytes)
-	
+
 	return sig, nil
 }
 
@@ -273,11 +273,11 @@ func (x *XRPLAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 	orderModulus := x.group.Order()
 	orderBig := orderModulus.Big()
 	halfOrder := new(big.Int).Div(orderBig, big.NewInt(2))
-	
+
 	// Convert s to big.Int
 	sBytes, _ := s.MarshalBinary()
 	sInt := new(big.Int).SetBytes(sBytes)
-	
+
 	// If s > n/2, set s = n - s
 	if sInt.Cmp(halfOrder) > 0 {
 		sInt = new(big.Int).Sub(orderBig, sInt)
@@ -286,14 +286,14 @@ func (x *XRPLAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 		s = x.group.NewScalar()
 		s.UnmarshalBinary(sNat)
 	}
-	
+
 	return s
 }
 
 // FormatPublicKey formats public key for XRPL with appropriate prefix
 func (x *XRPLAdapter) FormatPublicKey(pubKey curve.Point) string {
 	keyBytes, _ := pubKey.MarshalBinary()
-	
+
 	if x.sigType == SignatureEdDSA {
 		// Add 0xED prefix for Ed25519 keys
 		prefixedKey := make([]byte, len(keyBytes)+1)
@@ -301,7 +301,7 @@ func (x *XRPLAdapter) FormatPublicKey(pubKey curve.Point) string {
 		copy(prefixedKey[1:], keyBytes)
 		return hex.EncodeToString(prefixedKey)
 	}
-	
+
 	// ECDSA keys use standard compressed format
 	return hex.EncodeToString(keyBytes)
 }
@@ -310,29 +310,29 @@ func (x *XRPLAdapter) FormatPublicKey(pubKey curve.Point) string {
 func (x *XRPLAdapter) ValidateConfig(config *UnifiedConfig) error {
 	// XRPL-specific validation
 	if config.SignatureScheme != x.sigType {
-		return fmt.Errorf("config signature type %v doesn't match adapter type %v", 
+		return fmt.Errorf("config signature type %v doesn't match adapter type %v",
 			config.SignatureScheme, x.sigType)
 	}
-	
+
 	// Check threshold bounds for XRPL
 	if config.Threshold < 1 || config.Threshold > 8 {
 		return fmt.Errorf("XRPL supports threshold 1-8, got %d", config.Threshold)
 	}
-	
+
 	// Verify all verification shares are present
 	for _, pid := range config.PartyIDs {
 		if _, exists := config.VerificationShares[pid]; !exists {
 			return fmt.Errorf("missing verification share for party %s", pid)
 		}
 	}
-	
+
 	return nil
 }
 
 // GetSignerListEntry creates XRPL SignerListSet entry for this configuration
 func (x *XRPLAdapter) GetSignerListEntry(config *UnifiedConfig, weight uint16) map[string]interface{} {
 	signers := make([]map[string]interface{}, 0, len(config.PartyIDs))
-	
+
 	for _, pid := range config.PartyIDs {
 		verificationShare, ok := config.VerificationShares[pid].(curve.Point)
 		if !ok {
@@ -346,7 +346,7 @@ func (x *XRPLAdapter) GetSignerListEntry(config *UnifiedConfig, weight uint16) m
 			},
 		})
 	}
-	
+
 	return map[string]interface{}{
 		"SignerQuorum":  config.Threshold * int(weight),
 		"SignerEntries": signers,
