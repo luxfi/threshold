@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/luxfi/threshold/pkg/math/curve"
-	"github.com/luxfi/threshold/pkg/party"
 )
 
 // SolanaAdapter implements SignerAdapter for Solana

@@ -186,8 +186,8 @@ func (c *UnifiedConfig) Clone() *UnifiedConfig {
 		PartyIDs:        make([]party.ID, len(c.PartyIDs)),
 		SignatureScheme: c.SignatureScheme,
 		Group:           c.Group,
-		SecretShare:     c.Group.NewScalar().Set(c.SecretShare),
-		PublicKey:       c.Group.NewPoint().Set(c.PublicKey),
+		SecretShare:     c.SecretShare,
+		PublicKey:       c.PublicKey,
 		VerificationShares: make(map[party.ID]curve.Point),
 		ChainKey:        c.ChainKey,
 	}
@@ -195,7 +195,7 @@ func (c *UnifiedConfig) Clone() *UnifiedConfig {
 	copy(clone.PartyIDs, c.PartyIDs)
 
 	for id, share := range c.VerificationShares {
-		clone.VerificationShares[id] = c.Group.NewPoint().Set(share)
+		clone.VerificationShares[id] = share
 	}
 
 	if c.ECDSAExtensions != nil {
