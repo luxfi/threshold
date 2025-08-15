@@ -297,35 +297,24 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 	return configs, nil
 }
 
-func runSingleSign(protocolName string, configs []interface{}, message []byte) error {
-	pl := pool.NewPool(0)
-	defer pl.TearDown()
-
-	var partyIDs []party.ID
-
-	// Extract party IDs based on protocol
-	switch protocolName {
-	case protocolLSS:
-		partyIDs = make([]party.ID, len(configs))
-		for i, c := range configs {
+func extractPartyIDs(protocolName string, configs []interface{}) []party.ID {
+	partyIDs := make([]party.ID, len(configs))
+	
+	for i, c := range configs {
+		switch protocolName {
+		case protocolLSS:
 			cfg, ok := c.(*lss.Config)
 			if !ok {
 				panic("invalid config type for lss protocol")
 			}
 			partyIDs[i] = cfg.ID
-		}
-	case protocolCMP:
-		partyIDs = make([]party.ID, len(configs))
-		for i, c := range configs {
+		case protocolCMP:
 			cfg, ok := c.(*cmp.Config)
 			if !ok {
 				panic("invalid config type for cmp protocol")
 			}
 			partyIDs[i] = cfg.ID
-		}
-	case protocolFROST:
-		partyIDs = make([]party.ID, len(configs))
-		for i, c := range configs {
+		case protocolFROST:
 			cfg, ok := c.(*frost.Config)
 			if !ok {
 				panic("invalid config type for frost protocol")
@@ -333,7 +322,40 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 			partyIDs[i] = cfg.ID
 		}
 	}
+	
+	return partyIDs
+}
 
+func createSignHandler(protocolName string, cfg interface{}, partyIDs []party.ID, message []byte, pl *pool.Pool) (*protocol.Handler, error) {
+	switch protocolName {
+	case protocolLSS:
+		c, ok := cfg.(*lss.Config)
+		if !ok {
+			panic("invalid config type for lss protocol")
+		}
+		return protocol.NewMultiHandler(lss.Sign(c, partyIDs, message, pl), nil)
+	case protocolCMP:
+		c, ok := cfg.(*cmp.Config)
+		if !ok {
+			panic("invalid config type for cmp protocol")
+		}
+		return protocol.NewMultiHandler(cmp.Sign(c, partyIDs, message, pl), nil)
+	case protocolFROST:
+		c, ok := cfg.(*frost.Config)
+		if !ok {
+			panic("invalid config type for frost protocol")
+		}
+		return protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
+	default:
+		return nil, fmt.Errorf("unknown protocol: %s", protocolName)
+	}
+}
+
+func runSingleSign(protocolName string, configs []interface{}, message []byte) error {
+	pl := pool.NewPool(0)
+	defer pl.TearDown()
+
+	partyIDs := extractPartyIDs(protocolName, configs)
 	network := test.NewNetwork(partyIDs)
 
 	var wg sync.WaitGroup
@@ -343,30 +365,7 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 		go func(idx int, cfg interface{}) {
 			defer wg.Done()
 
-			var h *protocol.Handler
-			var err error
-
-			switch protocolName {
-			case protocolLSS:
-				c, ok := cfg.(*lss.Config)
-				if !ok {
-					panic("invalid config type for lss protocol")
-				}
-				h, err = protocol.NewMultiHandler(lss.Sign(c, partyIDs, message, pl), nil)
-			case protocolCMP:
-				c, ok := cfg.(*cmp.Config)
-				if !ok {
-					panic("invalid config type for cmp protocol")
-				}
-				h, err = protocol.NewMultiHandler(cmp.Sign(c, partyIDs, message, pl), nil)
-			case protocolFROST:
-				c, ok := cfg.(*frost.Config)
-				if !ok {
-					panic("invalid config type for frost protocol")
-				}
-				h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
-			}
-
+			h, err := createSignHandler(protocolName, cfg, partyIDs, message, pl)
 			if err != nil {
 				return
 			}
