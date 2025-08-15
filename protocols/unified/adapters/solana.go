@@ -42,7 +42,7 @@ func (s *SolanaAdapter) Digest(tx interface{}) ([]byte, error) {
 func (s *SolanaAdapter) digestTransaction(tx *SolanaTransaction) ([]byte, error) {
 	// Serialize message for signing
 	message := s.serializeMessage(tx.Message)
-	
+
 	// Solana uses the raw message bytes for Ed25519 signing
 	// No additional hashing required
 	return message, nil
@@ -68,23 +68,23 @@ func (s *SolanaAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	if len(parts) == 0 {
 		return nil, errors.New("no partial signatures")
 	}
-	
+
 	var r curve.Point
 	z := s.group.NewScalar()
-	
+
 	for _, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
 		}
-		
+
 		if r == nil && eddsaPart.R != nil {
 			r = eddsaPart.R
 		}
-		
+
 		z = z.Add(eddsaPart.Z)
 	}
-	
+
 	return &EdDSAFullSig{
 		R: r,
 		Z: z,
@@ -97,24 +97,24 @@ func (s *SolanaAdapter) Encode(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid Ed25519 signature")
 	}
-	
+
 	// Ed25519 signature: R (32 bytes) || z (32 bytes)
 	sig := make([]byte, 64)
-	
+
 	// Copy R
 	rBytes, _ := eddsaSig.R.MarshalBinary()
 	if len(rBytes) != 32 {
 		return nil, fmt.Errorf("invalid R length: %d", len(rBytes))
 	}
 	copy(sig[:32], rBytes)
-	
+
 	// Copy z
 	zBytes, _ := eddsaSig.Z.MarshalBinary()
 	if len(zBytes) > 32 {
 		return nil, fmt.Errorf("invalid z length: %d", len(zBytes))
 	}
 	copy(sig[32+(32-len(zBytes)):], zBytes)
-	
+
 	return sig, nil
 }
 
@@ -123,62 +123,62 @@ func (s *SolanaAdapter) ValidateConfig(config *UnifiedConfig) error {
 	if config.SignatureScheme != SignatureEdDSA {
 		return errors.New("Solana requires Ed25519 signatures")
 	}
-	
+
 	// Verify Ed25519 curve
 	// TODO: Check for Ed25519 curve when available
 	if _, ok := config.Group.(curve.Secp256k1); ok {
 		return errors.New("Solana requires Ed25519 curve")
 	}
-	
+
 	return nil
 }
 
 // serializeMessage serializes a Solana message for signing
 func (s *SolanaAdapter) serializeMessage(msg *SolanaMessage) []byte {
 	var buf []byte
-	
+
 	// Number of signatures required
 	buf = append(buf, msg.NumRequiredSignatures)
-	
+
 	// Number of read-only signed accounts
 	buf = append(buf, msg.NumReadonlySignedAccounts)
-	
+
 	// Number of read-only unsigned accounts
 	buf = append(buf, msg.NumReadonlyUnsignedAccounts)
-	
+
 	// Account keys (compact array)
 	buf = append(buf, s.encodeCompactArray(len(msg.AccountKeys))...)
 	for _, key := range msg.AccountKeys {
 		buf = append(buf, key[:]...)
 	}
-	
+
 	// Recent blockhash
 	buf = append(buf, msg.RecentBlockhash[:]...)
-	
+
 	// Instructions (compact array)
 	buf = append(buf, s.encodeCompactArray(len(msg.Instructions))...)
 	for _, inst := range msg.Instructions {
 		buf = append(buf, s.serializeInstruction(inst)...)
 	}
-	
+
 	return buf
 }
 
 // serializeInstruction serializes a Solana instruction
 func (s *SolanaAdapter) serializeInstruction(inst *SolanaInstruction) []byte {
 	var buf []byte
-	
+
 	// Program ID index
 	buf = append(buf, inst.ProgramIDIndex)
-	
+
 	// Account indices (compact array)
 	buf = append(buf, s.encodeCompactArray(len(inst.AccountIndices))...)
 	buf = append(buf, inst.AccountIndices...)
-	
+
 	// Data (compact array)
 	buf = append(buf, s.encodeCompactArray(len(inst.Data))...)
 	buf = append(buf, inst.Data...)
-	
+
 	return buf
 }
 
@@ -209,12 +209,12 @@ type SolanaTransaction struct {
 }
 
 type SolanaMessage struct {
-	NumRequiredSignatures        byte
-	NumReadonlySignedAccounts    byte
-	NumReadonlyUnsignedAccounts  byte
-	AccountKeys                   [][32]byte
-	RecentBlockhash              [32]byte
-	Instructions                  []*SolanaInstruction
+	NumRequiredSignatures       byte
+	NumReadonlySignedAccounts   byte
+	NumReadonlyUnsignedAccounts byte
+	AccountKeys                 [][32]byte
+	RecentBlockhash             [32]byte
+	Instructions                []*SolanaInstruction
 }
 
 type SolanaInstruction struct {
@@ -230,14 +230,14 @@ func (s *SolanaAdapter) CreateTransferInstruction(from, to [32]byte, lamports ui
 	// System program transfer instruction
 	// Instruction: 2 (transfer)
 	// Args: lamports (u64)
-	
+
 	data := []byte{2, 0, 0, 0} // Transfer instruction
 	lamportBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(lamportBytes, lamports)
 	data = append(data, lamportBytes...)
-	
+
 	return &SolanaInstruction{
-		ProgramIDIndex: 0, // System program
+		ProgramIDIndex: 0,            // System program
 		AccountIndices: []byte{0, 1}, // From, To
 		Data:           data,
 	}
@@ -248,14 +248,14 @@ func (s *SolanaAdapter) CreateTokenTransferInstruction(amount uint64, decimals b
 	// SPL Token transfer instruction
 	// Instruction: 3 (transfer)
 	// Args: amount (u64)
-	
+
 	data := []byte{3} // Transfer instruction
 	amountBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(amountBytes, amount)
 	data = append(data, amountBytes...)
-	
+
 	return &SolanaInstruction{
-		ProgramIDIndex: 2, // Token program
+		ProgramIDIndex: 2,               // Token program
 		AccountIndices: []byte{0, 1, 2}, // Source, Dest, Authority
 		Data:           data,
 	}
@@ -272,7 +272,7 @@ func (s *SolanaAdapter) VerifyEd25519Signature(pubkey [32]byte, message []byte, 
 func (s *SolanaAdapter) ComputeProgramDerivedAddress(programID [32]byte, seeds [][]byte) ([32]byte, byte, error) {
 	// PDA = hash(seeds || programID || bump)
 	// Find bump that produces off-curve point
-	
+
 	for bump := byte(255); bump > 0; bump-- {
 		h := sha256.New()
 		for _, seed := range seeds {
@@ -281,9 +281,9 @@ func (s *SolanaAdapter) ComputeProgramDerivedAddress(programID [32]byte, seeds [
 		h.Write([]byte{bump})
 		h.Write([]byte("ProgramDerivedAddress"))
 		h.Write(programID[:])
-		
+
 		hash := h.Sum(nil)
-		
+
 		// Check if point is off-curve (valid PDA)
 		// Simplified check - actual would verify Ed25519 curve equation
 		if hash[31]&0x80 == 0 {
@@ -292,7 +292,7 @@ func (s *SolanaAdapter) ComputeProgramDerivedAddress(programID [32]byte, seeds [
 			return pda, bump, nil
 		}
 	}
-	
+
 	return [32]byte{}, 0, errors.New("unable to find valid PDA")
 }
 
@@ -300,12 +300,12 @@ func (s *SolanaAdapter) ComputeProgramDerivedAddress(programID [32]byte, seeds [
 func (s *SolanaAdapter) CreateMultisigAccount(signers [][32]byte, threshold byte) ([]byte, error) {
 	// Create multisig account data
 	// Format: [threshold, num_signers, signer1, signer2, ...]
-	
+
 	data := []byte{threshold, byte(len(signers))}
 	for _, signer := range signers {
 		data = append(data, signer[:]...)
 	}
-	
+
 	return data, nil
 }
 
@@ -313,10 +313,10 @@ func (s *SolanaAdapter) CreateMultisigAccount(signers [][32]byte, threshold byte
 func (s *SolanaAdapter) EstimateComputeUnits(numSignatures int) uint32 {
 	// Base cost for Ed25519 verification
 	baseCost := uint32(900)
-	
+
 	// Additional cost per signature
 	perSigCost := uint32(200)
-	
+
 	return baseCost + uint32(numSignatures)*perSigCost
 }
 
@@ -326,18 +326,18 @@ func (s *SolanaAdapter) GetRentExemptBalance(dataSize int) uint64 {
 	// ~2 years of rent = 19.055441478439427 * dataSize + 128
 	rentPerByte := uint64(19055441478439427) // In lamports
 	baseRent := uint64(128 * 1000000000)     // 128 SOL base
-	
+
 	return (rentPerByte*uint64(dataSize))/1000000000000000 + baseRent
 }
 
 // SolanaConfig represents Solana-specific configuration
 type SolanaConfig struct {
-	Cluster          string // mainnet-beta, testnet, devnet
-	CommitmentLevel  string // processed, confirmed, finalized
-	SkipPreflight    bool
-	PreflightCommit  string
-	MaxRetries       int
-	MinContextSlot   uint64
+	Cluster         string // mainnet-beta, testnet, devnet
+	CommitmentLevel string // processed, confirmed, finalized
+	SkipPreflight   bool
+	PreflightCommit string
+	MaxRetries      int
+	MinContextSlot  uint64
 }
 
 // GetDefaultConfig returns default Solana configuration

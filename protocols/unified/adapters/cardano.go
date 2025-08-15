@@ -14,10 +14,10 @@ import (
 // CardanoAdapter implements SignerAdapter for Cardano blockchain
 // Cardano natively uses Ed25519 but also supports ECDSA/Schnorr for interoperability
 type CardanoAdapter struct {
-	group       curve.Curve
-	sigType     SignatureType
-	networkID   byte // 0x00 for testnet, 0x01 for mainnet
-	era         CardanoEra
+	group     curve.Curve
+	sigType   SignatureType
+	networkID byte // 0x00 for testnet, 0x01 for mainnet
+	era       CardanoEra
 }
 
 // CardanoEra represents different Cardano protocol eras
@@ -46,7 +46,7 @@ func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *C
 	default:
 		panic("unsupported signature type for Cardano")
 	}
-	
+
 	return &CardanoAdapter{
 		group:     group,
 		sigType:   sigType,
@@ -138,23 +138,23 @@ func (c *CardanoAdapter) aggregateEd25519(parts []PartialSig) (FullSig, error) {
 	if len(parts) == 0 {
 		return nil, errors.New("no partial signatures")
 	}
-	
+
 	var r curve.Point
 	z := c.group.NewScalar()
-	
+
 	for _, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
 		}
-		
+
 		if r == nil && eddsaPart.R != nil {
 			r = eddsaPart.R
 		}
-		
+
 		z = z.Add(eddsaPart.Z)
 	}
-	
+
 	return &EdDSAFullSig{
 		R: r,
 		Z: z,
@@ -164,23 +164,23 @@ func (c *CardanoAdapter) aggregateEd25519(parts []PartialSig) (FullSig, error) {
 // aggregateECDSA combines ECDSA partial signatures
 func (c *CardanoAdapter) aggregateECDSA(parts []PartialSig) (FullSig, error) {
 	var r, s curve.Scalar
-	
+
 	for _, part := range parts {
 		ecdsaPart, ok := part.(*ECDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid ECDSA partial signature")
 		}
-		
+
 		if r == nil && ecdsaPart.R != nil {
 			r = ecdsaPart.R
 		}
-		
+
 		if s == nil {
 			s = c.group.NewScalar()
 		}
 		s = s.Add(ecdsaPart.S)
 	}
-	
+
 	return &ECDSAFullSig{
 		R: r,
 		S: s,
@@ -191,20 +191,20 @@ func (c *CardanoAdapter) aggregateECDSA(parts []PartialSig) (FullSig, error) {
 func (c *CardanoAdapter) aggregateSchnorr(parts []PartialSig) (FullSig, error) {
 	var r curve.Point
 	s := c.group.NewScalar()
-	
+
 	for _, part := range parts {
 		schnorrPart, ok := part.(*SchnorrPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Schnorr partial signature")
 		}
-		
+
 		if r == nil && schnorrPart.R != nil {
 			r = schnorrPart.R
 		}
-		
+
 		s = s.Add(schnorrPart.S)
 	}
-	
+
 	return &SchnorrFullSig{
 		R: r,
 		S: s,
@@ -231,16 +231,16 @@ func (c *CardanoAdapter) encodeEd25519(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid Ed25519 signature")
 	}
-	
+
 	// Ed25519 signature: R (32 bytes) || z (32 bytes)
 	sig := make([]byte, 64)
-	
+
 	rBytes, _ := eddsaSig.R.MarshalBinary()
 	copy(sig[:32], rBytes)
-	
+
 	zBytes, _ := eddsaSig.Z.MarshalBinary()
 	copy(sig[32+(32-len(zBytes)):], zBytes)
-	
+
 	return sig, nil
 }
 
@@ -250,16 +250,16 @@ func (c *CardanoAdapter) encodeECDSA(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid ECDSA signature")
 	}
-	
+
 	// ECDSA: r (32 bytes) || s (32 bytes)
 	sig := make([]byte, 64)
-	
+
 	rBytes, _ := ecdsaSig.R.MarshalBinary()
 	copy(sig[32-len(rBytes):32], rBytes)
-	
+
 	sBytes, _ := ecdsaSig.S.MarshalBinary()
 	copy(sig[64-len(sBytes):], sBytes)
-	
+
 	return sig, nil
 }
 
@@ -269,16 +269,16 @@ func (c *CardanoAdapter) encodeSchnorr(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid Schnorr signature")
 	}
-	
+
 	// Schnorr: R (32 bytes) || s (32 bytes)
 	sig := make([]byte, 64)
-	
+
 	rBytes, _ := schnorrSig.R.MarshalBinary()
 	copy(sig[:32], rBytes)
-	
+
 	sBytes, _ := schnorrSig.S.MarshalBinary()
 	copy(sig[32+(32-len(sBytes)):], sBytes)
-	
+
 	return sig, nil
 }
 
@@ -288,37 +288,37 @@ func (c *CardanoAdapter) ValidateConfig(config *UnifiedConfig) error {
 		return fmt.Errorf("config signature type %v doesn't match adapter type %v",
 			config.SignatureScheme, c.sigType)
 	}
-	
+
 	return nil
 }
 
 // Cardano-specific structures
 
 type CardanoTransaction struct {
-	Body       *TransactionBody
-	Witnesses  *TransactionWitnessSet
-	IsValid    bool
-	AuxData    *CardanoMetadata // Optional metadata
+	Body      *TransactionBody
+	Witnesses *TransactionWitnessSet
+	IsValid   bool
+	AuxData   *CardanoMetadata // Optional metadata
 }
 
 type TransactionBody struct {
-	Inputs            []TransactionInput
-	Outputs           []TransactionOutput
-	Fee               uint64
-	TTL               uint32 // Time to live (slot)
-	Certificates      []Certificate
-	Withdrawals       map[string]uint64 // Stake address -> amount
-	Update            *ProtocolUpdate
-	AuxDataHash       [32]byte
-	ValidityInterval  *ValidityInterval
-	Mint              map[PolicyID]map[AssetName]int64
-	ScriptDataHash    [32]byte
-	Collateral        []TransactionInput
-	RequiredSigners   [][28]byte // Key hashes
-	NetworkID         byte
-	CollateralReturn  *TransactionOutput
-	TotalCollateral   uint64
-	ReferenceInputs   []TransactionInput
+	Inputs           []TransactionInput
+	Outputs          []TransactionOutput
+	Fee              uint64
+	TTL              uint32 // Time to live (slot)
+	Certificates     []Certificate
+	Withdrawals      map[string]uint64 // Stake address -> amount
+	Update           *ProtocolUpdate
+	AuxDataHash      [32]byte
+	ValidityInterval *ValidityInterval
+	Mint             map[PolicyID]map[AssetName]int64
+	ScriptDataHash   [32]byte
+	Collateral       []TransactionInput
+	RequiredSigners  [][28]byte // Key hashes
+	NetworkID        byte
+	CollateralReturn *TransactionOutput
+	TotalCollateral  uint64
+	ReferenceInputs  []TransactionInput
 }
 
 type TransactionInput struct {
@@ -335,10 +335,10 @@ type TransactionOutput struct {
 }
 
 type CardanoAddress struct {
-	Type      AddressType
-	Network   byte
-	Payment   [28]byte // Payment credential hash
-	Stake     [28]byte // Stake credential hash (optional)
+	Type    AddressType
+	Network byte
+	Payment [28]byte // Payment credential hash
+	Stake   [28]byte // Stake credential hash (optional)
 }
 
 type AddressType byte
@@ -381,26 +381,26 @@ type ValidityInterval struct {
 }
 
 type ProtocolUpdate struct {
-	Epoch           uint32
-	ProtocolParams  *ProtocolParameters
+	Epoch          uint32
+	ProtocolParams *ProtocolParameters
 }
 
 type ProtocolParameters struct {
-	MinFeeA              uint32
-	MinFeeB              uint32
-	MaxBlockBodySize     uint32
-	MaxTxSize            uint32
-	MaxBlockHeaderSize   uint32
-	KeyDeposit           uint64
-	PoolDeposit          uint64
-	MinPoolCost          uint64
-	PriceMemory          Rational
-	PriceSteps           Rational
-	MaxTxExecutionUnits  ExecutionUnits
+	MinFeeA                uint32
+	MinFeeB                uint32
+	MaxBlockBodySize       uint32
+	MaxTxSize              uint32
+	MaxBlockHeaderSize     uint32
+	KeyDeposit             uint64
+	PoolDeposit            uint64
+	MinPoolCost            uint64
+	PriceMemory            Rational
+	PriceSteps             Rational
+	MaxTxExecutionUnits    ExecutionUnits
 	MaxBlockExecutionUnits ExecutionUnits
-	MaxValueSize         uint32
-	CollateralPercentage uint32
-	MaxCollateralInputs  uint32
+	MaxValueSize           uint32
+	CollateralPercentage   uint32
+	MaxCollateralInputs    uint32
 }
 
 type Rational struct {
@@ -414,11 +414,11 @@ type ExecutionUnits struct {
 }
 
 type TransactionWitnessSet struct {
-	VKeyWitnesses    []VKeyWitness
-	Scripts          []Script
-	PlutusData       [][]byte
-	Redeemers        []Redeemer
-	NativeScripts    []NativeScript
+	VKeyWitnesses []VKeyWitness
+	Scripts       []Script
+	PlutusData    [][]byte
+	Redeemers     []Redeemer
+	NativeScripts []NativeScript
 }
 
 type VKeyWitness struct {
@@ -431,10 +431,10 @@ type Script interface {
 }
 
 type Redeemer struct {
-	Tag        RedeemerTag
-	Index      uint32
-	Data       []byte
-	ExUnits    ExecutionUnits
+	Tag     RedeemerTag
+	Index   uint32
+	Data    []byte
+	ExUnits ExecutionUnits
 }
 
 type RedeemerTag byte
@@ -472,34 +472,34 @@ func (c *CardanoAdapter) serializeToCBOR(tx *CardanoTransaction) []byte {
 	// Simplified CBOR serialization
 	// Actual implementation would use proper CBOR encoding
 	var cbor []byte
-	
+
 	// Transaction body
 	cbor = append(cbor, c.serializeTransactionBody(tx.Body)...)
-	
+
 	// Witnesses
 	if tx.Witnesses != nil {
 		cbor = append(cbor, c.serializeWitnessSet(tx.Witnesses)...)
 	}
-	
+
 	// IsValid flag
 	if tx.IsValid {
 		cbor = append(cbor, 1)
 	} else {
 		cbor = append(cbor, 0)
 	}
-	
+
 	// Auxiliary data
 	if tx.AuxData != nil {
 		cbor = append(cbor, c.serializeMetadataToCBOR(tx.AuxData)...)
 	}
-	
+
 	return cbor
 }
 
 // serializeTransactionBody serializes transaction body to CBOR
 func (c *CardanoAdapter) serializeTransactionBody(body *TransactionBody) []byte {
 	var cbor []byte
-	
+
 	// Inputs
 	for _, input := range body.Inputs {
 		cbor = append(cbor, input.TxID[:]...)
@@ -507,76 +507,76 @@ func (c *CardanoAdapter) serializeTransactionBody(body *TransactionBody) []byte 
 		binary.BigEndian.PutUint32(indexBytes, input.Index)
 		cbor = append(cbor, indexBytes...)
 	}
-	
+
 	// Outputs
 	for _, output := range body.Outputs {
 		cbor = append(cbor, c.serializeOutput(&output)...)
 	}
-	
+
 	// Fee
 	feeBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(feeBytes, body.Fee)
 	cbor = append(cbor, feeBytes...)
-	
+
 	// TTL
 	if body.TTL > 0 {
 		ttlBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(ttlBytes, body.TTL)
 		cbor = append(cbor, ttlBytes...)
 	}
-	
+
 	return cbor
 }
 
 // serializeOutput serializes transaction output
 func (c *CardanoAdapter) serializeOutput(output *TransactionOutput) []byte {
 	var data []byte
-	
+
 	// Address
 	data = append(data, c.serializeAddress(&output.Address)...)
-	
+
 	// Value
 	valueBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(valueBytes, output.Value.Coin)
 	data = append(data, valueBytes...)
-	
+
 	// Optional datum hash
 	if output.DatumHash != nil {
 		data = append(data, output.DatumHash[:]...)
 	}
-	
+
 	return data
 }
 
 // serializeAddress serializes Cardano address
 func (c *CardanoAdapter) serializeAddress(addr *CardanoAddress) []byte {
 	var data []byte
-	
+
 	// Address type and network
 	header := byte(addr.Type)<<4 | (addr.Network & 0x0F)
 	data = append(data, header)
-	
+
 	// Payment credential
 	data = append(data, addr.Payment[:]...)
-	
+
 	// Stake credential (if present)
 	if addr.Type == BaseAddress {
 		data = append(data, addr.Stake[:]...)
 	}
-	
+
 	return data
 }
 
 // serializeWitnessSet serializes witness set
 func (c *CardanoAdapter) serializeWitnessSet(witnesses *TransactionWitnessSet) []byte {
 	var data []byte
-	
+
 	// VKey witnesses
 	for _, vkey := range witnesses.VKeyWitnesses {
 		data = append(data, vkey.VKey[:]...)
 		data = append(data, vkey.Signature[:]...)
 	}
-	
+
 	return data
 }
 
@@ -599,19 +599,19 @@ func (c *CardanoAdapter) GenerateCardanoAddress(paymentPubKey, stakePubKey [32]b
 	paymentHasher, _ := blake2b.New(28, nil) // 224 bits = 28 bytes
 	paymentHasher.Write(paymentPubKey[:])
 	paymentHash := paymentHasher.Sum(nil)
-	
+
 	stakeHasher, _ := blake2b.New(28, nil)
 	stakeHasher.Write(stakePubKey[:])
 	stakeHash := stakeHasher.Sum(nil)
-	
+
 	addr := CardanoAddress{
 		Type:    BaseAddress,
 		Network: c.networkID,
 	}
-	
+
 	copy(addr.Payment[:], paymentHash[:])
 	copy(addr.Stake[:], stakeHash[:])
-	
+
 	return addr
 }
 
@@ -619,13 +619,13 @@ func (c *CardanoAdapter) GenerateCardanoAddress(paymentPubKey, stakePubKey [32]b
 func (c *CardanoAdapter) EstimateFee(tx *CardanoTransaction) uint64 {
 	// Cardano fee calculation: a * size + b
 	// Default mainnet: a = 44, b = 155381
-	
+
 	txSize := len(c.serializeToCBOR(tx))
 	minFeeA := uint64(44)
 	minFeeB := uint64(155381)
-	
+
 	fee := minFeeA*uint64(txSize) + minFeeB
-	
+
 	// Add script execution costs if present
 	if tx.Witnesses != nil && len(tx.Witnesses.Redeemers) > 0 {
 		for _, redeemer := range tx.Witnesses.Redeemers {
@@ -634,20 +634,20 @@ func (c *CardanoAdapter) EstimateFee(tx *CardanoTransaction) uint64 {
 			fee += redeemer.ExUnits.Steps * 721 / 10000000
 		}
 	}
-	
+
 	return fee
 }
 
 // GetCardanoConfig returns default Cardano configuration
 func GetDefaultCardanoConfig(networkID byte, era CardanoEra) map[string]interface{} {
 	return map[string]interface{}{
-		"network_id":      networkID,
+		"network_id":     networkID,
 		"era":            era,
 		"signature_type": SignatureEdDSA, // Native
-		"curve":         "Ed25519",
+		"curve":          "Ed25519",
 		"hash_algorithm": "Blake2b-256",
-		"encoding":      "CBOR",
-		"min_fee_a":     44,
-		"min_fee_b":     155381,
+		"encoding":       "CBOR",
+		"min_fee_a":      44,
+		"min_fee_b":      155381,
 	}
 }
