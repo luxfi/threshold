@@ -7,7 +7,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/luxfi/crypto v1.2.9
-	github.com/luxfi/log v1.1.1
+	github.com/luxfi/log v1.0.6
 	github.com/luxfi/zmq/v4 v4.2.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.38.0
