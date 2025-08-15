@@ -59,7 +59,7 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 			return round.ErrNotReady
 		}
 		commitment, _ := commitmentValue.([]byte)
-		
+
 		// Use session-based hash for verification - using the SENDER's ID
 		// The Helper should be the same as the one used in round1 for commitment creation
 		if !r.Helper.HashForID(from).Decommit(commitment, body.Decommitment, body.CL) {
@@ -106,7 +106,7 @@ func (r *round3) StoreMessage(msg round.Message) error {
 	//
 	// aborting if the check fails."
 	expected := body.FLi.ActOnBase()
-	
+
 	// Load phi from sync.Map
 	phiValue, ok := r.Phi.Load(from)
 	if !ok {
@@ -118,7 +118,7 @@ func (r *round3) StoreMessage(msg round.Message) error {
 	if phi == nil {
 		return round.ErrNotReady
 	}
-	
+
 	actual := phi.Evaluate(r.SelfID().Scalar(r.Group()))
 	if !expected.Equal(actual) {
 		// Debug: log the mismatch
@@ -135,7 +135,7 @@ func (r *round3) StoreMessage(msg round.Message) error {
 func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	// All messages should have been received before Finalize is called
 	// The protocol handler ensures all expected messages are received
-	
+
 	// Verify we have all chain keys (can be empty during refresh)
 	for _, j := range r.PartyIDs() {
 		if _, ok := r.ChainKeys.Load(j); !ok {
@@ -147,7 +147,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 			}
 		}
 	}
-	
+
 	// Now we have all chain keys, XOR them together
 	// During refresh, chain keys are empty, so ChainKey remains empty
 	ChainKey := types.EmptyRID()
@@ -178,7 +178,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		r.shareFrom.Delete(key)
 		return true
 	})
-	
+
 	// We should have exactly n shares (including our own)
 	if shareCount != r.PartyIDs().Len() {
 		return r.AbortRound(fmt.Errorf("expected %d shares, got %d", r.PartyIDs().Len(), shareCount)), nil

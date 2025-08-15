@@ -3,7 +3,7 @@ package frost
 // The issue with verification shares in FROST keygen:
 //
 // Current implementation computes Y_i = F(i)*G where F = sum of all n polynomials.
-// This creates shares from a degree n*t polynomial, which cannot reconstruct 
+// This creates shares from a degree n*t polynomial, which cannot reconstruct
 // the public key using only t shares.
 //
 // The FROST paper says:
@@ -18,7 +18,7 @@ package frost
 // - Y = ∑ᵢ λᵢ * Y_i (for any threshold subset)
 // - This requires Y_i to be shares of a degree-t polynomial
 //
-// The solution is to ensure verification shares Y_i = s_i * G where s_i are 
+// The solution is to ensure verification shares Y_i = s_i * G where s_i are
 // proper Shamir shares of the secret key. This means the secret polynomial
 // must have degree t, not n*t.
 //

@@ -17,7 +17,7 @@ func Start(selfID party.ID, participants []party.ID, threshold int, pl *pool.Poo
 		if threshold < 1 || threshold > len(participants) {
 			return nil, errors.New("invalid threshold")
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "corona/keygen",
 			FinalRoundNumber: 3, // Corona keygen has 3 rounds
@@ -25,15 +25,15 @@ func Start(selfID party.ID, participants []party.ID, threshold int, pl *pool.Poo
 			PartyIDs:         participants,
 			Threshold:        threshold,
 		}
-		
+
 		helper, err := round.NewSession(info, sessionID, pl)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Default to 192-bit security
 		cfg := config.NewConfig(selfID, threshold, config.Security192)
-		
+
 		// Start with round 1
 		return &round1{
 			Helper: helper,

@@ -51,7 +51,7 @@ func BenchmarkHandler(b *testing.B) {
 
 				handlers := make([]*protocol.Handler, tt.n)
 				for j, id := range partyIDs {
-					h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), 
+					h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
 						lss.Keygen(group, id, partyIDs, tt.threshold, pl), sessionID, cfg)
 					require.NoError(b, err)
 					handlers[j] = h
@@ -146,7 +146,7 @@ func runProtocol(handlers []*protocol.Handler, partyIDs []party.ID) {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// Protocol completed

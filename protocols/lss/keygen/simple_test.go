@@ -23,12 +23,12 @@ func TestSimpleKeygen(t *testing.T) {
 
 	// Create start function
 	startFunc := keygen.Start(selfID, participants, threshold, group, pl)
-	
+
 	// Verify it can create a session
 	session, err := startFunc([]byte("test-session"))
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	
+
 	// Check basic properties
 	require.Equal(t, selfID, session.SelfID())
 	require.Equal(t, party.IDSlice(participants), session.PartyIDs())
@@ -36,7 +36,7 @@ func TestSimpleKeygen(t *testing.T) {
 
 func TestDebugHandler(t *testing.T) {
 	group := curve.Secp256k1{}
-	selfID := party.ID("alice") 
+	selfID := party.ID("alice")
 	participants := []party.ID{"alice", "bob", "charlie"}
 	threshold := 2
 	pl := pool.NewPool(0)
@@ -46,7 +46,7 @@ func TestDebugHandler(t *testing.T) {
 	startFunc := keygen.Start(selfID, participants, threshold, group, pl)
 	session, err := startFunc(nil)
 	require.NoError(t, err)
-	
+
 	// Check round details
 	fmt.Printf("Round number: %d\n", session.Number())
 	fmt.Printf("Final round: %d\n", session.FinalRoundNumber())

@@ -17,10 +17,10 @@ import (
 // TestCoronaKeygenWithTimeout tests keygen with proper timeout handling
 func TestCoronaKeygenWithTimeout(t *testing.T) {
 	// Run with timeout to prevent hanging
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -30,7 +30,7 @@ func TestCoronaKeygenWithTimeout(t *testing.T) {
 
 	// Create a test harness with timeout
 	harness := test.NewHarness(t, partyIDs).WithTimeout(5 * time.Second)
-	
+
 	// Try to run the protocol
 	done := make(chan bool, 1)
 	go func() {
@@ -40,25 +40,25 @@ func TestCoronaKeygenWithTimeout(t *testing.T) {
 			}
 			done <- true
 		}()
-		
+
 		for _, id := range partyIDs {
 			sessionID := []byte("test-corona-keygen")
 			startFunc := corona.Keygen(id, partyIDs, threshold, pl)
-			
+
 			// Try to create handler
 			handler, err := harness.CreateHandler(id, startFunc, sessionID)
 			if err != nil {
 				t.Logf("Error creating handler for party %s: %v", id, err)
 				return
 			}
-			
+
 			// Don't wait for result, just check it was created
 			if handler != nil {
 				t.Logf("Handler created for party %s", id)
 			}
 		}
 	}()
-	
+
 	// Wait for completion or timeout
 	select {
 	case <-done:
@@ -71,10 +71,10 @@ func TestCoronaKeygenWithTimeout(t *testing.T) {
 // TestCoronaSignWithTimeout tests signing with proper timeout handling
 func TestCoronaSignWithTimeout(t *testing.T) {
 	// Run with timeout to prevent hanging
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -92,7 +92,7 @@ func TestCoronaSignWithTimeout(t *testing.T) {
 
 	// Select signers
 	signers := partyIDs[:threshold]
-	
+
 	done := make(chan bool, 1)
 	go func() {
 		defer func() {
@@ -101,12 +101,12 @@ func TestCoronaSignWithTimeout(t *testing.T) {
 			}
 			done <- true
 		}()
-		
+
 		for _, id := range signers {
 			cfg := configs[id]
 			sessionID := []byte("test-corona-sign")
 			startFunc := corona.Sign(cfg, signers, message, pl)
-			
+
 			// Try to create session
 			session, err := startFunc(sessionID)
 			if err != nil {
@@ -116,7 +116,7 @@ func TestCoronaSignWithTimeout(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Wait for completion or timeout
 	select {
 	case <-done:
@@ -129,10 +129,10 @@ func TestCoronaSignWithTimeout(t *testing.T) {
 // TestCoronaRefreshWithTimeout tests refresh with proper timeout handling
 func TestCoronaRefreshWithTimeout(t *testing.T) {
 	// Run with timeout to prevent hanging
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -156,12 +156,12 @@ func TestCoronaRefreshWithTimeout(t *testing.T) {
 			}
 			done <- true
 		}()
-		
+
 		for _, id := range partyIDs {
 			cfg := configs[id]
 			sessionID := []byte("test-corona-refresh")
 			startFunc := corona.Refresh(cfg, partyIDs, threshold, pl)
-			
+
 			// Try to create session
 			session, err := startFunc(sessionID)
 			if err != nil {
@@ -171,7 +171,7 @@ func TestCoronaRefreshWithTimeout(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Wait for completion or timeout
 	select {
 	case <-done:

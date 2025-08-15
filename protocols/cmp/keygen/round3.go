@@ -157,7 +157,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 		// Not ready to advance yet - return ourselves to wait for more messages
 		return r, nil
 	}
-	
+
 	// c = ⊕ⱼ cⱼ
 	chainKey := r.PreviousChainKey
 	if chainKey == nil {
@@ -195,7 +195,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	if !ok || paillierSelf == nil {
 		return r, errors.New("invalid paillier public key for self")
 	}
-	
+
 	// Load Pedersen parameters for self
 	pedersenValue, ok := r.Pedersen.Load(r.SelfID())
 	if !ok {
@@ -205,7 +205,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	if !ok || pedersenSelf == nil {
 		return r, errors.New("invalid pedersen parameters for self")
 	}
-	
+
 	// Prove N is a blum prime with zkmod
 	mod := zkmod.NewProof(h.Clone(), zkmod.Private{
 		P:   r.PaillierSecret.P(),
@@ -239,7 +239,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if !ok || pedersenJ == nil {
 			return r, fmt.Errorf("invalid pedersen parameters for party %s", j)
 		}
-		
+
 		// Prove that the factors of N are relatively large
 		fac := zkfac.NewProof(zkfac.Private{P: r.PaillierSecret.P(), Q: r.PaillierSecret.Q()}, h.Clone(), zkfac.Public{
 			N:   paillierSelf.N(),

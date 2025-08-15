@@ -13,20 +13,20 @@ type TestConfig struct {
 	RoundTimeout    time.Duration
 	ProtocolTimeout time.Duration
 	TestTimeout     time.Duration
-	
+
 	// Concurrency
 	Workers         int
 	PriorityWorkers int
 	BufferSize      int
 	PriorityBuffer  int
-	
+
 	// Network
-	UseZMQ          bool
-	BasePort        int
-	
+	UseZMQ   bool
+	BasePort int
+
 	// Debug
-	EnableLogging   bool
-	LogLevel        string
+	EnableLogging bool
+	LogLevel      string
 }
 
 // DefaultTestConfig returns sensible defaults for unit tests
@@ -37,17 +37,17 @@ func DefaultTestConfig() *TestConfig {
 		RoundTimeout:    10 * time.Second,
 		ProtocolTimeout: 30 * time.Second,
 		TestTimeout:     60 * time.Second,
-		
+
 		// Sufficient concurrency
 		Workers:         4,
 		PriorityWorkers: 4,
 		BufferSize:      10000,
 		PriorityBuffer:  1000,
-		
+
 		// Local network
 		UseZMQ:   false,
 		BasePort: 50000,
-		
+
 		// Debug off by default
 		EnableLogging: false,
 		LogLevel:      "info",

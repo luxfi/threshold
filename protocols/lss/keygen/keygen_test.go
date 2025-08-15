@@ -20,10 +20,10 @@ func TestKeygenStart(t *testing.T) {
 	threshold := 2
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	startFunc := keygen.Start(selfID, participants, threshold, group, pl)
 	assert.NotNil(t, startFunc)
-	
+
 	// Test that the start function creates a session
 	sessionID := []byte("test-session")
 	session, err := startFunc(sessionID)
@@ -33,29 +33,29 @@ func TestKeygenStart(t *testing.T) {
 
 func TestKeygenWithNetwork(t *testing.T) {
 	// Simplified test that validates keygen initialization
-	
+
 	group := curve.Secp256k1{}
 	n := 3
 	threshold := 2
 	partyIDs := test.PartyIDs(n)
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Test that we can create keygen handlers for all parties
 	handlers := make([]*protocol.MultiHandler, n)
 	for i, id := range partyIDs {
 		startFunc := keygen.Start(id, partyIDs, threshold, group, pl)
 		require.NotNil(t, startFunc, "Start function should not be nil for party %s", id)
-		
+
 		h, err := protocol.NewMultiHandler(startFunc, nil)
 		require.NoError(t, err, "Should create handler for party %s", id)
 		require.NotNil(t, h, "Handler should not be nil for party %s", id)
 		handlers[i] = h
 	}
-	
+
 	// Verify all handlers were created successfully
 	assert.Equal(t, n, len(handlers), "Should have created %d handlers", n)
-	
+
 	// Test passes - keygen can be initialized for all parties
 	t.Log("Keygen initialization successful for all parties")
 }
@@ -64,7 +64,7 @@ func TestKeygenParameters(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	testCases := []struct {
 		name         string
 		participants []party.ID
@@ -96,7 +96,7 @@ func TestKeygenParameters(t *testing.T) {
 			expectError:  true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectError {

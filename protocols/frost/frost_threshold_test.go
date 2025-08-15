@@ -34,21 +34,21 @@ func TestFROSTThresholdPerformance(t *testing.T) {
 			allParties := test.PartyIDs(tc.n)
 			signingParties := allParties[:tc.threshold+1]
 			group := curve.Secp256k1{}
-			
+
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			// Quick keygen initialization test
 			for _, id := range signingParties {
 				startFunc := frost.Keygen(group, id, allParties, tc.threshold)
 				require.NotNil(t, startFunc, "Keygen should initialize for party %s", id)
-				
+
 				// Test that start function creates a valid round
 				round, err := startFunc(nil)
 				require.NoError(t, err)
 				require.NotNil(t, round)
 			}
-			
+
 			t.Logf("%s: FROST threshold performance test passed with %d signers", tc.name, len(signingParties))
 		})
 	}
@@ -58,62 +58,62 @@ func TestFROSTThresholdPerformance(t *testing.T) {
 func TestFROSTMinimalParties(t *testing.T) {
 	N := 5
 	T := 3
-	
+
 	partyIDs := test.PartyIDs(N)
 	// Use only T+1 parties for the protocol
 	activeParties := partyIDs[:T+1]
 	group := curve.Secp256k1{}
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	
+
 	var wg sync.WaitGroup
 	errors := make(chan error, len(activeParties))
-	
+
 	for _, id := range activeParties {
 		wg.Add(1)
 		go func(partyID party.ID) {
 			defer wg.Done()
-			
+
 			startFunc := frost.Keygen(group, partyID, partyIDs, T)
 			if startFunc == nil {
 				errors <- fmt.Errorf("nil start function for party %s", partyID)
 				return
 			}
-			
+
 			round, err := startFunc(nil)
 			if err != nil {
 				errors <- err
 				return
 			}
-			
+
 			if round == nil {
 				errors <- fmt.Errorf("nil round for party %s", partyID)
 				return
 			}
-			
+
 			// Just test initialization, don't run full protocol
 			errors <- nil
 		}(id)
 	}
-	
+
 	// Wait with timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Logf("FROST minimal parties test completed successfully with %d/%d parties", T+1, N)
 	case <-ctx.Done():
 		t.Logf("FROST minimal parties test completed (timeout expected for full protocol)")
 	}
-	
+
 	// Check for any errors
 	close(errors)
 	for err := range errors {
@@ -125,19 +125,19 @@ func TestFROSTMinimalParties(t *testing.T) {
 func TestFROSTSubsetSigners(t *testing.T) {
 	N := 7
 	T := 4
-	
+
 	partyIDs := test.PartyIDs(N)
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Test different valid signer subsets
 	subsets := [][]party.ID{
-		partyIDs[:T+1],     // First T+1 parties
-		partyIDs[1:T+2],     // Middle T+1 parties
-		partyIDs[N-T-1:],    // Last T+1 parties
+		partyIDs[:T+1],    // First T+1 parties
+		partyIDs[1 : T+2], // Middle T+1 parties
+		partyIDs[N-T-1:],  // Last T+1 parties
 	}
-	
+
 	for i, signers := range subsets {
 		t.Run(fmt.Sprintf("Subset%d", i+1), func(t *testing.T) {
 			// Create mock configs for testing
@@ -148,7 +148,7 @@ func TestFROSTSubsetSigners(t *testing.T) {
 				privateShareBytes := make([]byte, 32)
 				privateShareBytes[0] = byte(i + 1) // Simple non-zero value
 				privateShare.UnmarshalBinary(privateShareBytes)
-				
+
 				// Create verification shares
 				verificationSharesMap := make(map[party.ID]curve.Point)
 				for j, pid := range partyIDs {
@@ -158,7 +158,7 @@ func TestFROSTSubsetSigners(t *testing.T) {
 					shareScalar.UnmarshalBinary(shareBytes)
 					verificationSharesMap[pid] = shareScalar.ActOnBase()
 				}
-				
+
 				configs[id] = &frost.Config{
 					ID:                 id,
 					Threshold:          T,
@@ -167,7 +167,7 @@ func TestFROSTSubsetSigners(t *testing.T) {
 					VerificationShares: party.NewPointMap(verificationSharesMap),
 				}
 			}
-			
+
 			// Test that we can create sign protocol with subset
 			message := []byte("test message")
 			for _, signer := range signers {
@@ -177,7 +177,7 @@ func TestFROSTSubsetSigners(t *testing.T) {
 					t.Logf("Sign function created for signer %s in subset %d", signer, i+1)
 				}
 			}
-			
+
 			require.Equal(t, T+1, len(signers), "Should have exactly T+1 signers")
 			t.Logf("Subset %d: Successfully tested with %d signers", i+1, len(signers))
 		})
@@ -195,33 +195,33 @@ func TestFROSTPerformanceScaling(t *testing.T) {
 		{5, 3, 2 * time.Second},
 		{7, 5, 3 * time.Second},
 	}
-	
+
 	group := curve.Secp256k1{}
-	
+
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%d-of-%d", tc.threshold, tc.n), func(t *testing.T) {
 			partyIDs := test.PartyIDs(tc.n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			start := time.Now()
-			
+
 			// Initialize keygen for all parties
 			var initTime time.Duration
 			for _, id := range partyIDs {
 				startFunc := frost.Keygen(group, id, partyIDs, tc.threshold)
 				require.NotNil(t, startFunc)
-				
+
 				round, err := startFunc(nil)
 				require.NoError(t, err)
 				require.NotNil(t, round)
 			}
-			
+
 			initTime = time.Since(start)
-			require.Less(t, initTime, tc.maxTime, 
+			require.Less(t, initTime, tc.maxTime,
 				"Initialization for %d parties should complete within %v", tc.n, tc.maxTime)
-			
-			t.Logf("%d-of-%d: Initialization completed in %v (limit: %v)", 
+
+			t.Logf("%d-of-%d: Initialization completed in %v (limit: %v)",
 				tc.threshold, tc.n, initTime, tc.maxTime)
 		})
 	}
@@ -231,22 +231,22 @@ func TestFROSTPerformanceScaling(t *testing.T) {
 func TestFROSTOptimizedKeygen(t *testing.T) {
 	N := 5
 	T := 3
-	
+
 	partyIDs := test.PartyIDs(N)
 	group := curve.Secp256k1{}
-	
+
 	// Use optimized pool settings
 	pl := pool.NewPool(4) // Use 4 workers for parallelization
 	defer pl.TearDown()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	// Test with minimum required parties
 	activeParties := partyIDs[:T+1]
-	
+
 	results := make(chan error, len(activeParties))
-	
+
 	for _, id := range activeParties {
 		go func(partyID party.ID) {
 			startFunc := frost.Keygen(group, partyID, partyIDs, T)
@@ -254,13 +254,13 @@ func TestFROSTOptimizedKeygen(t *testing.T) {
 				results <- fmt.Errorf("nil start function for party %s", partyID)
 				return
 			}
-			
+
 			round, err := startFunc(nil)
 			if err != nil {
 				results <- err
 				return
 			}
-			
+
 			if round != nil {
 				results <- nil
 			} else {
@@ -268,7 +268,7 @@ func TestFROSTOptimizedKeygen(t *testing.T) {
 			}
 		}(id)
 	}
-	
+
 	// Collect results with timeout
 	successCount := 0
 	for i := 0; i < len(activeParties); i++ {
@@ -284,9 +284,9 @@ func TestFROSTOptimizedKeygen(t *testing.T) {
 			break
 		}
 	}
-	
-	require.Equal(t, len(activeParties), successCount, 
+
+	require.Equal(t, len(activeParties), successCount,
 		"All %d active parties should initialize successfully", len(activeParties))
-	
+
 	t.Logf("FROST optimized keygen: %d/%d parties initialized successfully", successCount, len(activeParties))
 }

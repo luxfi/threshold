@@ -100,19 +100,19 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Load values from sync.Map for self ID
 	ridValue, _ := r.RIDs.Load(r.SelfID())
 	rid, _ := ridValue.(types.RID)
-	
+
 	chainKeyValue, _ := r.ChainKeys.Load(r.SelfID())
 	chainKey, _ := chainKeyValue.(types.RID)
-	
+
 	vssPolyValue, _ := r.VSSPolynomials.Load(r.SelfID())
 	vssPoly, _ := vssPolyValue.(*polynomial.Exponent)
-	
+
 	elGamalValue, _ := r.ElGamalPublic.Load(r.SelfID())
 	elGamal, _ := elGamalValue.(curve.Point)
-	
+
 	pedersenValue, _ := r.Pedersen.Load(r.SelfID())
 	pedersen, _ := pedersenValue.(*pedersen.Parameters)
-	
+
 	// Send the message we created in Round1 to all
 	err := r.BroadcastMessage(out, &broadcast3{
 		RID:                rid,

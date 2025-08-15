@@ -199,13 +199,13 @@ func (r *blindingRoundII) BroadcastContent() round.BroadcastContent {
 func (r *blindingRoundII) Finalize(_ chan<- *round.Message) (round.Session, error) {
 	// Verify we have enough blinded shares
 	if len(r.blindedShares) < r.config.Threshold {
-		return nil, fmt.Errorf("insufficient blinded shares: have %d, need %d", 
+		return nil, fmt.Errorf("insufficient blinded shares: have %d, need %d",
 			len(r.blindedShares), r.config.Threshold)
 	}
 
 	// Use first threshold signers for computation
 	contributingSigners := r.signers[:r.config.Threshold]
-	
+
 	// Compute Lagrange coefficients
 	lagrange := polynomial.Lagrange(r.config.Group, contributingSigners)
 
@@ -230,30 +230,30 @@ func (r *blindingRoundII) Finalize(_ chan<- *round.Message) (round.Session, erro
 	unblindedSecret := r.config.Group.NewScalar()
 	unblindedSecret = unblindedSecret.Set(blindedSecret)
 	unblindedSecret = unblindedSecret.Sub(betaTimesT)
-	
+
 	// Divide by alpha
 	alphaInv := r.config.Group.NewScalar().Set(r.alpha).Invert()
 	unblindedSecret = unblindedSecret.Mul(alphaInv)
 
 	// At this point, unblindedSecret should be the original secret a
 	// Now proceed with standard ECDSA signing using the recovered secret
-	
+
 	// For simplicity, we'll create a signature directly
 	// In practice, this would follow the full ECDSA protocol
 	k := sample.Scalar(rand.Reader, r.config.Group) // Nonce
 	R := k.ActOnBase()
-	
+
 	// Extract r from R
 	rBytes, _ := R.MarshalBinary()
 	r.r = r.config.Group.NewScalar()
 	_ = r.r.UnmarshalBinary(rBytes[:32])
-	
+
 	// Compute s = k^{-1} * (hash + r * secret)
 	kInv := r.config.Group.NewScalar().Set(k).Invert()
 	hashNat := new(saferith.Nat).SetBytes(r.messageHash)
 	hash := r.config.Group.NewScalar()
 	hash.SetNat(hashNat.Mod(hashNat, r.config.Group.Order())) // Simplified hash conversion
-	
+
 	r.s = r.config.Group.NewScalar()
 	r.s = r.s.Set(r.r)
 	r.s = r.s.Mul(unblindedSecret)
@@ -300,13 +300,13 @@ func (r *blindingRoundIII) Finalize(_ chan<- *round.Message) (round.Session, err
 func startBlindingProtocolII(c *config.Config, signers []party.ID, messageHash []byte, sessionID []byte, pl *pool.Pool) (round.Session, error) {
 	// Protocol II uses additional commitment rounds and verification
 	// This provides stronger security guarantees against malicious adversaries
-	
+
 	// For now, we'll use Protocol I as a base
 	// Full Protocol II would add:
 	// 1. Commitment phase for blinding factors
 	// 2. Zero-knowledge proofs of correct blinding
 	// 3. Verification of blinded share consistency
 	// 4. Additional rounds for enhanced security
-	
+
 	return startBlindingProtocolI(c, signers, messageHash, sessionID, pl)
 }

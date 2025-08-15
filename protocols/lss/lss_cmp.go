@@ -238,14 +238,14 @@ func verifyResharingCMP(
 	// Get the original public key from old configs
 	var oldPublicKey curve.Point
 	var group curve.Curve
-	
+
 	// Get first old config to extract public key and group
 	for _, cfg := range oldConfigs {
 		oldPublicKey = cfg.PublicPoint()
 		group = cfg.Group
 		break
 	}
-	
+
 	// Verify new shares reconstruct to the same public key
 	// Use Lagrange interpolation with new threshold parties
 	newPartyIDs := make([]party.ID, 0, len(newConfigs))
@@ -255,15 +255,15 @@ func verifyResharingCMP(
 			break
 		}
 	}
-	
+
 	if len(newPartyIDs) < newThreshold {
-		return fmt.Errorf("insufficient new parties for verification: have %d, need %d", 
+		return fmt.Errorf("insufficient new parties for verification: have %d, need %d",
 			len(newPartyIDs), newThreshold)
 	}
-	
+
 	// Compute Lagrange coefficients for the new parties
 	lagrange := polynomial.Lagrange(group, newPartyIDs)
-	
+
 	// Reconstruct public key from new shares
 	reconstructedKey := group.NewPoint()
 	for _, pid := range newPartyIDs {
@@ -271,32 +271,32 @@ func verifyResharingCMP(
 		if cfg == nil {
 			return fmt.Errorf("missing config for party %s", pid)
 		}
-		
+
 		// Get the public share for this party
 		publicShare := cfg.ECDSA.ActOnBase()
-		
+
 		// Apply Lagrange coefficient
 		if coeff, exists := lagrange[pid]; exists {
 			contribution := coeff.Act(publicShare)
 			reconstructedKey = reconstructedKey.Add(contribution)
 		}
 	}
-	
+
 	// Verify the reconstructed key matches the original
 	if !reconstructedKey.Equal(oldPublicKey) {
 		return errors.New("resharing verification failed: public keys do not match")
 	}
-	
+
 	// Additional verification: check threshold consistency
 	if oldThreshold > len(oldConfigs) {
-		return fmt.Errorf("old threshold %d exceeds old party count %d", 
+		return fmt.Errorf("old threshold %d exceeds old party count %d",
 			oldThreshold, len(oldConfigs))
 	}
 	if newThreshold > len(newConfigs) {
-		return fmt.Errorf("new threshold %d exceeds new party count %d", 
+		return fmt.Errorf("new threshold %d exceeds new party count %d",
 			newThreshold, len(newConfigs))
 	}
-	
+
 	return nil
 }
 

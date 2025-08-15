@@ -27,7 +27,7 @@ func RunKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold i
 	shares := make(map[party.ID]curve.Scalar)
 	coefficients := make([]curve.Scalar, threshold)
 	coefficients[0] = masterSecret
-	
+
 	for i := 1; i < threshold; i++ {
 		coefficients[i] = sample.Scalar(rand.Reader, group)
 	}
@@ -36,7 +36,7 @@ func RunKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold i
 	for _, id := range partyIDs {
 		x := id.Scalar(group)
 		share := group.NewScalar().Set(coefficients[0])
-		
+
 		// Evaluate polynomial at x using Horner's method
 		xPower := group.NewScalar().Set(x)
 		for j := 1; j < threshold; j++ {
@@ -45,13 +45,13 @@ func RunKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold i
 			share = share.Add(term)
 			xPower = xPower.Mul(x)
 		}
-		
+
 		shares[id] = share
 	}
 
 	// Create configs for each party
 	configs := make(map[party.ID]*config.Config)
-	
+
 	for _, id := range partyIDs {
 		cfg := &config.Config{
 			ID:         id,
@@ -85,7 +85,7 @@ func RunKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold i
 // RunSign executes a signing protocol for testing
 func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.ID, messageHash []byte) *ecdsa.Signature {
 	require.True(t, len(messageHash) == 32, "message hash must be 32 bytes")
-	
+
 	// Get first config to extract group and threshold
 	var group curve.Curve
 	var threshold int
@@ -94,7 +94,7 @@ func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.
 		threshold = cfg.Threshold
 		break
 	}
-	
+
 	require.True(t, len(signers) >= threshold, "insufficient signers")
 
 	// Generate nonce k
@@ -110,7 +110,7 @@ func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.
 	// Compute s using threshold signatures
 	// s = k^{-1} * (m + r * x)
 	// where x is reconstructed from shares
-	
+
 	// First, reconstruct the private key using Lagrange interpolation
 	// (only for testing - in real protocol this never happens)
 	signerConfigs := make([]*config.Config, 0, threshold)
@@ -119,7 +119,7 @@ func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.
 	}
 
 	privateKey := reconstructPrivateKey(group, signerConfigs)
-	
+
 	// Compute s = k^{-1} * (m + r * privateKey)
 	rx := group.NewScalar().Set(r).Mul(privateKey)
 	s := group.NewScalar().Set(m).Add(rx)
@@ -151,7 +151,7 @@ func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 			break
 		}
 	}
-	
+
 	masterSecret := reconstructPrivateKey(group, oldConfigSlice)
 	masterPublic := masterSecret.ActOnBase()
 
@@ -159,7 +159,7 @@ func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 	shares := make(map[party.ID]curve.Scalar)
 	coefficients := make([]curve.Scalar, newThreshold)
 	coefficients[0] = masterSecret
-	
+
 	for i := 1; i < newThreshold; i++ {
 		coefficients[i] = sample.Scalar(rand.Reader, group)
 	}
@@ -168,7 +168,7 @@ func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 	for _, id := range newPartyIDs {
 		x := id.Scalar(group)
 		share := group.NewScalar().Set(coefficients[0])
-		
+
 		// Evaluate polynomial at x using Horner's method
 		// share = a_0 + x*(a_1 + x*(a_2 + ... ))
 		xPower := group.NewScalar().Set(x)
@@ -178,13 +178,13 @@ func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 			share = share.Add(term)
 			xPower = xPower.Mul(x)
 		}
-		
+
 		shares[id] = share
 	}
 
 	// Create new configs
 	newConfigs := make(map[party.ID]*config.Config)
-	
+
 	for _, id := range newPartyIDs {
 		cfg := &config.Config{
 			ID:         id,
@@ -224,7 +224,7 @@ func RunProtocols(t *testing.T, protocols map[party.ID]protocol.StartFunc, sessi
 	// For testing, we just return mock configs
 	// In a real implementation, we'd run the full protocol
 	results := make(map[party.ID]interface{})
-	
+
 	for id := range protocols {
 		results[id] = &config.Config{
 			ID:        id,
@@ -255,10 +255,10 @@ func VerifySignature(sig *ecdsa.Signature, publicKey curve.Point, messageHash []
 func reconstructPrivateKey(group curve.Curve, configs []*config.Config) curve.Scalar {
 	// Use Lagrange interpolation to reconstruct the secret
 	// This is only for testing - never done in production
-	
+
 	partyIDs := make([]party.ID, len(configs))
 	shares := make(map[party.ID]curve.Scalar)
-	
+
 	for i, cfg := range configs {
 		partyIDs[i] = cfg.ID
 		shares[cfg.ID] = cfg.ECDSA
@@ -266,33 +266,33 @@ func reconstructPrivateKey(group curve.Curve, configs []*config.Config) curve.Sc
 
 	// Compute Lagrange coefficients
 	result := group.NewScalar()
-	
+
 	for i, xi := range partyIDs {
 		numerator := group.NewScalar().SetNat(new(saferith.Nat).SetUint64(1).Mod(new(saferith.Nat).SetUint64(1), group.Order()))
 		denominator := group.NewScalar().SetNat(new(saferith.Nat).SetUint64(1).Mod(new(saferith.Nat).SetUint64(1), group.Order()))
-		
+
 		for j, xj := range partyIDs {
 			if i != j {
 				// numerator *= (0 - xj)
 				negXj := group.NewScalar().Set(xj.Scalar(group)).Negate()
 				numerator = numerator.Mul(negXj)
-				
+
 				// denominator *= (xi - xj)
 				diff := group.NewScalar().Set(xi.Scalar(group))
 				diff = diff.Sub(xj.Scalar(group))
 				denominator = denominator.Mul(diff)
 			}
 		}
-		
+
 		// Compute coefficient
 		coeff := numerator.Mul(denominator.Invert())
-		
+
 		// Add contribution
 		contribution := group.NewScalar().Set(shares[xi])
 		contribution = contribution.Mul(coeff)
 		result = result.Add(contribution)
 	}
-	
+
 	return result
 }
 
