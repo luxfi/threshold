@@ -18,6 +18,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	protocolLSS   = "lss"
+	protocolCMP   = "cmp"
+	protocolFROST = "frost"
+	operationAll  = "all"
+)
+
 var (
 	// Global flags
 	configDir    string
@@ -156,11 +163,11 @@ func init() {
 
 	// Benchmark flags
 	benchCmd.Flags().Int("iterations", 10, "Number of benchmark iterations")
-	benchCmd.Flags().String("operation", "all", "Operation to benchmark: keygen, sign, reshare, all")
+	benchCmd.Flags().String("operation", operationAll, "Operation to benchmark: keygen, sign, reshare, all")
 	benchCmd.Flags().Bool("profile", false, "Enable CPU profiling")
 
 	// Test flags
-	testCmd.Flags().String("suite", "all", "Test suite to run: functional, security, property, fuzz, all")
+	testCmd.Flags().String("suite", operationAll, "Test suite to run: functional, security, property, fuzz, all")
 	testCmd.Flags().Bool("ginkgo", false, "Run Ginkgo tests")
 	testCmd.Flags().Duration("timeout", 0, "Test timeout (0 = no timeout)")
 
@@ -396,7 +403,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal signature: %w", err)
 	}
 
-	if err := os.WriteFile(outputFile, sigData, 0644); err != nil {
+	if err := os.WriteFile(outputFile, sigData, 0600); err != nil {
 		return fmt.Errorf("failed to write signature: %w", err)
 	}
 
@@ -412,8 +419,14 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get parameters
-	addParties, _ := cmd.Flags().GetStringSlice("add-parties")
-	removeParties, _ := cmd.Flags().GetStringSlice("remove-parties")
+	addParties, addErr := cmd.Flags().GetStringSlice("add-parties")
+	if addErr != nil {
+		return fmt.Errorf("failed to get add-parties flag: %w", addErr)
+	}
+	removeParties, removeErr := cmd.Flags().GetStringSlice("remove-parties")
+	if removeErr != nil {
+		return fmt.Errorf("failed to get remove-parties flag: %w", removeErr)
+	}
 
 	if threshold == 0 && len(addParties) == 0 && len(removeParties) == 0 {
 		return fmt.Errorf("must specify new threshold, parties to add, or parties to remove")
@@ -425,7 +438,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	}
 
 	var config lss.Config
-	if err := json.Unmarshal(configData, &config); err != nil {
+	if err = json.Unmarshal(configData, &config); err != nil {
 		return fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
@@ -545,7 +558,10 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	if opErr != nil {
 		return fmt.Errorf("failed to get operation flag: %w", opErr)
 	}
-	enableProfile, _ := cmd.Flags().GetBool("profile")
+	enableProfile, profileErr := cmd.Flags().GetBool("profile")
+	if profileErr != nil {
+		return fmt.Errorf("failed to get profile flag: %w", profileErr)
+	}
 
 	fmt.Printf("Running %s benchmarks for %s protocol...\n", operation, protocolName)
 	fmt.Printf("Iterations: %d\n", iterations)
@@ -566,7 +582,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("reshare benchmark only available for LSS protocol")
 		}
 		return benchmarkReshare(iterations)
-	case "all":
+	case operationAll:
 		if err := benchmarkKeygen(protocolName, iterations); err != nil {
 			return err
 		}
@@ -608,7 +624,7 @@ func runTests(cmd *cobra.Command, args []string) error {
 		return runPropertyTests(protocolName)
 	case "fuzz":
 		return runFuzzTests(protocolName)
-	case "all":
+	case operationAll:
 		if err := runFunctionalTests(protocolName); err != nil {
 			return err
 		}
