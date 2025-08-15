@@ -126,9 +126,9 @@ func init() {
 	keygenCmd.Flags().IntVarP(&parties, "parties", "N", 0, "Total number of parties (required)")
 	keygenCmd.Flags().StringVarP(&partyID, "id", "i", "", "Party ID (required)")
 	keygenCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file for config")
-	_ = keygenCmd.MarkFlagRequired("threshold")
-	_ = keygenCmd.MarkFlagRequired("parties")
-	_ = keygenCmd.MarkFlagRequired("id")
+	_ = keygenCmd.MarkFlagRequired("threshold") //nolint:errcheck
+	_ = keygenCmd.MarkFlagRequired("parties")   //nolint:errcheck
+	_ = keygenCmd.MarkFlagRequired("id")        //nolint:errcheck
 
 	// Sign flags
 	signCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input config file (required)")
@@ -136,7 +136,7 @@ func init() {
 	signCmd.Flags().StringSliceP("signers", "s", nil, "List of signer IDs")
 	signCmd.Flags().String("message", "", "Message to sign (hex encoded)")
 	signCmd.Flags().String("message-file", "", "File containing message to sign")
-	_ = signCmd.MarkFlagRequired("input")
+	_ = signCmd.MarkFlagRequired("input") //nolint:errcheck
 
 	// Reshare flags
 	reshareCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input config file (required)")
@@ -144,15 +144,15 @@ func init() {
 	reshareCmd.Flags().IntVar(&threshold, "new-threshold", 0, "New threshold value")
 	reshareCmd.Flags().StringSlice("add-parties", nil, "Parties to add")
 	reshareCmd.Flags().StringSlice("remove-parties", nil, "Parties to remove")
-	_ = reshareCmd.MarkFlagRequired("input")
+	_ = reshareCmd.MarkFlagRequired("input") //nolint:errcheck
 
 	// Verify flags
 	verifyCmd.Flags().String("signature", "", "Signature file (required)")
 	verifyCmd.Flags().String("public-key", "", "Public key file (required)")
 	verifyCmd.Flags().String("message", "", "Message (hex encoded)")
 	verifyCmd.Flags().String("message-file", "", "File containing message")
-	_ = verifyCmd.MarkFlagRequired("signature")
-	_ = verifyCmd.MarkFlagRequired("public-key")
+	_ = verifyCmd.MarkFlagRequired("signature")  //nolint:errcheck
+	_ = verifyCmd.MarkFlagRequired("public-key") //nolint:errcheck
 
 	// Benchmark flags
 	benchCmd.Flags().Int("iterations", 10, "Number of benchmark iterations")
@@ -173,12 +173,12 @@ func init() {
 	exportCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input config file (required)")
 	exportCmd.Flags().String("format", "pem", "Export format: pem, jwk, der")
 	exportCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file")
-	_ = exportCmd.MarkFlagRequired("input")
+	_ = exportCmd.MarkFlagRequired("input") //nolint:errcheck
 
 	importCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input file (required)")
 	importCmd.Flags().String("format", "pem", "Import format: pem, jwk, der")
 	importCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output config file")
-	_ = importCmd.MarkFlagRequired("input")
+	_ = importCmd.MarkFlagRequired("input") //nolint:errcheck
 
 	// Add subcommands
 	rootCmd.AddCommand(keygenCmd, signCmd, reshareCmd, verifyCmd, benchCmd,
