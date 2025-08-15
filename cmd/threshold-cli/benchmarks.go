@@ -299,7 +299,7 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 
 func extractPartyIDs(protocolName string, configs []interface{}) []party.ID {
 	partyIDs := make([]party.ID, len(configs))
-	
+
 	for i, c := range configs {
 		switch protocolName {
 		case protocolLSS:
@@ -322,7 +322,7 @@ func extractPartyIDs(protocolName string, configs []interface{}) []party.ID {
 			partyIDs[i] = cfg.ID
 		}
 	}
-	
+
 	return partyIDs
 }
 
