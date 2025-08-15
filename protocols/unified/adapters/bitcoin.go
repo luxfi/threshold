@@ -76,16 +76,16 @@ func (b *BitcoinAdapter) Digest(tx interface{}) ([]byte, error) {
 func (b *BitcoinAdapter) digestLegacy(tx *LegacyBitcoinTx) ([]byte, error) {
 	// Serialize transaction with SIGHASH
 	serialized := b.serializeLegacy(tx)
-	
+
 	// Append SIGHASH type
 	sighashBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(sighashBytes, uint32(tx.SigHash))
 	serialized = append(serialized, sighashBytes...)
-	
+
 	// Double SHA256
 	first := sha256.Sum256(serialized)
 	second := sha256.Sum256(first[:])
-	
+
 	return second[:], nil
 }
 
@@ -93,57 +93,57 @@ func (b *BitcoinAdapter) digestLegacy(tx *LegacyBitcoinTx) ([]byte, error) {
 func (b *BitcoinAdapter) digestSegwit(tx *SegwitTx) ([]byte, error) {
 	// BIP143 signature hash algorithm
 	var preimage []byte
-	
+
 	// 1. nVersion (4 bytes)
 	version := make([]byte, 4)
 	binary.LittleEndian.PutUint32(version, tx.Version)
 	preimage = append(preimage, version...)
-	
+
 	// 2. hashPrevouts (32 bytes)
 	hashPrevouts := b.computeHashPrevouts(tx)
 	preimage = append(preimage, hashPrevouts...)
-	
+
 	// 3. hashSequence (32 bytes)
 	hashSequence := b.computeHashSequence(tx)
 	preimage = append(preimage, hashSequence...)
-	
+
 	// 4. outpoint (32 + 4 bytes)
 	preimage = append(preimage, tx.InputTxID[:]...)
 	outIndex := make([]byte, 4)
 	binary.LittleEndian.PutUint32(outIndex, tx.InputIndex)
 	preimage = append(preimage, outIndex...)
-	
+
 	// 5. scriptCode
 	preimage = append(preimage, tx.ScriptCode...)
-	
+
 	// 6. amount (8 bytes)
 	amount := make([]byte, 8)
 	binary.LittleEndian.PutUint64(amount, tx.Amount)
 	preimage = append(preimage, amount...)
-	
+
 	// 7. nSequence (4 bytes)
 	sequence := make([]byte, 4)
 	binary.LittleEndian.PutUint32(sequence, tx.Sequence)
 	preimage = append(preimage, sequence...)
-	
+
 	// 8. hashOutputs (32 bytes)
 	hashOutputs := b.computeHashOutputs(tx)
 	preimage = append(preimage, hashOutputs...)
-	
+
 	// 9. nLockTime (4 bytes)
 	locktime := make([]byte, 4)
 	binary.LittleEndian.PutUint32(locktime, tx.LockTime)
 	preimage = append(preimage, locktime...)
-	
+
 	// 10. sighash type (4 bytes)
 	sighashBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(sighashBytes, uint32(tx.SigHash))
 	preimage = append(preimage, sighashBytes...)
-	
+
 	// Double SHA256
 	first := sha256.Sum256(preimage)
 	second := sha256.Sum256(first[:])
-	
+
 	return second[:], nil
 }
 
@@ -151,50 +151,50 @@ func (b *BitcoinAdapter) digestSegwit(tx *SegwitTx) ([]byte, error) {
 func (b *BitcoinAdapter) digestTaproot(tx *TaprootTx) ([]byte, error) {
 	// BIP341 signature hash algorithm for Taproot
 	var preimage []byte
-	
+
 	// Epoch (1 byte): 0x00 for BIP341
 	preimage = append(preimage, 0x00)
-	
+
 	// Control byte: hash_type (1 byte)
 	preimage = append(preimage, byte(tx.SigHash))
-	
+
 	// Transaction data
 	// nVersion (4 bytes)
 	version := make([]byte, 4)
 	binary.LittleEndian.PutUint32(version, tx.Version)
 	preimage = append(preimage, version...)
-	
+
 	// nLockTime (4 bytes)
 	locktime := make([]byte, 4)
 	binary.LittleEndian.PutUint32(locktime, tx.LockTime)
 	preimage = append(preimage, locktime...)
-	
+
 	// If ANYONECANPAY flag is not set
 	if tx.SigHash&SigHashAnyOneCanPay == 0 {
 		// sha_prevouts (32 bytes)
 		hashPrevouts := b.computeHashPrevouts(&tx.SegwitTx)
 		preimage = append(preimage, hashPrevouts...)
-		
+
 		// sha_amounts (32 bytes)
 		hashAmounts := b.computeHashAmounts(tx)
 		preimage = append(preimage, hashAmounts...)
-		
+
 		// sha_scriptpubkeys (32 bytes)
 		hashScriptPubkeys := b.computeHashScriptPubkeys(tx)
 		preimage = append(preimage, hashScriptPubkeys...)
-		
+
 		// sha_sequences (32 bytes)
 		hashSequences := b.computeHashSequence(&tx.SegwitTx)
 		preimage = append(preimage, hashSequences...)
 	}
-	
+
 	// If NONE or SINGLE
 	if tx.SigHash&0x03 != SigHashNone && tx.SigHash&0x03 != SigHashSingle {
 		// sha_outputs (32 bytes)
 		hashOutputs := b.computeHashOutputs(&tx.SegwitTx)
 		preimage = append(preimage, hashOutputs...)
 	}
-	
+
 	// Data about this input
 	// spend_type (1 byte)
 	spendType := byte(0x00) // Key path spend
@@ -202,27 +202,27 @@ func (b *BitcoinAdapter) digestTaproot(tx *TaprootTx) ([]byte, error) {
 		spendType = 0x02 // Script path spend
 	}
 	preimage = append(preimage, spendType)
-	
+
 	// Input index (4 bytes)
 	inputIndex := make([]byte, 4)
 	binary.LittleEndian.PutUint32(inputIndex, tx.InputIndex)
 	preimage = append(preimage, inputIndex...)
-	
+
 	// For script path, include additional data
 	if tx.ScriptPath {
 		// Annex (optional)
 		if len(tx.Annex) > 0 {
 			preimage = append(preimage, tx.Annex...)
 		}
-		
+
 		// Script and control block
 		preimage = append(preimage, tx.TapScript...)
 		preimage = append(preimage, tx.ControlBlock...)
 	}
-	
+
 	// Apply tagged hash "TapSighash"
 	taggedHash := b.taggedHash("TapSighash", preimage)
-	
+
 	return taggedHash, nil
 }
 
@@ -256,7 +256,7 @@ func (b *BitcoinAdapter) signSchnorr(digest []byte, share Share) (PartialSig, er
 	if len(b.taprootTweak) > 0 {
 		tweakedShare = b.applyTaprootTweak(share.Value)
 	}
-	
+
 	return &SchnorrPartialSig{
 		PartyID: share.ID,
 		R:       nil, // Computed in FROST
@@ -279,26 +279,26 @@ func (b *BitcoinAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 // aggregateECDSA combines ECDSA partial signatures with low-S
 func (b *BitcoinAdapter) aggregateECDSA(parts []PartialSig) (FullSig, error) {
 	var r, s curve.Scalar
-	
+
 	for _, part := range parts {
 		ecdsaPart, ok := part.(*ECDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid ECDSA partial signature")
 		}
-		
+
 		if r == nil && ecdsaPart.R != nil {
 			r = ecdsaPart.R
 		}
-		
+
 		if s == nil {
 			s = b.group.NewScalar()
 		}
 		s = s.Add(ecdsaPart.S)
 	}
-	
+
 	// Enforce low-S for Bitcoin
 	s = b.normalizeLowS(s)
-	
+
 	return &ECDSAFullSig{
 		R: r,
 		S: s,
@@ -309,23 +309,23 @@ func (b *BitcoinAdapter) aggregateECDSA(parts []PartialSig) (FullSig, error) {
 func (b *BitcoinAdapter) aggregateSchnorr(parts []PartialSig) (FullSig, error) {
 	var r curve.Point
 	s := b.group.NewScalar()
-	
+
 	for _, part := range parts {
 		schnorrPart, ok := part.(*SchnorrPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Schnorr partial signature")
 		}
-		
+
 		if r == nil && schnorrPart.R != nil {
 			r = schnorrPart.R
 		}
-		
+
 		s = s.Add(schnorrPart.S)
 	}
-	
+
 	// BIP340 requires x-only public keys
 	xOnlyR := b.makeXOnly(r)
-	
+
 	return &SchnorrFullSig{
 		R: xOnlyR,
 		S: s,
@@ -350,7 +350,7 @@ func (b *BitcoinAdapter) encodeECDSA(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid ECDSA signature")
 	}
-	
+
 	// DER encoding for Bitcoin
 	rBytes, _ := ecdsaSig.R.MarshalBinary()
 	sBytes, _ := ecdsaSig.S.MarshalBinary()
@@ -363,18 +363,18 @@ func (b *BitcoinAdapter) encodeSchnorr(full FullSig) ([]byte, error) {
 	if !ok {
 		return nil, errors.New("invalid Schnorr signature")
 	}
-	
+
 	// BIP340: 64 bytes (32 bytes R x-coordinate + 32 bytes s)
 	sig := make([]byte, 64)
-	
+
 	// R x-coordinate (32 bytes)
 	rBytes, _ := schnorrSig.R.MarshalBinary()
 	copy(sig[:32], rBytes)
-	
+
 	// s value (32 bytes)
 	sBytes, _ := schnorrSig.S.MarshalBinary()
 	copy(sig[32:], sBytes)
-	
+
 	return sig, nil
 }
 
@@ -384,16 +384,16 @@ func (b *BitcoinAdapter) ValidateConfig(config *UnifiedConfig) error {
 	if b.sigType == SignatureSchnorr && config.SignatureScheme != SignatureSchnorr {
 		return errors.New("Taproot requires Schnorr signatures")
 	}
-	
+
 	if b.sigType == SignatureECDSA && config.SignatureScheme != SignatureECDSA {
 		return errors.New("Legacy/SegWit requires ECDSA signatures")
 	}
-	
+
 	// Verify secp256k1 curve
 	if _, ok := config.Group.(curve.Secp256k1); !ok {
 		return errors.New("Bitcoin requires secp256k1 curve")
 	}
-	
+
 	return nil
 }
 
@@ -410,12 +410,12 @@ func (b *BitcoinAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 func (b *BitcoinAdapter) taggedHash(tag string, data []byte) []byte {
 	// BIP340 tagged hash
 	tagHash := sha256.Sum256([]byte(tag))
-	
+
 	h := sha256.New()
 	h.Write(tagHash[:])
 	h.Write(tagHash[:])
 	h.Write(data)
-	
+
 	return h.Sum(nil)
 }
 
@@ -435,17 +435,17 @@ func (b *BitcoinAdapter) makeXOnly(point curve.Point) curve.Point {
 func (b *BitcoinAdapter) encodeDER(r, s []byte) []byte {
 	// DER encoding for ECDSA
 	der := []byte{0x30} // SEQUENCE
-	
+
 	// Encode R
 	rDER := b.encodeDERInt(r)
 	// Encode S
 	sDER := b.encodeDERInt(s)
-	
+
 	// Total length
 	der = append(der, byte(len(rDER)+len(sDER)))
 	der = append(der, rDER...)
 	der = append(der, sDER...)
-	
+
 	return der
 }
 
@@ -454,12 +454,12 @@ func (b *BitcoinAdapter) encodeDERInt(val []byte) []byte {
 	for len(val) > 0 && val[0] == 0 {
 		val = val[1:]
 	}
-	
+
 	// Add padding if high bit is set
 	if len(val) > 0 && val[0]&0x80 != 0 {
 		val = append([]byte{0}, val...)
 	}
-	
+
 	result := []byte{0x02, byte(len(val))}
 	return append(result, val...)
 }
@@ -510,16 +510,16 @@ func (b *BitcoinAdapter) serializeLegacy(tx *LegacyBitcoinTx) []byte {
 	// Serialize legacy transaction
 	// Simplified - actual would follow Bitcoin serialization format
 	var buf []byte
-	
+
 	// Version
 	version := make([]byte, 4)
 	binary.LittleEndian.PutUint32(version, tx.Version)
 	buf = append(buf, version...)
-	
+
 	// Inputs
 	// Outputs
 	// Locktime
-	
+
 	return buf
 }
 
@@ -554,11 +554,11 @@ type TaprootTx struct {
 }
 
 type Input struct {
-	PrevTxID   [32]byte
-	PrevIndex  uint32
-	ScriptSig  []byte
-	Sequence   uint32
-	Witness    [][]byte
+	PrevTxID  [32]byte
+	PrevIndex uint32
+	ScriptSig []byte
+	Sequence  uint32
+	Witness   [][]byte
 }
 
 type Output struct {
@@ -600,7 +600,7 @@ func (s *SchnorrFullSig) Serialize() []byte {
 func (b *BitcoinAdapter) CreateP2TRAddress(internalKey curve.Point, scriptTree []byte) (string, error) {
 	// Compute Taproot output key
 	// Q = P + hash_tweak(P || script_tree) * G
-	
+
 	// This would implement full BIP341 address derivation
 	return "bc1p...", nil // Placeholder
 }
@@ -609,17 +609,17 @@ func (b *BitcoinAdapter) CreateP2TRAddress(internalKey curve.Point, scriptTree [
 func (b *BitcoinAdapter) CreateMultisigScript(pubkeys []curve.Point, threshold int) ([]byte, error) {
 	// Create m-of-n multisig script
 	// OP_<m> <pubkey1> ... <pubkeyn> OP_<n> OP_CHECKMULTISIG
-	
+
 	script := []byte{byte(0x50 + threshold)} // OP_m
-	
+
 	for _, pk := range pubkeys {
 		pkBytes, _ := pk.MarshalBinary()
 		script = append(script, byte(len(pkBytes)))
 		script = append(script, pkBytes...)
 	}
-	
+
 	script = append(script, byte(0x50+len(pubkeys))) // OP_n
-	script = append(script, 0xae)                     // OP_CHECKMULTISIG
-	
+	script = append(script, 0xae)                    // OP_CHECKMULTISIG
+
 	return script, nil
 }
