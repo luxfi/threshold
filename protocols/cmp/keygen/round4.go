@@ -61,7 +61,7 @@ func (r *round4) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || paillierFrom == nil {
 		return errors.New("invalid paillier public key for party")
 	}
-	
+
 	// Load Pedersen parameters for from party
 	pedersenValue, ok := r.Pedersen.Load(from)
 	if !ok {
@@ -71,7 +71,7 @@ func (r *round4) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || pedersenFrom == nil {
 		return errors.New("invalid pedersen parameters for party")
 	}
-	
+
 	// verify zkmod - use Paillier N, not Pedersen N
 	// Use a fresh hash for verification to match proof generation
 	hMod := hash.New()
@@ -108,7 +108,7 @@ func (r *round4) VerifyMessage(msg round.Message) error {
 	if !ok || paillierTo == nil {
 		return errors.New("invalid paillier public key for recipient")
 	}
-	
+
 	if !paillierTo.ValidateCiphertexts(body.Share) {
 		return errors.New("invalid ciphertext")
 	}
@@ -122,7 +122,7 @@ func (r *round4) VerifyMessage(msg round.Message) error {
 	if !ok || paillierFrom == nil {
 		return errors.New("invalid paillier public key for sender")
 	}
-	
+
 	// Load Pedersen parameters for recipient (ourselves)
 	pedersenToValue, ok := r.Pedersen.Load(r.SelfID())
 	if !ok {
@@ -132,7 +132,7 @@ func (r *round4) VerifyMessage(msg round.Message) error {
 	if !ok || pedersenTo == nil {
 		return errors.New("invalid pedersen parameters for recipient")
 	}
-	
+
 	// verify zkfac
 	// Use a fresh hash for verification to match proof generation
 	hFac := hash.New()
@@ -203,11 +203,11 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		// Not ready to advance yet - return ourselves to wait for more messages
 		return r, nil
 	}
-	
+
 	// Update hash state with RID now that all verifications are complete
 	// This was delayed from round3 to ensure proofs could be verified with pre-RID hash
 	r.UpdateHashState(r.RID)
-	
+
 	// add all shares to our secret
 	UpdatedSecretECDSA := r.Group().NewScalar()
 	if r.PreviousSecretECDSA != nil {
@@ -246,7 +246,7 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if r.PreviousPublicSharesECDSA != nil {
 			PublicECDSAShare = PublicECDSAShare.Add(r.PreviousPublicSharesECDSA[j])
 		}
-		
+
 		// Load from sync.Maps
 		elGamalValue, ok := r.ElGamalPublic.Load(j)
 		if !ok {
@@ -256,7 +256,7 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if !ok || elGamal == nil {
 			return r, errors.New("invalid ElGamal public key for party")
 		}
-		
+
 		paillierValue, ok := r.PaillierPublic.Load(j)
 		if !ok {
 			return r, errors.New("Paillier public key not found for party")
@@ -265,7 +265,7 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if !ok || paillier == nil {
 			return r, errors.New("invalid Paillier public key for party")
 		}
-		
+
 		pedersenValue, ok := r.Pedersen.Load(j)
 		if !ok {
 			return r, errors.New("Pedersen parameters not found for party")
@@ -274,7 +274,7 @@ func (r *round4) Finalize(out chan<- *round.Message) (round.Session, error) {
 		if !ok || pedersen == nil {
 			return r, errors.New("invalid Pedersen parameters for party")
 		}
-		
+
 		PublicData[j] = &config.Public{
 			ECDSA:    PublicECDSAShare,
 			ElGamal:  elGamal,

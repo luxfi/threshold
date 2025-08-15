@@ -12,10 +12,10 @@ func VerifyShareConsistency(publicKey curve.Point, verificationShares map[party.
 	if len(partyIDs) < threshold {
 		return false
 	}
-	
+
 	subset := partyIDs[:threshold]
 	lambdas := polynomial.Lagrange(publicKey.Curve(), subset)
-	
+
 	// Reconstruct public key from verification shares
 	reconstructed := publicKey.Curve().NewPoint()
 	for _, id := range subset {
@@ -25,7 +25,7 @@ func VerifyShareConsistency(publicKey curve.Point, verificationShares map[party.
 		}
 		reconstructed = reconstructed.Add(lambdas[id].Act(yShare))
 	}
-	
+
 	return reconstructed.Equal(publicKey)
 }
 

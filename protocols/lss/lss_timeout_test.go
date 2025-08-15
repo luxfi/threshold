@@ -27,7 +27,7 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Create handlers
 	createHandlers := func() map[party.ID]*protocol.Handler {
 		handlers := make(map[party.ID]*protocol.Handler)
@@ -35,7 +35,7 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 		logger := log.NewTestLogger(level.Info)
 		sessionID := []byte("test-lss-keygen")
 		cfg := protocol.DefaultConfig()
-		
+
 		for _, id := range partyIDs {
 			h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
 				lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
@@ -47,15 +47,15 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 		}
 		return handlers
 	}
-	
+
 	// Run with timeout
 	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 3*time.Second, createHandlers)
-	
+
 	// Don't fail on timeout
 	if err != nil {
 		t.Logf("LSS keygen timed out (expected): %v", err)
 	}
-	
+
 	if len(results) > 0 {
 		t.Logf("Got %d results before timeout", len(results))
 		for id, result := range results {
@@ -65,7 +65,7 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 			}
 		}
 	}
-	
+
 	// Pass if no panic
 	assert.True(t, true, "Test completed without panic")
 }
@@ -74,12 +74,12 @@ func TestLSSSimpleInit(t *testing.T) {
 	// Simple initialization test
 	n := 5
 	threshold := 3
-	
+
 	test.SimpleProtocolTest(t, "LSS-Init", n, threshold, func(ids []party.ID) bool {
 		group := curve.Secp256k1{}
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
-		
+
 		// Test that we can create keygen for all parties
 		for _, id := range ids {
 			keygen := lss.Keygen(group, id, ids, threshold, pl)
@@ -100,7 +100,7 @@ func TestLSSSignWithTimeout(t *testing.T) {
 	message := []byte("test message for LSS")
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Create mock configs
 	configs := make([]*config.Config, n)
 	for i, id := range partyIDs {
@@ -110,10 +110,10 @@ func TestLSSSignWithTimeout(t *testing.T) {
 			Threshold: threshold,
 		}
 	}
-	
+
 	// Select signers
 	signers := partyIDs[:threshold]
-	
+
 	// Create sign handlers
 	createHandlers := func() map[party.ID]*protocol.Handler {
 		handlers := make(map[party.ID]*protocol.Handler)
@@ -121,7 +121,7 @@ func TestLSSSignWithTimeout(t *testing.T) {
 		logger := log.NewTestLogger(level.Info)
 		sessionID := []byte("test-lss-sign")
 		cfg := protocol.DefaultConfig()
-		
+
 		for i, id := range signers {
 			if i < len(configs) && configs[i] != nil {
 				h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
@@ -135,18 +135,18 @@ func TestLSSSignWithTimeout(t *testing.T) {
 		}
 		return handlers
 	}
-	
+
 	// Run with timeout
 	results, err := test.RunProtocolWithTimeoutNew(t, signers, 2*time.Second, createHandlers)
-	
+
 	if err != nil {
 		t.Logf("LSS sign timed out (expected): %v", err)
 	}
-	
+
 	if len(results) > 0 {
 		t.Logf("Got %d sign results", len(results))
 	}
-	
+
 	assert.True(t, true, "Sign test completed without panic")
 }
 
@@ -161,20 +161,20 @@ func TestLSSReshareWithTimeout(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Create a mock config
 	cfg := &config.Config{
 		Group:     group,
 		ID:        oldPartyIDs[0],
 		Threshold: oldThreshold,
 	}
-	
+
 	// Test reshare initialization
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	
+
 	done := make(chan bool, 1)
-	
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -182,13 +182,13 @@ func TestLSSReshareWithTimeout(t *testing.T) {
 			}
 			done <- true
 		}()
-		
+
 		reshare := lss.Reshare(cfg, newPartyIDs, newThreshold, pl)
 		if reshare != nil {
 			t.Log("LSS reshare created successfully")
 		}
 	}()
-	
+
 	select {
 	case <-done:
 		// Completed
@@ -207,28 +207,28 @@ func TestLSSProtocolCreation(t *testing.T) {
 	message := []byte("test")
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Test keygen creation
 	for _, id := range partyIDs {
 		keygen := lss.Keygen(group, id, partyIDs, threshold, pl)
 		require.NotNil(t, keygen, "Keygen should be created for party %s", id)
 	}
-	
+
 	// Test sign creation with mock config
 	cfg := &config.Config{
 		Group:     group,
 		ID:        partyIDs[0],
 		Threshold: threshold,
 	}
-	
+
 	sign := lss.Sign(cfg, partyIDs[:threshold], message, pl)
 	require.NotNil(t, sign, "Sign should be created")
-	
+
 	// Test reshare creation
 	newPartyIDs := test.PartyIDs(7)
 	reshare := lss.Reshare(cfg, newPartyIDs, 4, pl)
 	require.NotNil(t, reshare, "Reshare should be created")
-	
+
 	t.Log("All LSS protocols can be created successfully")
 }
 
@@ -238,7 +238,7 @@ func TestLSSConfigOperations(t *testing.T) {
 	threshold := 2
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	
+
 	// Create configs
 	configs := make([]*config.Config, n)
 	for i, id := range partyIDs {
@@ -248,7 +248,7 @@ func TestLSSConfigOperations(t *testing.T) {
 			Threshold: threshold,
 		}
 	}
-	
+
 	// Test config validity
 	for i, cfg := range configs {
 		assert.NotNil(t, cfg)
@@ -256,6 +256,6 @@ func TestLSSConfigOperations(t *testing.T) {
 		assert.Equal(t, threshold, cfg.Threshold)
 		assert.Equal(t, group, cfg.Group)
 	}
-	
+
 	t.Log("LSS config operations work correctly")
 }

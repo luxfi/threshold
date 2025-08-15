@@ -3,19 +3,19 @@ package doerner_test
 import (
 	"testing"
 
-	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 func TestDoernerBasicSetup(t *testing.T) {
 	// Test basic Doerner protocol setup
 	n := 5
 	partyIDs := test.PartyIDs(n)
-	
+
 	if len(partyIDs) != n {
 		t.Errorf("Expected %d party IDs, got %d", n, len(partyIDs))
 	}
-	
+
 	// Check party ID uniqueness
 	seen := make(map[party.ID]bool)
 	for _, id := range partyIDs {
@@ -29,7 +29,7 @@ func TestDoernerBasicSetup(t *testing.T) {
 func TestDoernerPartyCount(t *testing.T) {
 	// Test various party counts
 	testCases := []int{2, 3, 5, 7, 10}
-	
+
 	for _, n := range testCases {
 		partyIDs := test.PartyIDs(n)
 		if len(partyIDs) != n {
@@ -52,7 +52,7 @@ func TestDoernerThresholdLogic(t *testing.T) {
 		{5, 6, false},
 		{10, 10, true},
 	}
-	
+
 	for _, tc := range testCases {
 		isValid := tc.threshold > 0 && tc.threshold <= tc.n
 		if isValid != tc.valid {

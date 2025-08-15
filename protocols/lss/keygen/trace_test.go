@@ -25,14 +25,14 @@ func TestTraceHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Round1 created: Number=%d, Final=%d", r1.Number(), r1.FinalRoundNumber())
-	t.Logf("SelfID=%s, PartyIDs=%v, OtherPartyIDs=%v", 
+	t.Logf("SelfID=%s, PartyIDs=%v, OtherPartyIDs=%v",
 		r1.SelfID(), r1.PartyIDs(), r1.OtherPartyIDs())
 
 	// Manually finalize round1 to see what it produces
 	out := make(chan *round.Message, 10)
 	r2, err := r1.Finalize(out)
 	close(out)
-	
+
 	if err != nil {
 		t.Fatalf("Failed to finalize round1: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestTraceHandler(t *testing.T) {
 	msgCount := 0
 	for msg := range out {
 		msgCount++
-		t.Logf("Message %d: Broadcast=%v, Round=%d", 
+		t.Logf("Message %d: Broadcast=%v, Round=%d",
 			msgCount, msg.Broadcast, msg.Content.RoundNumber())
 	}
 

@@ -14,8 +14,8 @@ import (
 
 func TestLSSKeygenNetwork(t *testing.T) {
 	group := curve.Secp256k1{}
-	n := 5  // Test with 5 parties
-	threshold := 3  // 3-of-5 threshold
+	n := 5         // Test with 5 parties
+	threshold := 3 // 3-of-5 threshold
 	partyIDs := test.PartyIDs(n)
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
@@ -33,10 +33,10 @@ func TestLSSKeygenNetwork(t *testing.T) {
 	iterations := 0
 	maxIterations := 3 // Reduced iterations for test
 	hasMessages := false
-	
+
 	for iterations < maxIterations {
 		iterations++
-		
+
 		// Try to collect some messages
 		messageCount := 0
 		for _, h := range handlers {
@@ -65,25 +65,25 @@ func TestLSSKeygenNetwork(t *testing.T) {
 				// No message available, continue
 			}
 		}
-		
+
 		t.Logf("Iteration %d: %d messages exchanged", iterations, messageCount)
-		
+
 		if messageCount == 0 {
 			break // No more messages to process
 		}
 	}
-	
+
 	// Test passes if we successfully created handlers and exchanged some messages
 	require.NotNil(t, handlers, "Handlers should be created")
 	require.Equal(t, n, len(handlers), "Should have %d handlers", n)
-	
+
 	if hasMessages {
 		t.Log("Protocol message exchange initiated successfully")
 	} else {
 		t.Log("Protocol initialized successfully (no messages generated yet)")
 	}
-	
-	// The protocol may not complete in this test environment, 
+
+	// The protocol may not complete in this test environment,
 	// but we've validated that handlers are created and can exchange messages
 	t.Logf("LSS keygen test completed with %d parties, threshold %d", n, threshold)
 }

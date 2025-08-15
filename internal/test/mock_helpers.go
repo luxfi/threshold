@@ -10,7 +10,7 @@ import (
 func CreateMockLSSConfigs(partyIDs []party.ID, threshold int) []*config.Config {
 	configs := make([]*config.Config, len(partyIDs))
 	group := curve.Secp256k1{}
-	
+
 	for i, id := range partyIDs {
 		configs[i] = &config.Config{
 			ID:        id,
@@ -21,7 +21,7 @@ func CreateMockLSSConfigs(partyIDs []party.ID, threshold int) []*config.Config {
 			RID:       []byte("mock-rid"),
 			Public:    make(map[party.ID]*config.Public),
 		}
-		
+
 		// Add public keys for all parties
 		for _, pid := range partyIDs {
 			configs[i].Public[pid] = &config.Public{
@@ -29,7 +29,7 @@ func CreateMockLSSConfigs(partyIDs []party.ID, threshold int) []*config.Config {
 			}
 		}
 	}
-	
+
 	return configs
 }
 
@@ -37,7 +37,7 @@ func CreateMockLSSConfigs(partyIDs []party.ID, threshold int) []*config.Config {
 func CreateMockFROSTConfigs(partyIDs []party.ID, threshold int) []interface{} {
 	configs := make([]interface{}, len(partyIDs))
 	group := curve.Secp256k1{}
-	
+
 	for i, id := range partyIDs {
 		// Create a mock config that satisfies FROST requirements
 		configs[i] = struct {
@@ -56,7 +56,7 @@ func CreateMockFROSTConfigs(partyIDs []party.ID, threshold int) []interface{} {
 			PublicShares: make(map[party.ID]curve.Point),
 		}
 	}
-	
+
 	return configs
 }
 
@@ -64,7 +64,7 @@ func CreateMockFROSTConfigs(partyIDs []party.ID, threshold int) []interface{} {
 func CreateMockCMPConfigs(partyIDs []party.ID, threshold int) []interface{} {
 	configs := make([]interface{}, len(partyIDs))
 	group := curve.Secp256k1{}
-	
+
 	for i, id := range partyIDs {
 		// Create a mock config that satisfies CMP requirements
 		configs[i] = struct {
@@ -83,6 +83,6 @@ func CreateMockCMPConfigs(partyIDs []party.ID, threshold int) []interface{} {
 			Nonce:     []byte("mock-nonce"),
 		}
 	}
-	
+
 	return configs
 }

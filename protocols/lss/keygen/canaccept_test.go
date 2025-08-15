@@ -40,7 +40,7 @@ func TestCanAcceptDetailed(t *testing.T) {
 	t.Logf("  Alice round: %d", aliceSession.Number())
 	t.Logf("  Bob round: %d", bobSession.Number())
 	t.Logf("  Final round: %d", aliceSession.FinalRoundNumber())
-	
+
 	// Verify sessions are compatible
 	require.Equal(t, aliceSession.ProtocolID(), bobSession.ProtocolID())
 	require.True(t, bytes.Equal(aliceSession.SSID(), bobSession.SSID()))

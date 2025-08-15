@@ -53,7 +53,7 @@ func TestLSSKeygenReshareSignPhased(t *testing.T) {
 	// Simple test that validates initialization
 	oldPartyIDs := test.PartyIDs(3)
 	threshold := 2
-	
+
 	// Test keygen initialization
 	for _, id := range oldPartyIDs {
 		startFunc := lss.Keygen(curve.Secp256k1{}, id, oldPartyIDs, threshold, pl)
@@ -64,12 +64,12 @@ func TestLSSKeygenReshareSignPhased(t *testing.T) {
 	configs := make(map[party.ID]*config.Config)
 	for _, id := range oldPartyIDs {
 		configs[id] = &config.Config{
-			ID:        id,
-			Threshold: threshold,
-			Group:     curve.Secp256k1{},
-			ECDSA:     curve.Secp256k1{}.NewScalar(),
-			ChainKey:  []byte("test-chain-key"),
-			RID:       []byte("test-rid"),
+			ID:         id,
+			Threshold:  threshold,
+			Group:      curve.Secp256k1{},
+			ECDSA:      curve.Secp256k1{}.NewScalar(),
+			ChainKey:   []byte("test-chain-key"),
+			RID:        []byte("test-rid"),
 			Generation: 0,
 		}
 	}
@@ -82,7 +82,7 @@ func TestLSSKeygenReshareSignPhased(t *testing.T) {
 			_ = startFunc
 		}
 	}
-	
+
 	t.Log("LSS keygen/reshare/sign initialization test passed")
 }
 
@@ -91,7 +91,7 @@ func TestLSSPresignPhased(t *testing.T) {
 	// Note: Presign functions are not yet implemented in the LSS protocol
 	// This test validates the test infrastructure works correctly
 	t.Log("Presign functions not yet implemented in LSS protocol")
-	
+
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -100,7 +100,7 @@ func TestLSSPresignPhased(t *testing.T) {
 	// Test that we can create the infrastructure even if presign isn't implemented
 	suite := test.NewMPCTestSuite(t, test.ProtocolLSS, 3, threshold)
 	defer suite.Cleanup()
-	
+
 	// Test initialization
 	suite.RunInitTest(func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc {
 		return lss.Keygen(group, id, partyIDs, threshold, pl)
@@ -121,7 +121,7 @@ func BenchmarkLSSSignPhased(b *testing.B) {
 	// Simple benchmark that tests initialization
 	partyIDs := test.PartyIDs(3)
 	threshold := 2
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Just test that we can create sign functions
@@ -136,10 +136,10 @@ func BenchmarkLSSSignPhased(b *testing.B) {
 				RID:       []byte("test-rid"),
 			}
 		}
-		
+
 		messageHash := make([]byte, 32)
 		_, _ = rand.Read(messageHash)
-		
+
 		signers := partyIDs[:threshold]
 		for _, id := range signers {
 			if cfg, ok := configs[id]; ok {
@@ -158,7 +158,7 @@ func BenchmarkLSSPresignPhased(b *testing.B) {
 
 	partyIDs := test.PartyIDs(3)
 	threshold := 2
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create mock configs
@@ -173,7 +173,7 @@ func BenchmarkLSSPresignPhased(b *testing.B) {
 				RID:       []byte("test-rid"),
 			}
 		}
-		
+
 		// Presign would be tested here if implemented
 		_ = configs
 	}

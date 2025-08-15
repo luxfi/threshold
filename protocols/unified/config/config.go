@@ -3,11 +3,11 @@ package config
 import (
 	"fmt"
 
+	"github.com/luxfi/threshold/internal/types"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/paillier"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pedersen"
-	"github.com/luxfi/threshold/internal/types"
 )
 
 // SignatureType represents the type of signature scheme
@@ -180,16 +180,16 @@ func (c *UnifiedConfig) IsResharing() bool {
 // Clone creates a deep copy of the configuration
 func (c *UnifiedConfig) Clone() *UnifiedConfig {
 	clone := &UnifiedConfig{
-		ID:              c.ID,
-		Threshold:       c.Threshold,
-		Generation:      c.Generation,
-		PartyIDs:        make([]party.ID, len(c.PartyIDs)),
-		SignatureScheme: c.SignatureScheme,
-		Group:           c.Group,
-		SecretShare:     c.SecretShare,
-		PublicKey:       c.PublicKey,
+		ID:                 c.ID,
+		Threshold:          c.Threshold,
+		Generation:         c.Generation,
+		PartyIDs:           make([]party.ID, len(c.PartyIDs)),
+		SignatureScheme:    c.SignatureScheme,
+		Group:              c.Group,
+		SecretShare:        c.SecretShare,
+		PublicKey:          c.PublicKey,
 		VerificationShares: make(map[party.ID]curve.Point),
-		ChainKey:        c.ChainKey,
+		ChainKey:           c.ChainKey,
 	}
 
 	copy(clone.PartyIDs, c.PartyIDs)

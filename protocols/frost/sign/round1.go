@@ -91,23 +91,23 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	if err != nil {
 		return r, err
 	}
-	
+
 	// Initialize maps with expected capacity
 	D := make(map[party.ID]curve.Point, len(r.PartyIDs()))
 	E := make(map[party.ID]curve.Point, len(r.PartyIDs()))
-	
+
 	// Store our own values using marshal/unmarshal to ensure clean copy
 	dBytes, _ := DI.MarshalBinary()
 	eBytes, _ := EI.MarshalBinary()
-	
+
 	DCopy := r.Group().NewPoint()
 	_ = DCopy.UnmarshalBinary(dBytes)
 	ECopy := r.Group().NewPoint()
 	_ = ECopy.UnmarshalBinary(eBytes)
-	
+
 	D[r.SelfID()] = DCopy
 	E[r.SelfID()] = ECopy
-	
+
 	return &round2{
 		round1: r,
 		d_i:    dI,

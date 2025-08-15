@@ -30,14 +30,14 @@ func TestIntegration(t *testing.T) {
 	// Run with timeout to prevent hanging
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		RegisterFailHandler(Fail)
 		RunSpecs(t, "Protocol Integration Suite")
 	}()
-	
+
 	select {
 	case <-done:
 		// Completed
@@ -62,9 +62,9 @@ var _ = Describe("Protocol Integration", func() {
 			partyIDs := test.PartyIDs(n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			configs := runLSSKeygen(partyIDs, threshold, group, pl)
-			
+
 			Expect(configs).To(HaveLen(n))
 			publicKey0, err := configs[0].PublicKey()
 			Expect(err).NotTo(HaveOccurred())
@@ -81,9 +81,9 @@ var _ = Describe("Protocol Integration", func() {
 			partyIDs := test.PartyIDs(n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			configs := runLSSKeygen(partyIDs, threshold, group, pl)
-			
+
 			Expect(configs).To(HaveLen(n))
 			publicKey0, err := configs[0].PublicKey()
 			Expect(err).NotTo(HaveOccurred())
@@ -100,9 +100,9 @@ var _ = Describe("Protocol Integration", func() {
 			partyIDs := test.PartyIDs(n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			configs := runLSSKeygen(partyIDs, threshold, group, pl)
-			
+
 			Expect(configs).To(HaveLen(n))
 			publicKey0, err := configs[0].PublicKey()
 			Expect(err).NotTo(HaveOccurred())
@@ -121,9 +121,9 @@ var _ = Describe("Protocol Integration", func() {
 			partyIDs := test.PartyIDs(n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			configs := runFROSTKeygen(partyIDs, threshold, group, pl)
-			
+
 			Expect(configs).To(HaveLen(n))
 			publicKey0 := configs[0].PublicKey
 			for i := 1; i < n; i++ {
@@ -140,11 +140,11 @@ var _ = Describe("Protocol Integration", func() {
 			partyIDs := test.PartyIDs(n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			// Run keygen
 			configs := runCMPKeygen(partyIDs, threshold, group, pl)
 			Expect(configs).To(HaveLen(n))
-			
+
 			// Run signing if configs are valid
 			if configs[0] != nil {
 				// CMP config structure is different, skip signing test for now
@@ -155,22 +155,22 @@ var _ = Describe("Protocol Integration", func() {
 	Describe("Protocol Comparisons", func() {
 		It("should benchmark LSS keygen", func() {
 			benchmarkResults := make(map[string]time.Duration)
-			
+
 			for _, n := range []int{3, 5, 7} {
 				threshold := n/2 + 1
 				partyIDs := test.PartyIDs(n)
 				pl := pool.NewPool(0)
-				
+
 				start := time.Now()
 				configs := runLSSKeygen(partyIDs, threshold, group, pl)
 				duration := time.Since(start)
-				
+
 				Expect(configs).To(HaveLen(n))
 				benchmarkResults[fmt.Sprintf("LSS %d-of-%d", threshold, n)] = duration
-				
+
 				pl.TearDown()
 			}
-			
+
 			fmt.Println("\n=== LSS Keygen Benchmarks ===")
 			for test, duration := range benchmarkResults {
 				fmt.Printf("%s: %v\n", test, duration)
@@ -179,22 +179,22 @@ var _ = Describe("Protocol Integration", func() {
 
 		It("should benchmark CMP keygen", func() {
 			benchmarkResults := make(map[string]time.Duration)
-			
+
 			for _, n := range []int{3, 5, 7} {
 				threshold := n/2 + 1
 				partyIDs := test.PartyIDs(n)
 				pl := pool.NewPool(0)
-				
+
 				start := time.Now()
 				configs := runCMPKeygen(partyIDs, threshold, group, pl)
 				duration := time.Since(start)
-				
+
 				Expect(configs).To(HaveLen(n))
 				benchmarkResults[fmt.Sprintf("CMP %d-of-%d", threshold, n)] = duration
-				
+
 				pl.TearDown()
 			}
-			
+
 			fmt.Println("\n=== CMP Keygen Benchmarks ===")
 			for test, duration := range benchmarkResults {
 				fmt.Printf("%s: %v\n", test, duration)
@@ -203,22 +203,22 @@ var _ = Describe("Protocol Integration", func() {
 
 		It("should benchmark FROST keygen", func() {
 			benchmarkResults := make(map[string]time.Duration)
-			
+
 			for _, n := range []int{3, 5, 7} {
 				threshold := n/2 + 1
 				partyIDs := test.PartyIDs(n)
 				pl := pool.NewPool(0)
-				
+
 				start := time.Now()
 				configs := runFROSTKeygen(partyIDs, threshold, group, pl)
 				duration := time.Since(start)
-				
+
 				Expect(configs).To(HaveLen(n))
 				benchmarkResults[fmt.Sprintf("FROST %d-of-%d", threshold, n)] = duration
-				
+
 				pl.TearDown()
 			}
-			
+
 			fmt.Println("\n=== FROST Keygen Benchmarks ===")
 			for test, duration := range benchmarkResults {
 				fmt.Printf("%s: %v\n", test, duration)
@@ -231,25 +231,25 @@ var _ = Describe("Protocol Integration", func() {
 			partyIDs := test.PartyIDs(n)
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			// LSS
 			start := time.Now()
 			lssConfigs := runLSSKeygen(partyIDs, threshold, group, pl)
 			lssTime := time.Since(start)
 			Expect(lssConfigs).To(HaveLen(n))
-			
+
 			// CMP
 			start = time.Now()
 			cmpConfigs := runCMPKeygen(partyIDs, threshold, group, pl)
 			cmpTime := time.Since(start)
 			Expect(cmpConfigs).To(HaveLen(n))
-			
+
 			// FROST
 			start = time.Now()
 			frostConfigs := runFROSTKeygen(partyIDs, threshold, group, pl)
 			frostTime := time.Since(start)
 			Expect(frostConfigs).To(HaveLen(n))
-			
+
 			fmt.Println("\n=== Protocol Comparison (5-of-3) ===")
 			fmt.Printf("LSS:   %v\n", lssTime)
 			fmt.Printf("CMP:   %v\n", cmpTime)
@@ -263,22 +263,22 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 	n := len(partyIDs)
 	handlers := make([]*protocol.Handler, n)
 	configs := make([]*lssconfig.Config, n)
-	
+
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-session")
 	config := protocol.DefaultConfig()
-	
+
 	// Create handlers
 	for i, id := range partyIDs {
 		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
 		Expect(err).NotTo(HaveOccurred())
 		handlers[i] = h
 	}
-	
+
 	// Run protocol
 	runProtocol(handlers, partyIDs)
-	
+
 	// Get results
 	for i, h := range handlers {
 		result, err := h.Result()
@@ -287,7 +287,7 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 		Expect(ok).To(BeTrue())
 		configs[i] = cfg
 	}
-	
+
 	return configs
 }
 
@@ -296,22 +296,22 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 	n := len(partyIDs)
 	handlers := make([]*protocol.Handler, n)
 	configs := make([]*cmpconfig.Config, n)
-	
+
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-session")
 	config := protocol.DefaultConfig()
-	
+
 	// Create handlers
 	for i, id := range partyIDs {
 		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), cmp.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
 		Expect(err).NotTo(HaveOccurred())
 		handlers[i] = h
 	}
-	
+
 	// Run protocol
 	runProtocol(handlers, partyIDs)
-	
+
 	// Get results
 	for i, h := range handlers {
 		result, err := h.Result()
@@ -335,7 +335,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 			}
 		}
 	}
-	
+
 	return configs
 }
 
@@ -343,22 +343,22 @@ func runCMPSign(configs []*cmpconfig.Config, partyIDs []party.ID, message []byte
 	n := len(partyIDs)
 	handlers := make([]*protocol.Handler, n)
 	signatures := make([]*ecdsa.Signature, n)
-	
+
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-sign-session")
 	config := protocol.DefaultConfig()
-	
+
 	// Create subset of signers (threshold)
 	signerIndices := []int{0, 1} // Use first threshold parties
 	signers := make([]party.ID, len(signerIndices))
 	for i, idx := range signerIndices {
 		signers[i] = partyIDs[idx]
 	}
-	
+
 	// Create handlers for signers
 	for i, idx := range signerIndices {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), 
+		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
 			cmp.Sign(configs[idx], signers, message, pl), sessionID, config)
 		if err != nil {
 			// Sign might not be implemented, return empty signatures
@@ -366,10 +366,10 @@ func runCMPSign(configs []*cmpconfig.Config, partyIDs []party.ID, message []byte
 		}
 		handlers[i] = h
 	}
-	
+
 	// Run protocol
 	runProtocol(handlers[:len(signerIndices)], signers)
-	
+
 	// Get results
 	for i, h := range handlers[:len(signerIndices)] {
 		if h != nil {
@@ -382,7 +382,7 @@ func runCMPSign(configs []*cmpconfig.Config, partyIDs []party.ID, message []byte
 			}
 		}
 	}
-	
+
 	return signatures
 }
 
@@ -391,22 +391,22 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 	n := len(partyIDs)
 	handlers := make([]*protocol.Handler, n)
 	configs := make([]*frost.Config, n)
-	
+
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-session")
 	config := protocol.DefaultConfig()
-	
+
 	// Create handlers
 	for i, id := range partyIDs {
 		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), frost.Keygen(group, id, partyIDs, threshold), sessionID, config)
 		Expect(err).NotTo(HaveOccurred())
 		handlers[i] = h
 	}
-	
+
 	// Run protocol
 	runProtocol(handlers, partyIDs)
-	
+
 	// Get results
 	for i, h := range handlers {
 		result, err := h.Result()
@@ -415,7 +415,7 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 		Expect(ok).To(BeTrue())
 		configs[i] = cfg
 	}
-	
+
 	return configs
 }
 
@@ -424,21 +424,21 @@ func runProtocol(handlers []*protocol.Handler, partyIDs []party.ID) {
 	if len(handlers) == 0 || handlers[0] == nil {
 		return
 	}
-	
+
 	// Create a test network for message routing
 	network := test.NewNetwork(partyIDs)
-	
+
 	// Start handler loops with proper synchronization
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	for i, h := range handlers {
 		if h != nil {
 			wg.Add(1)
 			go func(id party.ID, handler *protocol.Handler) {
 				defer wg.Done()
-				
+
 				// Handle incoming messages
 				go func() {
 					for {
@@ -452,7 +452,7 @@ func runProtocol(handlers []*protocol.Handler, partyIDs []party.ID) {
 						}
 					}
 				}()
-				
+
 				// Handle outgoing messages
 				go func() {
 					for {
@@ -466,21 +466,21 @@ func runProtocol(handlers []*protocol.Handler, partyIDs []party.ID) {
 						}
 					}
 				}()
-				
+
 				// Wait for result with timeout
 				resultChan := make(chan struct{})
 				go func() {
 					handler.WaitForResult()
 					close(resultChan)
 				}()
-				
+
 				select {
 				case <-resultChan:
 					// Success
 				case <-ctx.Done():
 					// Timeout
 				}
-				
+
 				// Signal network done
 				select {
 				case <-network.Done(id):
@@ -490,14 +490,14 @@ func runProtocol(handlers []*protocol.Handler, partyIDs []party.ID) {
 			}(partyIDs[i], h)
 		}
 	}
-	
+
 	// Wait for all handlers to complete (with timeout)
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// All handlers completed

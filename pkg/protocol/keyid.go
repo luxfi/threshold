@@ -3,10 +3,10 @@ package protocol
 import (
 	"sort"
 
+	"github.com/luxfi/threshold/internal/types"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/internal/types"
 )
 
 // KeyID represents a stable, phase-independent identifier for a key generation

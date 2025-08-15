@@ -25,15 +25,15 @@ func TestKeygenWithTimeout(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Create handlers with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	
+
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-keygen-timeout")
 	cfg := protocol.DefaultConfig()
-	
+
 	handlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
 		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
@@ -44,16 +44,16 @@ func TestKeygenWithTimeout(t *testing.T) {
 		}
 		handlers[i] = h
 	}
-	
+
 	// Run with timeout - expect timeout but no panic
 	done := make(chan bool, n)
-	
+
 	for i, h := range handlers {
 		if h == nil {
 			done <- false
 			continue
 		}
-		
+
 		go func(handler *protocol.Handler, idx int) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -61,7 +61,7 @@ func TestKeygenWithTimeout(t *testing.T) {
 				}
 				done <- true
 			}()
-			
+
 			// Just try to start the handler
 			select {
 			case <-handler.Listen():
@@ -71,7 +71,7 @@ func TestKeygenWithTimeout(t *testing.T) {
 			}
 		}(h, i)
 	}
-	
+
 	// Wait for completion or timeout
 	for i := 0; i < n; i++ {
 		select {
@@ -83,7 +83,7 @@ func TestKeygenWithTimeout(t *testing.T) {
 			return
 		}
 	}
-	
+
 	// Pass if no panic
 	assert.True(t, true, "Test completed without panic")
 }
@@ -99,14 +99,14 @@ func TestKeygenInitialization(t *testing.T) {
 		{5, 3, "5-party"},
 		{7, 4, "7-party"},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			partyIDs := test.PartyIDs(tc.n)
 			group := curve.Secp256k1{}
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			// Just test initialization
 			for _, id := range partyIDs {
 				keygen := lss.Keygen(group, id, partyIDs, tc.threshold, pl)
@@ -120,20 +120,20 @@ func TestKeygenQuickTimeout(t *testing.T) {
 	// Test with very quick timeout to ensure no hanging
 	n := 3
 	threshold := 2
-	
+
 	test.SimpleProtocolTest(t, "Keygen-Quick", n, threshold, func(ids []party.ID) bool {
 		group := curve.Secp256k1{}
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
-		
+
 		// Create context with very short timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		
+
 		logger := log.NewTestLogger(level.Info)
 		sessionID := []byte("quick-test")
 		cfg := protocol.DefaultConfig()
-		
+
 		// Try to create handlers
 		for _, id := range ids {
 			h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
@@ -146,7 +146,7 @@ func TestKeygenQuickTimeout(t *testing.T) {
 				// Handler created successfully
 			}
 		}
-		
+
 		// Wait for context to expire
 		<-ctx.Done()
 		return true

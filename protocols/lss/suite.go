@@ -31,7 +31,7 @@ func WithCMP(pl *pool.Pool) *Suite {
 	return NewSuite(adapters.NewCMPProtocol(pl), pl)
 }
 
-// WithFROST creates an LSS suite using FROST for Schnorr signatures  
+// WithFROST creates an LSS suite using FROST for Schnorr signatures
 func WithFROST(pl *pool.Pool) *Suite {
 	return NewSuite(adapters.NewFROSTProtocol(), pl)
 }

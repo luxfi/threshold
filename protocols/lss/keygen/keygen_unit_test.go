@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/internal/test"
+	"github.com/luxfi/threshold/pkg/party"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +14,7 @@ func TestKeygenRoundCreation(t *testing.T) {
 	n := 3
 	threshold := 2
 	partyIDs := test.PartyIDs(n)
-	
+
 	// Test that we have the right number of parties
 	assert.Equal(t, n, len(partyIDs))
 	assert.True(t, threshold > 0 && threshold <= n)
@@ -35,7 +35,7 @@ func TestKeygenValidation(t *testing.T) {
 		{"empty parties", 0, 0, true},
 		{"single party", 1, 1, false},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			hasError := tc.threshold <= 0 || tc.threshold > tc.n || tc.n == 0
@@ -46,7 +46,7 @@ func TestKeygenValidation(t *testing.T) {
 
 func TestKeygenMessageTypes(t *testing.T) {
 	// Test keygen message types
-	
+
 	// Verify message creation for each round
 	for i := 1; i <= 3; i++ {
 		t.Run(fmt.Sprintf("Round%d", i), func(t *testing.T) {
@@ -60,15 +60,15 @@ func TestKeygenPartyTracking(t *testing.T) {
 	// Test party tracking during keygen
 	n := 5
 	partyIDs := test.PartyIDs(n)
-	
+
 	// Test that all parties are tracked
 	tracked := make(map[party.ID]bool)
 	for _, id := range partyIDs {
 		tracked[id] = true
 	}
-	
+
 	assert.Equal(t, n, len(tracked), "All parties should be tracked")
-	
+
 	// Test party removal
 	delete(tracked, partyIDs[0])
 	assert.Equal(t, n-1, len(tracked), "Party should be removed")
@@ -87,7 +87,7 @@ func TestKeygenThresholdBounds(t *testing.T) {
 		{10, 5, "half threshold"},
 		{3, 2, "small group threshold"},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			assert.True(t, tc.threshold > 0, "Threshold must be positive")
@@ -107,7 +107,7 @@ func TestKeygenPolynomialDegree(t *testing.T) {
 		{5, 4},
 		{10, 9},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("threshold=%d", tc.threshold), func(t *testing.T) {
 			expectedDegree := tc.threshold - 1
@@ -120,9 +120,9 @@ func TestKeygenConcurrency(t *testing.T) {
 	// Test concurrent keygen initialization
 	n := 5
 	partyIDs := test.PartyIDs(n)
-	
+
 	done := make(chan bool, n)
-	
+
 	for _, id := range partyIDs {
 		go func(partyID party.ID) {
 			// Just test that we can create parties concurrently
@@ -130,10 +130,9 @@ func TestKeygenConcurrency(t *testing.T) {
 			done <- true
 		}(id)
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < n; i++ {
 		<-done
 	}
 }
-

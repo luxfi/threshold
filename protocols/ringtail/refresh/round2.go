@@ -21,7 +21,7 @@ type refreshRound2 struct {
 	shares          map[party.ID][]byte
 	newPolynomial   []int
 	decommit        hash.Decommitment
-	
+
 	// Received refresh shares
 	refreshShares map[party.ID][]byte
 }
@@ -69,13 +69,13 @@ func (r *refreshRound2) VerifyMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	params := r.config.GetParameters()
 	expectedSize := params.N * 8
 	if len(body.RefreshShare) != expectedSize {
 		return errors.New("invalid refresh share size")
 	}
-	
+
 	return nil
 }
 
@@ -85,7 +85,7 @@ func (r *refreshRound2) StoreMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	if r.refreshShares == nil {
 		r.refreshShares = make(map[party.ID][]byte)
 	}
@@ -99,12 +99,12 @@ func (r *refreshRound2) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	// Verify decommitment matches polynomial
 	if !verifyPolynomialCommitment(body.Polynomial, body.Decommitment, *r.Hash()) {
 		return errors.New("invalid polynomial decommitment")
 	}
-	
+
 	return nil
 }
 
@@ -117,17 +117,17 @@ func (r *refreshRound2) Finalize(out chan<- *round.Message) (round.Session, erro
 	}); err != nil {
 		return nil, err
 	}
-	
+
 	// Generate refresh shares for each new participant
 	params := r.config.GetParameters()
 	for i, partyID := range r.newParticipants {
 		share := evaluateRefreshPolynomial(r.newPolynomial, i+1, params.Q)
-		
+
 		shareBytes := make([]byte, params.N*8)
 		for j, coeff := range share {
 			binary.LittleEndian.PutUint64(shareBytes[j*8:], uint64(coeff))
 		}
-		
+
 		if partyID == r.SelfID() {
 			if r.refreshShares == nil {
 				r.refreshShares = make(map[party.ID][]byte)
@@ -141,7 +141,7 @@ func (r *refreshRound2) Finalize(out chan<- *round.Message) (round.Session, erro
 			}
 		}
 	}
-	
+
 	// Move to round 3
 	return &refreshRound3{
 		Helper:          r.Helper,
@@ -174,7 +174,7 @@ func createPolynomialCommitment(poly []int, hasher hash.Hash) ([]byte, hash.Deco
 		h.Write(coeffBytes)
 	}
 	polyHash := h.Sum(nil)
-	
+
 	commitment, decommit, _ := hasher.Commit(polyHash)
 	return commitment, decommit
 }
@@ -187,7 +187,7 @@ func verifyPolynomialCommitment(poly []int, decommit hash.Decommitment, hasher h
 		h.Write(coeffBytes)
 	}
 	polyHash := h.Sum(nil)
-	
+
 	return hasher.Decommit(polyHash, decommit, nil)
 }
 

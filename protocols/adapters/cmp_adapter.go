@@ -88,23 +88,23 @@ func (c *CMPConfigAdapter) IsCompatible(other protocol.ThresholdConfig) bool {
 	if other == nil {
 		return false
 	}
-	
+
 	// Check if public keys match
 	myPubKey, err1 := c.GetPublicKey()
 	otherPubKey, err2 := other.GetPublicKey()
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	
+
 	if !myPubKey.Equal(otherPubKey) {
 		return false
 	}
-	
+
 	// Check if groups match
 	if c.GetGroup().Name() != other.GetGroup().Name() {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -130,7 +130,7 @@ func (p *CMPProtocolAdapter) Sign(config protocol.ThresholdConfig, signers []par
 	if !ok {
 		return nil, fmt.Errorf("config is not a CMP config")
 	}
-	
+
 	return cmp.Sign(cmpAdapter.Config, signers, message, p.pool), nil
 }
 
@@ -140,7 +140,7 @@ func (p *CMPProtocolAdapter) Refresh(config protocol.ThresholdConfig) (protocol.
 	if !ok {
 		return nil, fmt.Errorf("config is not a CMP config")
 	}
-	
+
 	return cmp.Refresh(cmpAdapter.Config, p.pool), nil
 }
 

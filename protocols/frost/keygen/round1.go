@@ -118,7 +118,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	var commitment hash.Commitment
 	var decommitment hash.Decommitment
 	var err error
-	
+
 	if !r.refresh {
 		cI, err = types.NewRID(rand.Reader)
 		if err != nil {
@@ -155,16 +155,16 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		commitmentCopy = make([]byte, len(commitment))
 		copy(commitmentCopy, commitment)
 	}
-	
+
 	// Initialize sync.Maps with initial values
 	phi := &sync.Map{}
 	phi.Store(r.SelfID(), PhiI)
-	
+
 	chainKeys := &sync.Map{}
 	chainKeys.Store(r.SelfID(), cI)
-	
+
 	chainKeyCommitments := &sync.Map{}
-	
+
 	return &round2{
 		round1:               r,
 		fI:                   fI,

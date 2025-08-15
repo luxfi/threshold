@@ -59,7 +59,7 @@ func TestHandlerAcceptDebug(t *testing.T) {
 					t.Logf("  To: %s", msg.To)
 					t.Logf("  RoundNumber: %d", msg.RoundNumber)
 					t.Logf("  Data length: %d", len(msg.Data))
-					
+
 					if canAccept {
 						t.Logf("  ACCEPTED - calling Accept")
 						h.Accept(msg)
@@ -79,7 +79,7 @@ func TestHandlerAcceptDebug(t *testing.T) {
 		} else if result != nil {
 			t.Logf("Party %s has result!", partyIDs[i])
 		}
-		
+
 		// Check for more messages
 		msgChan := h.Listen()
 		select {

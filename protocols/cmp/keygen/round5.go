@@ -44,7 +44,7 @@ func (r *round5) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || schnorrCommit == nil {
 		return errors.New("invalid schnorr commitment for party")
 	}
-	
+
 	// Check if public key exists for party
 	if r.UpdatedConfig == nil || r.UpdatedConfig.Public == nil {
 		return errors.New("updated config not initialized")
@@ -52,7 +52,7 @@ func (r *round5) StoreBroadcastMessage(msg round.Message) error {
 	if _, ok := r.UpdatedConfig.Public[from]; !ok {
 		return errors.New("public key not found in updated config for party")
 	}
-	
+
 	if !body.SchnorrResponse.Verify(r.HashForID(from),
 		r.UpdatedConfig.Public[from].ECDSA,
 		schnorrCommit, nil) {

@@ -122,28 +122,28 @@ func TestSign(t *testing.T) {
 	// Test that we can create keygen functions
 	keygenSender := Keygen(testGroup, true, partyIDs[0], partyIDs[1], pl)
 	keygenReceiver := Keygen(testGroup, false, partyIDs[1], partyIDs[0], pl)
-	
+
 	require.NotNil(t, keygenSender, "Sender keygen should not be nil")
 	require.NotNil(t, keygenReceiver, "Receiver keygen should not be nil")
-	
+
 	// Create empty configs for testing
 	configSender := EmptyConfigSender(testGroup)
 	configReceiver := EmptyConfigReceiver(testGroup)
-	
+
 	require.NotNil(t, configSender, "Sender config should not be nil")
 	require.NotNil(t, configReceiver, "Receiver config should not be nil")
-	
+
 	// Test that we have valid configs
 	require.NotNil(t, configSender.Public, "Sender public key should not be nil")
 	require.NotNil(t, configReceiver.Public, "Receiver public key should not be nil")
-	
+
 	t.Log("Doerner sign initialization test passed")
 }
 
 func BenchmarkSign(t *testing.B) {
 	// Simplified benchmark that tests initialization
 	group := curve.Secp256k1{}
-	
+
 	for i := 0; i < t.N; i++ {
 		// Just test config creation
 		configSender := EmptyConfigSender(group)
