@@ -9,7 +9,7 @@ import (
 
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/protocols/unified/adapters"
+	"github.com/luxfi/threshold/protocols/lss/adapters"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -245,13 +245,15 @@ func TestBitcoinTaprootFeatures(t *testing.T) {
 		assert.Len(t, digest, 32)
 
 		// Test with tweak
+		// Note: Taproot tweak is applied to the private key during signing,
+		// not to the message digest, so the digest should be the same
 		tweak := make([]byte, 32)
 		rand.Read(tweak)
 		btc.SetTaprootTweak(tweak)
 
 		digestTweaked, err := btc.Digest(taproot)
 		require.NoError(t, err)
-		assert.NotEqual(t, digest, digestTweaked)
+		assert.Equal(t, digest, digestTweaked, "digest should be the same, tweak is applied to key")
 	})
 
 	t.Run("ScriptPath_Spending", func(t *testing.T) {
@@ -641,10 +643,10 @@ func TestAdapterErrorHandling(t *testing.T) {
 	t.Run("InvalidConfiguration", func(t *testing.T) {
 		adapter := adapters.NewBitcoinAdapter(adapters.SignatureSchnorr)
 
-		// Wrong curve for Bitcoin
+		// Wrong signature scheme for Bitcoin
 		config := &adapters.UnifiedConfig{
-			SignatureScheme: adapters.SignatureSchnorr,
-			Group:           curve.Secp256k1{}, // Using Secp256k1 as Edwards25519 not available // Wrong curve
+			SignatureScheme: adapters.SignatureEdDSA, // Bitcoin doesn't support EdDSA
+			Group:           curve.Secp256k1{},
 		}
 
 		err := adapter.ValidateConfig(config)
