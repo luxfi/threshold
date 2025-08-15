@@ -310,22 +310,35 @@ func runSign(cmd *cobra.Command, args []string) error {
 
 	// Get message
 	var message []byte
-	if msgFile, _ := cmd.Flags().GetString("message-file"); msgFile != "" {
+	msgFile, msgFileErr := cmd.Flags().GetString("message-file")
+	if msgFileErr != nil {
+		return fmt.Errorf("failed to get message-file flag: %w", msgFileErr)
+	}
+	if msgFile != "" {
 		message, err = os.ReadFile(msgFile)
 		if err != nil {
 			return fmt.Errorf("failed to read message file: %w", err)
 		}
-	} else if msgHex, _ := cmd.Flags().GetString("message"); msgHex != "" {
-		message, err = hex.DecodeString(msgHex)
-		if err != nil {
-			return fmt.Errorf("failed to decode message: %w", err)
-		}
 	} else {
-		return fmt.Errorf("either --message or --message-file must be specified")
+		msgHex, msgHexErr := cmd.Flags().GetString("message")
+		if msgHexErr != nil {
+			return fmt.Errorf("failed to get message flag: %w", msgHexErr)
+		}
+		if msgHex != "" {
+			message, err = hex.DecodeString(msgHex)
+			if err != nil {
+				return fmt.Errorf("failed to decode message: %w", err)
+			}
+		} else {
+			return fmt.Errorf("either --message or --message-file must be specified")
+		}
 	}
 
 	// Get signers
-	signerStrs, _ := cmd.Flags().GetStringSlice("signers")
+	signerStrs, signerErr := cmd.Flags().GetStringSlice("signers")
+	if signerErr != nil {
+		return fmt.Errorf("failed to get signers flag: %w", signerErr)
+	}
 	signers := make([]party.ID, len(signerStrs))
 	for i, s := range signerStrs {
 		signers[i] = party.ID(s)
@@ -340,7 +353,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 	switch protocolName {
 	case protocolLSS:
 		var config lss.Config
-		if err := json.Unmarshal(configData, &config); err != nil {
+		if err = json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal LSS config: %w", err)
 		}
 
@@ -349,7 +362,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 
 	case protocolCMP:
 		var config cmp.Config
-		if err := json.Unmarshal(configData, &config); err != nil {
+		if err = json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal CMP config: %w", err)
 		}
 
@@ -473,18 +486,28 @@ func runVerify(cmd *cobra.Command, args []string) error {
 
 	// Get message
 	var message []byte
-	if msgFile, _ := cmd.Flags().GetString("message-file"); msgFile != "" {
+	msgFile, msgFileErr := cmd.Flags().GetString("message-file")
+	if msgFileErr != nil {
+		return fmt.Errorf("failed to get message-file flag: %w", msgFileErr)
+	}
+	if msgFile != "" {
 		message, err = os.ReadFile(msgFile)
 		if err != nil {
 			return fmt.Errorf("failed to read message file: %w", err)
 		}
-	} else if msgHex, _ := cmd.Flags().GetString("message"); msgHex != "" {
-		message, err = hex.DecodeString(msgHex)
-		if err != nil {
-			return fmt.Errorf("failed to decode message: %w", err)
-		}
 	} else {
-		return fmt.Errorf("either --message or --message-file must be specified")
+		msgHex, msgHexErr := cmd.Flags().GetString("message")
+		if msgHexErr != nil {
+			return fmt.Errorf("failed to get message flag: %w", msgHexErr)
+		}
+		if msgHex != "" {
+			message, err = hex.DecodeString(msgHex)
+			if err != nil {
+				return fmt.Errorf("failed to decode message: %w", err)
+			}
+		} else {
+			return fmt.Errorf("either --message or --message-file must be specified")
+		}
 	}
 
 	// Verify based on protocol
@@ -635,13 +658,13 @@ func runExport(cmd *cobra.Command, args []string) error {
 	switch protocolName {
 	case protocolLSS:
 		var config lss.Config
-		if err := json.Unmarshal(configData, &config); err != nil {
+		if err = json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal config: %w", err)
 		}
 		exported, err = exportLSSConfig(&config, format)
 	case protocolCMP:
 		var config cmp.Config
-		if err := json.Unmarshal(configData, &config); err != nil {
+		if err = json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal config: %w", err)
 		}
 		exported, err = exportCMPConfig(&config, format)
