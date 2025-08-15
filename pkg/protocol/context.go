@@ -78,14 +78,10 @@ func Protocol(ctx context.Context) string {
 	return MustSession(ctx).Protocol
 }
 
-// LogFields returns structured logging fields from context
-func LogFields(ctx context.Context) []interface{} {
-	info := MustSession(ctx)
-	return []interface{}{
-		"protocol", info.Protocol,
-		"session", info.SessionID,
-		"self", info.SelfID,
-		"threshold", info.Threshold,
-		"parties", len(info.PartyIDs),
-	}
-}
+// Note: For logging, use the luxfi/log package directly:
+//   import "github.com/luxfi/log"
+//   log.Info("event", "session", SessionID(ctx), "self", Self(ctx))
+//
+// For metrics, use the luxfi/metric package directly:
+//   import "github.com/luxfi/metric"  
+//   metric.Inc("threshold.rounds.completed")
