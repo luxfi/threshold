@@ -43,11 +43,11 @@ func runGinkgoTests(protocolName, suite string, timeout time.Duration) error {
 
 	// Add protocol path
 	switch protocolName {
-	case "lss":
+	case protocolLSS:
 		args = append(args, "./protocols/lss")
-	case "cmp":
+	case protocolCMP:
 		args = append(args, "./protocols/cmp")
-	case "frost":
+	case protocolFROST:
 		args = append(args, "./protocols/frost")
 	}
 
@@ -215,11 +215,11 @@ func testBasicSignature(protocolName string) error {
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "frost":
+			case protocolFROST:
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 
@@ -261,13 +261,13 @@ func testBasicSignature(protocolName string) error {
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				c := configs[i].(*lss.Config)
 				h, err = protocol.NewMultiHandler(lss.Sign(c, signers, message, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				c := configs[i].(*cmp.Config)
 				h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
-			case "frost":
+			case protocolFROST:
 				c := configs[i].(*frost.Config)
 				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
 			}
@@ -484,11 +484,11 @@ func setupTestConfigs(protocolName string, n, threshold int, pl *pool.Pool, netw
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "frost":
+			case protocolFROST:
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 
@@ -533,13 +533,13 @@ func performSign(protocolName string, configs []interface{}, signers []party.ID,
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				c := cfg.(*lss.Config)
 				h, err = protocol.NewMultiHandler(lss.Sign(c, signers, message, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				c := cfg.(*cmp.Config)
 				h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
-			case "frost":
+			case protocolFROST:
 				c := cfg.(*frost.Config)
 				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
 			}
