@@ -121,6 +121,13 @@ func RunProtocolWithTimeoutNew(t testing.TB, partyIDs []party.ID, timeout time.D
 		}
 	}
 
+	// Clean up all handlers
+	for _, h := range handlers {
+		if h != nil {
+			h.Stop()
+		}
+	}
+
 	// Return partial results even on timeout
 	if len(errors) > 0 && len(results) == 0 {
 		// All failed, return first error
