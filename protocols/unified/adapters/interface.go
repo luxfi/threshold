@@ -240,6 +240,7 @@ func GetSupportedChains() []string {
 		"ethereum",
 		"bitcoin",
 		"solana",
+		"ton",
 		"cosmos",
 		"polkadot",
 		"avalanche",
