@@ -400,6 +400,9 @@ func TestRingtailAdapter(t *testing.T) {
 				SignatureScheme: SignatureRingtail,
 				Threshold:       3,
 				PartyIDs:        []party.ID{"alice", "bob", "charlie", "dave", "eve"},
+				RingtailConfig: &RingtailExtensions{
+					SecurityLevel: level,
+				},
 			}
 
 			err := adapter.ValidateConfig(config)

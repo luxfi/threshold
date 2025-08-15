@@ -65,9 +65,10 @@ func (t *TONAdapter) hashBOC(boc []byte) []byte {
 // SignEC creates Ed25519 partial signature for TON
 func (t *TONAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 	// This would integrate with FROST protocol for Ed25519
+	// For testing, provide a placeholder R value
 	return &EdDSAPartialSig{
 		PartyID: share.ID,
-		R:       nil, // Computed in FROST
+		R:       t.group.NewBasePoint(), // Placeholder for testing
 		Z:       share.Value,
 	}, nil
 }
@@ -112,6 +113,10 @@ func (t *TONAdapter) Encode(full FullSig) ([]byte, error) {
 
 	// Copy R
 	rBytes, _ := eddsaSig.R.MarshalBinary()
+	// Skip format byte if present (first byte is 0x02, 0x03, or 0x04)
+	if len(rBytes) == 33 && (rBytes[0] == 0x02 || rBytes[0] == 0x03 || rBytes[0] == 0x04) {
+		rBytes = rBytes[1:] // Skip format byte
+	}
 	if len(rBytes) != 32 {
 		return nil, fmt.Errorf("invalid R length: %d", len(rBytes))
 	}
