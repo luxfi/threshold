@@ -14,7 +14,8 @@ const (
 	SignatureEdDSA
 	SignatureSchnorr
 	SignatureBLS
-	SignatureCorona // Post-quantum lattice-based
+	SignatureCorona  // Post-quantum lattice-based
+	SignatureDilithium // Post-quantum ML-DSA (NIST standard)
 )
 
 // Share represents a party's secret share
@@ -73,9 +74,10 @@ type UnifiedConfig struct {
 	PublicKey   interface{} // curve.Point for EC, lattice public key for PQ
 
 	// Additional scheme-specific data
-	ECDSAConfig    *ECDSAExtensions
-	EdDSAConfig    *EdDSAExtensions
-	CoronaConfig *CoronaExtensions
+	ECDSAConfig     *ECDSAExtensions
+	EdDSAConfig     *EdDSAExtensions
+	CoronaConfig  *CoronaExtensions
+	DilithiumConfig *DilithiumExtensions
 
 	// Verification shares for all parties
 	VerificationShares map[party.ID]interface{}
@@ -114,6 +116,19 @@ type CoronaPreprocessing struct {
 	Round1   interface{} // Offline round 1 data
 	Round2   interface{} // Offline round 2 data
 	Consumed bool
+}
+
+// DilithiumExtensions holds Dilithium/ML-DSA specific configuration
+type DilithiumExtensions struct {
+	// NIST security level (2, 3, or 5)
+	SecurityLevel int // Maps to ML-DSA-44, ML-DSA-65, ML-DSA-87
+	
+	// Lattice parameters (auto-configured based on security level)
+	K int // Vector dimension
+	L int // Matrix dimension
+	
+	// Public seed for deterministic key generation
+	PublicSeed []byte
 }
 
 // ECDSA signature components
