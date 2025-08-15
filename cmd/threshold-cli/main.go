@@ -537,8 +537,14 @@ func runVerify(cmd *cobra.Command, args []string) error {
 }
 
 func runBenchmark(cmd *cobra.Command, args []string) error {
-	iterations, _ := cmd.Flags().GetInt("iterations")
-	operation, _ := cmd.Flags().GetString("operation")
+	iterations, iterErr := cmd.Flags().GetInt("iterations")
+	if iterErr != nil {
+		return fmt.Errorf("failed to get iterations flag: %w", iterErr)
+	}
+	operation, opErr := cmd.Flags().GetString("operation")
+	if opErr != nil {
+		return fmt.Errorf("failed to get operation flag: %w", opErr)
+	}
 	enableProfile, _ := cmd.Flags().GetBool("profile")
 
 	fmt.Printf("Running %s benchmarks for %s protocol...\n", operation, protocolName)
