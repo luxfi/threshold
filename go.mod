@@ -2,8 +2,6 @@ module github.com/luxfi/threshold
 
 go 1.24.5
 
-replace github.com/luxfi/log => ../log
-
 require (
 	github.com/cronokirby/saferith v0.33.0
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
