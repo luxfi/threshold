@@ -116,7 +116,7 @@ including LSS-MPC, CGG21 (CMP), and FROST protocols.`,
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVarP(&configDir, "config-dir", "d", "./threshold-data", "Configuration directory")
-	rootCmd.PersistentFlags().StringVarP(&protocolName, "protocol", "p", "lss", "Protocol to use: lss, cmp, frost")
+	rootCmd.PersistentFlags().StringVarP(&protocolName, "protocol", "p", protocolLSS, "Protocol to use: lss, cmp, frost")
 	rootCmd.PersistentFlags().StringVarP(&curveType, "curve", "c", "secp256k1", "Elliptic curve: secp256k1, p256, ed25519")
 	rootCmd.PersistentFlags().StringVarP(&networkAddr, "network", "n", "", "Network address for distributed mode")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
@@ -144,15 +144,15 @@ func init() {
 	reshareCmd.Flags().IntVar(&threshold, "new-threshold", 0, "New threshold value")
 	reshareCmd.Flags().StringSlice("add-parties", nil, "Parties to add")
 	reshareCmd.Flags().StringSlice("remove-parties", nil, "Parties to remove")
-	reshareCmd.MarkFlagRequired("input")
+	_ = reshareCmd.MarkFlagRequired("input")
 
 	// Verify flags
 	verifyCmd.Flags().String("signature", "", "Signature file (required)")
 	verifyCmd.Flags().String("public-key", "", "Public key file (required)")
 	verifyCmd.Flags().String("message", "", "Message (hex encoded)")
 	verifyCmd.Flags().String("message-file", "", "File containing message")
-	verifyCmd.MarkFlagRequired("signature")
-	verifyCmd.MarkFlagRequired("public-key")
+	_ = verifyCmd.MarkFlagRequired("signature")
+	_ = verifyCmd.MarkFlagRequired("public-key")
 
 	// Benchmark flags
 	benchCmd.Flags().Int("iterations", 10, "Number of benchmark iterations")
@@ -173,12 +173,12 @@ func init() {
 	exportCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input config file (required)")
 	exportCmd.Flags().String("format", "pem", "Export format: pem, jwk, der")
 	exportCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output file")
-	exportCmd.MarkFlagRequired("input")
+	_ = exportCmd.MarkFlagRequired("input")
 
 	importCmd.Flags().StringVarP(&inputFile, "input", "i", "", "Input file (required)")
 	importCmd.Flags().String("format", "pem", "Import format: pem, jwk, der")
 	importCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Output config file")
-	importCmd.MarkFlagRequired("input")
+	_ = importCmd.MarkFlagRequired("input")
 
 	// Add subcommands
 	rootCmd.AddCommand(keygenCmd, signCmd, reshareCmd, verifyCmd, benchCmd,
@@ -194,7 +194,7 @@ func main() {
 
 func runKeygen(cmd *cobra.Command, args []string) error {
 	// Create config directory
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -242,11 +242,11 @@ func runKeygen(cmd *cobra.Command, args []string) error {
 	var config interface{}
 
 	switch protocolName {
-	case "lss":
+	case protocolLSS:
 		config, err = runLSSKeygen(group, partyIDs[ourIndex], partyIDs, threshold, pl, network)
-	case "cmp":
+	case protocolCMP:
 		config, err = runCMPKeygen(group, partyIDs[ourIndex], partyIDs, threshold, pl, network)
-	case "frost":
+	case protocolFROST:
 		config, err = runFROSTKeygen(group, partyIDs[ourIndex], partyIDs, threshold, pl, network)
 	default:
 		return fmt.Errorf("unknown protocol: %s", protocolName)
@@ -338,7 +338,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 	var signature interface{}
 
 	switch protocolName {
-	case "lss":
+	case protocolLSS:
 		var config lss.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal LSS config: %w", err)
@@ -347,7 +347,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 		network := test.NewNetwork(signers)
 		signature, err = runLSSSign(&config, signers, message, pl, network)
 
-	case "cmp":
+	case protocolCMP:
 		var config cmp.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal CMP config: %w", err)
@@ -356,7 +356,7 @@ func runSign(cmd *cobra.Command, args []string) error {
 		network := test.NewNetwork(signers)
 		signature, err = runCMPSign(&config, signers, message, pl, network)
 
-	case "frost":
+	case protocolFROST:
 		var config frost.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal FROST config: %w", err)
@@ -407,7 +407,7 @@ func runReshare(cmd *cobra.Command, args []string) error {
 	}
 
 	// Currently only LSS supports resharing
-	if protocolName != "lss" {
+	if protocolName != protocolLSS {
 		return fmt.Errorf("resharing is currently only supported for LSS protocol")
 	}
 
@@ -490,10 +490,10 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	// Verify based on protocol
 	valid := false
 	switch protocolName {
-	case "lss", "cmp":
+	case protocolLSS, protocolCMP:
 		// ECDSA verification
 		valid, err = verifyECDSA(sigData, pkData, message)
-	case "frost":
+	case protocolFROST:
 		// Schnorr verification
 		valid, err = verifySchnorr(sigData, pkData, message)
 	default:
@@ -533,7 +533,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	case "sign":
 		return benchmarkSign(protocolName, iterations)
 	case "reshare":
-		if protocolName != "lss" {
+		if protocolName != protocolLSS {
 			return fmt.Errorf("reshare benchmark only available for LSS protocol")
 		}
 		return benchmarkReshare(iterations)
@@ -544,7 +544,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		if err := benchmarkSign(protocolName, iterations); err != nil {
 			return err
 		}
-		if protocolName == "lss" {
+		if protocolName == protocolLSS {
 			if err := benchmarkReshare(iterations); err != nil {
 				return err
 			}
@@ -633,19 +633,19 @@ func runExport(cmd *cobra.Command, args []string) error {
 	var exported []byte
 
 	switch protocolName {
-	case "lss":
+	case protocolLSS:
 		var config lss.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal config: %w", err)
 		}
 		exported, err = exportLSSConfig(&config, format)
-	case "cmp":
+	case protocolCMP:
 		var config cmp.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal config: %w", err)
 		}
 		exported, err = exportCMPConfig(&config, format)
-	case "frost":
+	case protocolFROST:
 		var config frost.Config
 		if err := json.Unmarshal(configData, &config); err != nil {
 			return fmt.Errorf("failed to unmarshal config: %w", err)
@@ -684,11 +684,11 @@ func runImport(cmd *cobra.Command, args []string) error {
 	var config interface{}
 
 	switch protocolName {
-	case "lss":
+	case protocolLSS:
 		config, err = importLSSConfig(data, format)
-	case "cmp":
+	case protocolCMP:
 		config, err = importCMPConfig(data, format)
-	case "frost":
+	case protocolFROST:
 		config, err = importFROSTConfig(data, format)
 	default:
 		return fmt.Errorf("unknown protocol: %s", protocolName)
