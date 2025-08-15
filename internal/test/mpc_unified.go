@@ -91,6 +91,8 @@ func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []
 
 	// Test that we can create handlers
 	sessionID := []byte(fmt.Sprintf("test-%s-init", s.protocolType))
+	handlers := make([]*protocol.Handler, 0, len(partyIDs))
+	
 	for _, id := range partyIDs {
 		startFunc := createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
 
@@ -108,6 +110,13 @@ func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []
 			"%s: Failed to create handler for party %s", s.protocolType, id)
 		require.NotNil(s.t, h,
 			"%s: Handler should not be nil for party %s", s.protocolType, id)
+		
+		handlers = append(handlers, h)
+	}
+	
+	// Clean up all handlers
+	for _, h := range handlers {
+		h.Stop()
 	}
 
 	s.t.Logf("%s initialization test passed", s.protocolType)

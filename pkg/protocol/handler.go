@@ -366,11 +366,19 @@ func (h *Handler) startWorkers() {
 	}
 
 	// Start round processor
-	go h.roundProcessor()
+	h.workerGroup.Add(1)
+	go func() {
+		defer h.workerGroup.Done()
+		h.roundProcessor()
+	}()
 
 	// Start metrics updater
 	if h.metrics != nil {
-		go h.metricsUpdater()
+		h.workerGroup.Add(1)
+		go func() {
+			defer h.workerGroup.Done()
+			h.metricsUpdater()
+		}()
 	}
 }
 
@@ -1207,6 +1215,9 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 			h.closeOnce.Do(func() {
 				close(h.out)
 			})
+			// Clean up all goroutines after closing the output channel
+			time.Sleep(10 * time.Millisecond)
+			h.cancel() // Cancel context to stop all workers
 		}()
 		return nil
 
