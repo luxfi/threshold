@@ -1,11 +1,6 @@
 run:
   timeout: 5m
   tests: true
-  # Use skip-dirs-use-default instead of skip-dirs
-  skip-dirs-use-default: true
-  # Use exclude instead of skip-files
-  exclude-files:
-    - ".*_test.go"
 
 linters:
   enable:
@@ -14,7 +9,6 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - exhaustive
     - gochecknoinits
     - goconst
@@ -47,7 +41,6 @@ linters:
     - gocognit
     - godox
     - prealloc
-    - gomnd  # Removed from enabled list
 
 linters-settings:
   depguard:
@@ -110,7 +103,7 @@ linters-settings:
   revive:
     confidence: 0
     rules:
-      - name: context-as-arg
+      - name: context-as-argument
         severity: error
         disabled: false
       - name: context-keys-type
@@ -135,6 +128,10 @@ issues:
       linters:
         - dupl
         - gosec
+
+    - path: cmd/threshold-cli/
+      linters:
+        - dupl  # Intentional duplication between benchmarks and tests
 
     - path: pkg/math/
       text: "magic number"
