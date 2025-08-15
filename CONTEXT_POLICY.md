@@ -80,15 +80,36 @@ func processRound(ctx protocol.Context) error {
 - Protocol name
 - Request/trace IDs
 
-❌ **NO**: Heavy dependencies
-- Logger instances
+❌ **NO**: Heavy dependencies or global utilities
 - Database connections
 - Network handlers
 - Cryptographic keys
 - Mutable state
 - Mutexes
 
-Keep these as explicit struct fields with proper dependency injection.
+## Global Packages - Use Directly
+
+**Don't pass these through context - use the packages directly:**
+
+### Logging
+```go
+import "github.com/luxfi/log"
+
+// Just use it directly everywhere
+log.Info("processing round", "session", sessionID, "round", roundNum)
+log.Debug("message received", "from", sender, "type", msgType)
+```
+
+### Metrics
+```go
+import "github.com/luxfi/metric"
+
+// Use directly for instrumentation
+metric.Inc("threshold.keygen.started")
+metric.Record("threshold.sign.duration", time.Since(start))
+```
+
+These are global utilities designed to be used directly - no need to thread them through context or parameters.
 
 ## Why This Pattern?
 
@@ -107,19 +128,29 @@ type Context struct {
     Network   NetworkHandler
     Storage   Database
     Logger    Logger
+    Metrics   MetricsCollector
     // ... lots of deps
 }
 
 func Sign(ctx *Context, msg []byte) error {
     ctx.Logger.Info("signing")
+    ctx.Metrics.Inc("sign.attempts")
     // ...
 }
 ```
 
-### After (minimal context)
+### After (minimal context + global packages)
 ```go
+import (
+    "github.com/luxfi/log"
+    "github.com/luxfi/metric"
+)
+
 func Sign(ctx context.Context, network NetworkHandler, msg []byte) error {
-    sessionID := protocol.SessionID(ctx)
+    // Use global packages directly
+    log.Info("signing", "session", protocol.SessionID(ctx))
+    metric.Inc("threshold.sign.attempts")
+    
     // network passed explicitly - clear dependencies
     // ...
 }
