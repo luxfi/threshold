@@ -16,6 +16,12 @@ import (
 	"github.com/luxfi/threshold/protocols/lss"
 )
 
+const (
+	protocolLSS   = "lss"
+	protocolCMP   = "cmp"
+	protocolFROST = "frost"
+)
+
 func benchmarkKeygen(protocolName string, iterations int) error {
 	fmt.Printf("\n=== Keygen Benchmark ===\n")
 
@@ -98,7 +104,9 @@ func benchmarkSign(protocolName string, iterations int) error {
 
 		for i := 0; i < iterations; i++ {
 			message := make([]byte, 32)
-			rand.Read(message)
+			if _, err := rand.Read(message); err != nil {
+				panic(fmt.Sprintf("failed to generate random message: %v", err))
+			}
 
 			start := time.Now()
 
@@ -165,7 +173,11 @@ func benchmarkReshare(iterations int) error {
 			// Clone configs for this iteration
 			iterConfigs := make([]*lss.Config, len(configs))
 			for j, c := range configs {
-				iterConfigs[j] = c.(*lss.Config)
+				cfg, ok := c.(*lss.Config)
+				if !ok {
+					panic("invalid config type for lss protocol")
+				}
+				iterConfigs[j] = cfg
 			}
 
 			start := time.Now()
@@ -218,11 +230,11 @@ func runSingleKeygen(protocolName string, n, threshold int) error {
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "frost":
+			case protocolFROST:
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 
@@ -260,11 +272,11 @@ func setupBenchmarkConfigs(protocolName string, n, threshold int) ([]interface{}
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "frost":
+			case protocolFROST:
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 
@@ -293,20 +305,32 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 
 	// Extract party IDs based on protocol
 	switch protocolName {
-	case "lss":
+	case protocolLSS:
 		partyIDs = make([]party.ID, len(configs))
 		for i, c := range configs {
-			partyIDs[i] = c.(*lss.Config).ID
+			cfg, ok := c.(*lss.Config)
+			if !ok {
+				panic("invalid config type for lss protocol")
+			}
+			partyIDs[i] = cfg.ID
 		}
-	case "cmp":
+	case protocolCMP:
 		partyIDs = make([]party.ID, len(configs))
 		for i, c := range configs {
-			partyIDs[i] = c.(*cmp.Config).ID
+			cfg, ok := c.(*cmp.Config)
+			if !ok {
+				panic("invalid config type for cmp protocol")
+			}
+			partyIDs[i] = cfg.ID
 		}
-	case "frost":
+	case protocolFROST:
 		partyIDs = make([]party.ID, len(configs))
 		for i, c := range configs {
-			partyIDs[i] = c.(*frost.Config).ID
+			cfg, ok := c.(*frost.Config)
+			if !ok {
+				panic("invalid config type for frost protocol")
+			}
+			partyIDs[i] = cfg.ID
 		}
 	}
 
@@ -323,14 +347,23 @@ func runSingleSign(protocolName string, configs []interface{}, message []byte) e
 			var err error
 
 			switch protocolName {
-			case "lss":
-				c := cfg.(*lss.Config)
+			case protocolLSS:
+				c, ok := cfg.(*lss.Config)
+				if !ok {
+					panic("invalid config type for lss protocol")
+				}
 				h, err = protocol.NewMultiHandler(lss.Sign(c, partyIDs, message, pl), nil)
-			case "cmp":
-				c := cfg.(*cmp.Config)
+			case protocolCMP:
+				c, ok := cfg.(*cmp.Config)
+				if !ok {
+					panic("invalid config type for cmp protocol")
+				}
 				h, err = protocol.NewMultiHandler(cmp.Sign(c, partyIDs, message, pl), nil)
-			case "frost":
-				c := cfg.(*frost.Config)
+			case protocolFROST:
+				c, ok := cfg.(*frost.Config)
+				if !ok {
+					panic("invalid config type for frost protocol")
+				}
 				h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
 			}
 
