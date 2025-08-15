@@ -82,9 +82,9 @@ func NewMPCTestEnvironment(t *testing.T, config MPCTestConfig) *MPCTestEnvironme
 	partyIDs := PartyIDs(config.PartyCount)
 	pl := pool.NewPool(0)
 	network := NewNetwork(partyIDs)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
-	
+
 	env := &MPCTestEnvironment{
 		Config:   config,
 		PartyIDs: partyIDs,
@@ -93,13 +93,13 @@ func NewMPCTestEnvironment(t *testing.T, config MPCTestConfig) *MPCTestEnvironme
 		ctx:      ctx,
 		cancel:   cancel,
 	}
-	
+
 	// Register cleanup
 	t.Cleanup(func() {
 		cancel()
 		pl.TearDown()
 	})
-	
+
 	return env
 }
 
@@ -114,9 +114,9 @@ func (env *MPCTestEnvironment) CreateHandler(
 	if !env.Config.Verbose {
 		logger = log.NewTestLogger(level.Error)
 	}
-	
+
 	config := protocol.DefaultConfig()
-	
+
 	h, err := protocol.NewHandler(
 		env.ctx,
 		logger,
@@ -127,7 +127,7 @@ func (env *MPCTestEnvironment) CreateHandler(
 	)
 	require.NoError(t, err, "Failed to create handler for party %s", id)
 	require.NotNil(t, h, "Handler should not be nil for party %s", id)
-	
+
 	return h
 }
 
@@ -139,24 +139,24 @@ func (env *MPCTestEnvironment) RunProtocolInitTest(
 ) {
 	t.Logf("Testing %s protocol initialization with %d parties (threshold %d)",
 		protocolName, env.Config.PartyCount, env.Config.Threshold)
-	
+
 	// Test that we can create start functions for all parties
 	startFuncs := make([]protocol.StartFunc, env.Config.PartyCount)
 	for i, id := range env.PartyIDs {
 		startFunc := createStartFunc(id)
-		require.NotNil(t, startFunc, 
+		require.NotNil(t, startFunc,
 			"%s: Start function should not be nil for party %s", protocolName, id)
 		startFuncs[i] = startFunc
 	}
-	
+
 	// Test that we can create handlers
 	sessionID := []byte(fmt.Sprintf("test-%s-init", protocolName))
 	for i, id := range env.PartyIDs {
 		h := env.CreateHandler(t, id, startFuncs[i], sessionID)
-		require.NotNil(t, h, 
+		require.NotNil(t, h,
 			"%s: Handler should not be nil for party %s", protocolName, id)
 	}
-	
+
 	t.Logf("%s initialization test passed", protocolName)
 }
 
@@ -168,33 +168,33 @@ func (env *MPCTestEnvironment) RunProtocolSimpleTest(
 ) map[party.ID]interface{} {
 	t.Logf("Running simple %s test with %d parties (threshold %d)",
 		protocolName, env.Config.PartyCount, env.Config.Threshold)
-	
+
 	sessionID := []byte(fmt.Sprintf("test-%s-simple", protocolName))
 	handlers := make(map[party.ID]*protocol.Handler)
-	
+
 	// Create handlers
 	for _, id := range env.PartyIDs {
 		startFunc := createStartFunc(id)
 		h := env.CreateHandler(t, id, startFunc, sessionID)
 		handlers[id] = h
 	}
-	
+
 	// Run simple message exchange test
 	results := make(map[party.ID]interface{})
 	resultsMu := sync.Mutex{}
-	
+
 	var wg sync.WaitGroup
 	for _, id := range env.PartyIDs {
 		wg.Add(1)
 		go func(partyID party.ID) {
 			defer wg.Done()
-			
+
 			h := handlers[partyID]
-			
+
 			// Try to collect some messages with timeout
 			msgCount := 0
 			timeout := time.After(500 * time.Millisecond)
-			
+
 		collectLoop:
 			for msgCount < 3 { // Collect up to 3 messages
 				select {
@@ -226,7 +226,7 @@ func (env *MPCTestEnvironment) RunProtocolSimpleTest(
 					break collectLoop
 				}
 			}
-			
+
 			// Try to get result (may not be ready)
 			result, err := h.Result()
 			if err == nil && result != nil {
@@ -236,21 +236,21 @@ func (env *MPCTestEnvironment) RunProtocolSimpleTest(
 			}
 		}(id)
 	}
-	
+
 	// Wait for goroutines with timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		t.Logf("%s: Simple test completed, got %d results", protocolName, len(results))
 	case <-env.ctx.Done():
 		t.Logf("%s: Simple test timed out (expected for complex protocols)", protocolName)
 	}
-	
+
 	return results
 }
 
@@ -266,7 +266,7 @@ func (env *MPCTestEnvironment) RunProtocolWithTimeout(
 		env.RunProtocolInitTest(t, protocolName, createStartFunc)
 		return nil
 	}
-	
+
 	if env.Config.SkipNetworkTest {
 		// Skip full network simulation
 		results := env.RunProtocolSimpleTest(t, protocolName, createStartFunc)
@@ -275,35 +275,35 @@ func (env *MPCTestEnvironment) RunProtocolWithTimeout(
 		}
 		return nil
 	}
-	
+
 	// Full protocol test with network simulation
 	t.Logf("Running full %s protocol test with %d parties", protocolName, env.Config.PartyCount)
-	
+
 	sessionID := []byte(fmt.Sprintf("test-%s-full", protocolName))
 	handlers := make(map[party.ID]*protocol.Handler)
 	results := make(map[party.ID]interface{})
 	resultsMu := sync.Mutex{}
-	
+
 	// Create all handlers
 	for _, id := range env.PartyIDs {
 		startFunc := createStartFunc(id)
 		h := env.CreateHandler(t, id, startFunc, sessionID)
 		handlers[id] = h
 	}
-	
+
 	// Run protocol with message routing
 	var wg sync.WaitGroup
 	for _, id := range env.PartyIDs {
 		wg.Add(1)
 		go func(partyID party.ID) {
 			defer wg.Done()
-			
+
 			h := handlers[partyID]
-			
+
 			// Run handler with timeout
 			ctx, cancel := context.WithTimeout(context.Background(), env.Config.Timeout/2)
 			defer cancel()
-			
+
 			// Message routing loop
 			go func() {
 				for {
@@ -312,7 +312,7 @@ func (env *MPCTestEnvironment) RunProtocolWithTimeout(
 						if msg == nil {
 							continue
 						}
-						
+
 						// Route message to appropriate parties
 						if msg.Broadcast {
 							for _, targetID := range env.PartyIDs {
@@ -336,7 +336,7 @@ func (env *MPCTestEnvironment) RunProtocolWithTimeout(
 					}
 				}
 			}()
-			
+
 			// Wait for result with timeout
 			resultChan := make(chan interface{}, 1)
 			go func() {
@@ -345,7 +345,7 @@ func (env *MPCTestEnvironment) RunProtocolWithTimeout(
 					resultChan <- result
 				}
 			}()
-			
+
 			select {
 			case result := <-resultChan:
 				resultsMu.Lock()
@@ -359,34 +359,34 @@ func (env *MPCTestEnvironment) RunProtocolWithTimeout(
 			}
 		}(id)
 	}
-	
+
 	// Wait for all goroutines
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
-		t.Logf("%s: Protocol completed, %d/%d parties finished", 
+		t.Logf("%s: Protocol completed, %d/%d parties finished",
 			protocolName, len(results), env.Config.PartyCount)
 	case <-env.ctx.Done():
-		t.Logf("%s: Protocol timed out after %v (this may be expected)", 
+		t.Logf("%s: Protocol timed out after %v (this may be expected)",
 			protocolName, env.Config.Timeout)
 	}
-	
+
 	// Validate results if provided
 	if validateResults != nil && len(results) > 0 {
 		return validateResults(results)
 	}
-	
+
 	// Consider test successful if we got at least one result or if initialization worked
 	if len(results) > 0 {
 		t.Logf("%s: Got %d valid results", protocolName, len(results))
 		return nil
 	}
-	
+
 	// For complex protocols, initialization success is enough
 	t.Logf("%s: Protocol initialized successfully (full completion may require more time)", protocolName)
 	return nil
@@ -416,12 +416,12 @@ func RunMPCProtocolTest(
 	// Use quick test for CI/fast feedback
 	config := QuickMPCTestConfig(partyCount, threshold)
 	env := NewMPCTestEnvironment(t, config)
-	
+
 	// Create start function wrapper
 	startFuncWrapper := func(id party.ID) protocol.StartFunc {
 		return createStartFunc(id, env.PartyIDs, env.Config.Threshold, env.Config.Group, env.Pool)
 	}
-	
+
 	// Run test
 	err := env.RunProtocolWithTimeout(t, protocolName, startFuncWrapper, nil)
 	if err != nil {

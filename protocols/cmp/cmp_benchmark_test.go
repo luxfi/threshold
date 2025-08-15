@@ -30,7 +30,7 @@ func BenchmarkCMPKeygen(b *testing.B) {
 	for _, cfg := range configs {
 		b.Run(cfg.name, func(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runCMPKeygen(b, partyIDs, cfg.threshold)
@@ -57,7 +57,7 @@ func BenchmarkCMPSign(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
 			configs := setupCMPConfigs(b, partyIDs, cfg.threshold)
 			message := []byte("benchmark message")
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runCMPSign(b, configs, partyIDs[:cfg.threshold+1], message)
@@ -83,7 +83,7 @@ func BenchmarkCMPPresign(b *testing.B) {
 			// Setup: generate configs once
 			partyIDs := test.PartyIDs(cfg.parties)
 			configs := setupCMPConfigs(b, partyIDs, cfg.threshold)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runCMPPresign(b, configs, partyIDs[:cfg.threshold+1])
@@ -109,7 +109,7 @@ func BenchmarkCMPRefresh(b *testing.B) {
 			// Setup: generate configs once
 			partyIDs := test.PartyIDs(cfg.parties)
 			configs := setupCMPConfigs(b, partyIDs, cfg.threshold)
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				runCMPRefresh(b, configs)
@@ -133,7 +133,7 @@ func BenchmarkCMPFullProtocol(b *testing.B) {
 		b.Run(cfg.name, func(b *testing.B) {
 			partyIDs := test.PartyIDs(cfg.parties)
 			message := []byte("benchmark message")
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				// Full protocol: Keygen -> Refresh -> Sign -> Presign -> PresignOnline
@@ -154,7 +154,7 @@ func setupCMPConfigs(b *testing.B, partyIDs []party.ID, threshold int) map[party
 	b.Helper()
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	configs, _ := test.GenerateConfig(curve.Secp256k1{}, len(partyIDs), threshold, rand.Reader, pl)
 	return configs
 }
@@ -163,16 +163,16 @@ func runCMPKeygen(b *testing.B, partyIDs []party.ID, threshold int) map[party.ID
 	b.Helper()
 	network := test.NewNetwork(partyIDs)
 	results := make(map[party.ID]*cmp.Config)
-	
+
 	for _, id := range partyIDs {
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
-		
+
 		h, err := protocol.NewMultiHandler(cmp.Keygen(curve.Secp256k1{}, id, partyIDs, threshold, pl), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		test.HandlerLoop(id, h, network)
 		r, err := h.Result()
 		if err != nil {
@@ -180,25 +180,25 @@ func runCMPKeygen(b *testing.B, partyIDs []party.ID, threshold int) map[party.ID
 		}
 		results[id] = r.(*cmp.Config)
 	}
-	
+
 	return results
 }
 
 func runCMPSign(b *testing.B, configs map[party.ID]*cmp.Config, signers []party.ID, message []byte) *ecdsa.Signature {
 	b.Helper()
 	network := test.NewNetwork(signers)
-	
+
 	var signature *ecdsa.Signature
 	for _, id := range signers {
 		if cfg, ok := configs[id]; ok {
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			h, err := protocol.NewMultiHandler(cmp.Sign(cfg, signers, message, pl), nil)
 			if err != nil {
 				b.Fatal(err)
 			}
-			
+
 			test.HandlerLoop(id, h, network)
 			r, err := h.Result()
 			if err != nil {
@@ -208,25 +208,25 @@ func runCMPSign(b *testing.B, configs map[party.ID]*cmp.Config, signers []party.
 			break // We only need one signature
 		}
 	}
-	
+
 	return signature
 }
 
 func runCMPPresign(b *testing.B, configs map[party.ID]*cmp.Config, signers []party.ID) *ecdsa.PreSignature {
 	b.Helper()
 	network := test.NewNetwork(signers)
-	
+
 	var presignature *ecdsa.PreSignature
 	for _, id := range signers {
 		if cfg, ok := configs[id]; ok {
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			h, err := protocol.NewMultiHandler(cmp.Presign(cfg, signers, pl), nil)
 			if err != nil {
 				b.Fatal(err)
 			}
-			
+
 			test.HandlerLoop(id, h, network)
 			r, err := h.Result()
 			if err != nil {
@@ -236,7 +236,7 @@ func runCMPPresign(b *testing.B, configs map[party.ID]*cmp.Config, signers []par
 			break
 		}
 	}
-	
+
 	return presignature
 }
 
@@ -246,19 +246,19 @@ func runCMPRefresh(b *testing.B, configs map[party.ID]*cmp.Config) map[party.ID]
 	for id := range configs {
 		partyIDs = append(partyIDs, id)
 	}
-	
+
 	network := test.NewNetwork(partyIDs)
 	refreshed := make(map[party.ID]*cmp.Config)
-	
+
 	for id, cfg := range configs {
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
-		
+
 		h, err := protocol.NewMultiHandler(cmp.Refresh(cfg, pl), nil)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		test.HandlerLoop(id, h, network)
 		r, err := h.Result()
 		if err != nil {
@@ -266,6 +266,6 @@ func runCMPRefresh(b *testing.B, configs map[party.ID]*cmp.Config) map[party.ID]
 		}
 		refreshed[id] = r.(*cmp.Config)
 	}
-	
+
 	return refreshed
 }

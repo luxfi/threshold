@@ -32,14 +32,14 @@ const (
 
 // MPCTestSuite provides a unified test suite for all MPC protocols
 type MPCTestSuite struct {
-	t          *testing.T
+	t            *testing.T
 	protocolType MPCProtocolType
-	partyCount int
-	threshold  int
-	group      curve.Curve
-	pool       *pool.Pool
-	timeout    time.Duration
-	verbose    bool
+	partyCount   int
+	threshold    int
+	group        curve.Curve
+	pool         *pool.Pool
+	timeout      time.Duration
+	verbose      bool
 }
 
 // NewMPCTestSuite creates a new unified test suite
@@ -78,65 +78,65 @@ func (s *MPCTestSuite) Cleanup() {
 // RunInitTest tests protocol initialization without full execution
 func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
 	partyIDs := PartyIDs(s.partyCount)
-	
+
 	s.t.Logf("Testing %s protocol initialization with %d parties (threshold %d)",
 		s.protocolType, s.partyCount, s.threshold)
-	
+
 	// Test that we can create start functions for all parties
 	for _, id := range partyIDs {
 		startFunc := createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
-		require.NotNil(s.t, startFunc, 
+		require.NotNil(s.t, startFunc,
 			"%s: Start function should not be nil for party %s", s.protocolType, id)
 	}
-	
+
 	// Test that we can create handlers
 	sessionID := []byte(fmt.Sprintf("test-%s-init", s.protocolType))
 	for _, id := range partyIDs {
 		startFunc := createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
-		
+
 		logger := log.NewTestLogger(level.Error)
 		if s.verbose {
 			logger = log.NewTestLogger(level.Info)
 		}
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		config := protocol.DefaultConfig()
 		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), startFunc, sessionID, config)
-		require.NoError(s.t, err, 
+		require.NoError(s.t, err,
 			"%s: Failed to create handler for party %s", s.protocolType, id)
-		require.NotNil(s.t, h, 
+		require.NotNil(s.t, h,
 			"%s: Handler should not be nil for party %s", s.protocolType, id)
 	}
-	
+
 	s.t.Logf("%s initialization test passed", s.protocolType)
 }
 
 // RunSimpleTest runs a simplified protocol test with basic message exchange
 func (s *MPCTestSuite) RunSimpleTest(createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
 	partyIDs := PartyIDs(s.partyCount)
-	
+
 	s.t.Logf("Running simple %s test with %d parties (threshold %d)",
 		s.protocolType, s.partyCount, s.threshold)
-	
+
 	// Use PhaseHarness for better timeout handling
 	harness := NewPhaseHarness(s.t, partyIDs)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	results, err := harness.RunPhase(10*time.Second, func(id party.ID) protocol.StartFunc {
 		return createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
 	})
-	
+
 	if err != nil {
 		// For complex protocols, timeout is expected
 		s.t.Logf("%s: Simple test timed out (expected for complex protocols): %v", s.protocolType, err)
 	} else if len(results) > 0 {
 		s.t.Logf("%s: Simple test completed with %d results", s.protocolType, len(results))
 	}
-	
+
 	// Even if the protocol times out, the test passes if initialization worked
 	select {
 	case <-ctx.Done():
@@ -151,26 +151,26 @@ func (s *MPCTestSuite) RunFullTest(
 	validateResults func(results map[party.ID]interface{}) error,
 ) {
 	partyIDs := PartyIDs(s.partyCount)
-	
+
 	s.t.Logf("Running full %s protocol test with %d parties", s.protocolType, s.partyCount)
-	
+
 	// Use PhaseHarness for robust message handling
 	harness := NewPhaseHarness(s.t, partyIDs)
-	
+
 	results, err := harness.RunPhase(s.timeout, func(id party.ID) protocol.StartFunc {
 		return createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
 	})
-	
+
 	if err != nil {
-		s.t.Logf("%s: Protocol timed out after %v (may be expected for complex protocols): %v", 
+		s.t.Logf("%s: Protocol timed out after %v (may be expected for complex protocols): %v",
 			s.protocolType, s.timeout, err)
 		// For complex protocols, initialization success is enough
 		return
 	}
-	
-	s.t.Logf("%s: Protocol completed, %d/%d parties finished", 
+
+	s.t.Logf("%s: Protocol completed, %d/%d parties finished",
 		s.protocolType, len(results), s.partyCount)
-	
+
 	// Validate results if provided
 	if validateResults != nil && len(results) > 0 {
 		if err := validateResults(results); err != nil {
@@ -182,15 +182,15 @@ func (s *MPCTestSuite) RunFullTest(
 // RunBenchmark runs a benchmark test for the protocol
 func (s *MPCTestSuite) RunBenchmark(b *testing.B, createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
 	partyIDs := PartyIDs(s.partyCount)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		harness := NewPhaseHarness(b, partyIDs)
-		
+
 		_, err := harness.RunPhase(s.timeout, func(id party.ID) protocol.StartFunc {
 			return createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
 		})
-		
+
 		if err != nil && s.verbose {
 			b.Logf("%s benchmark iteration %d: %v", s.protocolType, i, err)
 		}
@@ -244,7 +244,7 @@ func (h *MPCTestHelper) GetResult(id party.ID) interface{} {
 func (h *MPCTestHelper) GetAllResults() map[party.ID]interface{} {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	results := make(map[party.ID]interface{})
 	for id, result := range h.results {
 		results[id] = result
@@ -255,18 +255,18 @@ func (h *MPCTestHelper) GetAllResults() map[party.ID]interface{} {
 // StandardMPCTest runs a standard test sequence for an MPC protocol
 func StandardMPCTest(t *testing.T, protocolType MPCProtocolType, partyCount, threshold int,
 	createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
-	
+
 	suite := NewMPCTestSuite(t, protocolType, partyCount, threshold)
 	defer suite.Cleanup()
-	
+
 	t.Run("Initialization", func(t *testing.T) {
 		suite.RunInitTest(createStartFunc)
 	})
-	
+
 	t.Run("Simple", func(t *testing.T) {
 		suite.RunSimpleTest(createStartFunc)
 	})
-	
+
 	if !testing.Short() {
 		t.Run("Full", func(t *testing.T) {
 			suite.RunFullTest(createStartFunc, nil)
@@ -277,21 +277,21 @@ func StandardMPCTest(t *testing.T, protocolType MPCProtocolType, partyCount, thr
 // StandardMPCBenchmark runs a standard benchmark for an MPC protocol
 func StandardMPCBenchmark(b *testing.B, protocolType MPCProtocolType, partyCount, threshold int,
 	createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
-	
+
 	// testing.B embeds testing.TB, so we can pass it directly
 	suite := NewMPCTestSuite(&testing.T{}, protocolType, partyCount, threshold)
 	defer suite.Cleanup()
-	
+
 	suite.RunBenchmark(b, createStartFunc)
 }
 
 // QuickMPCTest runs a quick test suitable for CI/fast feedback
 func QuickMPCTest(t *testing.T, protocolType MPCProtocolType, partyCount, threshold int,
 	createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
-	
+
 	suite := NewMPCTestSuite(t, protocolType, partyCount, threshold).
 		WithTimeout(5 * time.Second)
 	defer suite.Cleanup()
-	
+
 	suite.RunInitTest(createStartFunc)
 }

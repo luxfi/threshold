@@ -26,15 +26,15 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Test with controlled timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	
+
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-lss-keygen-specific")
 	config := protocol.DefaultConfig()
-	
+
 	// Create handlers for each party
 	handlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
@@ -46,7 +46,7 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 		}
 		handlers[i] = h
 	}
-	
+
 	// Count successful handlers
 	successCount := 0
 	for _, h := range handlers {
@@ -54,10 +54,10 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 			successCount++
 		}
 	}
-	
+
 	t.Logf("Successfully created %d/%d handlers", successCount, n)
 	assert.True(t, successCount > 0, "At least one handler should be created")
-	
+
 	// Run a simple message exchange test
 	done := make(chan bool, 1)
 	go func() {
@@ -67,7 +67,7 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 			}
 			done <- true
 		}()
-		
+
 		// Just check that handlers can start
 		for _, h := range handlers {
 			if h != nil {
@@ -83,7 +83,7 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Message exchange test completed")
@@ -103,20 +103,20 @@ func TestLSSKeygenInitOnly(t *testing.T) {
 		{5, 3, "5-party"},
 		{7, 4, "7-party"},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			partyIDs := test.PartyIDs(tc.n)
 			group := curve.Secp256k1{}
 			pl := pool.NewPool(0)
 			defer pl.TearDown()
-			
+
 			// Just test that we can create the protocol
 			for _, id := range partyIDs {
 				keygen := lss.Keygen(group, id, partyIDs, tc.threshold, pl)
 				require.NotNil(t, keygen, "Keygen should be created for party %s", id)
 			}
-			
+
 			t.Logf("Successfully initialized %d-of-%d keygen", tc.threshold, tc.n)
 		})
 	}
@@ -130,24 +130,24 @@ func TestLSSKeygenRoundProgression(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Create a single handler to test
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	
+
 	logger := log.NewTestLogger(level.Info)
 	sessionID := []byte("test-round-progression")
 	config := protocol.DefaultConfig()
-	
+
 	h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
 		lss.Keygen(group, partyIDs[0], partyIDs, threshold, pl), sessionID, config)
-	
+
 	require.NoError(t, err, "Handler should be created")
 	require.NotNil(t, h, "Handler should not be nil")
-	
+
 	// Check that handler is ready
 	done := make(chan bool, 1)
-	
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -155,7 +155,7 @@ func TestLSSKeygenRoundProgression(t *testing.T) {
 			}
 			done <- true
 		}()
-		
+
 		// Try to get initial messages
 		select {
 		case msg := <-h.Listen():
@@ -166,7 +166,7 @@ func TestLSSKeygenRoundProgression(t *testing.T) {
 			t.Log("No initial message (may be waiting for input)")
 		}
 	}()
-	
+
 	select {
 	case <-done:
 		t.Log("Round progression test completed")
@@ -183,11 +183,11 @@ func TestLSSKeygenConcurrentInit(t *testing.T) {
 	group := curve.Secp256k1{}
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	
+
 	// Initialize concurrently
 	done := make(chan bool, n)
 	errors := make(chan error, n)
-	
+
 	for _, id := range partyIDs {
 		go func(partyID party.ID) {
 			defer func() {
@@ -196,18 +196,18 @@ func TestLSSKeygenConcurrentInit(t *testing.T) {
 				}
 				done <- true
 			}()
-			
+
 			keygen := lss.Keygen(group, partyID, partyIDs, threshold, pl)
 			if keygen == nil {
 				errors <- assert.AnError
 			}
 		}(id)
 	}
-	
+
 	// Wait for all goroutines
 	successCount := 0
 	errorCount := 0
-	
+
 	for i := 0; i < n; i++ {
 		select {
 		case <-done:
@@ -219,7 +219,7 @@ func TestLSSKeygenConcurrentInit(t *testing.T) {
 			return
 		}
 	}
-	
+
 	t.Logf("Concurrent init: %d succeeded, %d failed", successCount, errorCount)
 	assert.True(t, successCount > 0, "At least one concurrent init should succeed")
 }

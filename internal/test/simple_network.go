@@ -20,12 +20,12 @@ func NewNetwork(parties []party.ID) *Network {
 		messages: make(map[party.ID]chan *protocol.Message),
 		done:     make(map[party.ID]chan struct{}),
 	}
-	
+
 	for _, id := range parties {
 		n.messages[id] = make(chan *protocol.Message, 1000)
 		n.done[id] = make(chan struct{})
 	}
-	
+
 	return n
 }
 
@@ -34,10 +34,10 @@ func (n *Network) Send(msg *protocol.Message) {
 	if msg == nil {
 		return
 	}
-	
+
 	n.mu.RLock()
 	targets := make([]chan *protocol.Message, 0)
-	
+
 	if msg.To == "" {
 		// Broadcast to all parties except sender
 		for id, ch := range n.messages {
@@ -52,7 +52,7 @@ func (n *Network) Send(msg *protocol.Message) {
 		}
 	}
 	n.mu.RUnlock()
-	
+
 	// Send without holding lock to avoid deadlock
 	for _, ch := range targets {
 		ch <- msg
@@ -63,7 +63,7 @@ func (n *Network) Send(msg *protocol.Message) {
 func (n *Network) Next(id party.ID) <-chan *protocol.Message {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	
+
 	if ch, ok := n.messages[id]; ok {
 		return ch
 	}
@@ -74,7 +74,7 @@ func (n *Network) Next(id party.ID) <-chan *protocol.Message {
 func (n *Network) Done(id party.ID) <-chan struct{} {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	
+
 	if ch, ok := n.done[id]; ok {
 		return ch
 	}
@@ -88,7 +88,7 @@ func (n *Network) SetSession([]byte) {}
 func (n *Network) Close() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	
+
 	for _, ch := range n.done {
 		select {
 		case <-ch:
@@ -97,7 +97,7 @@ func (n *Network) Close() {
 			close(ch)
 		}
 	}
-	
+
 	for _, ch := range n.messages {
 		close(ch)
 	}

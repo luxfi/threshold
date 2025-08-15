@@ -18,7 +18,7 @@ func Start(cfg *config.Config, newParticipants []party.ID, newThreshold int, pl 
 		if newThreshold < 1 || newThreshold > len(newParticipants) {
 			return nil, errors.New("invalid threshold")
 		}
-		
+
 		// Check if we're part of the new group
 		inNewGroup := false
 		for _, id := range newParticipants {
@@ -30,7 +30,7 @@ func Start(cfg *config.Config, newParticipants []party.ID, newThreshold int, pl 
 		if !inNewGroup {
 			return nil, errors.New("self not in new participant list")
 		}
-		
+
 		info := round.Info{
 			ProtocolID:       "ringtail/refresh",
 			FinalRoundNumber: 3, // Refresh has 3 rounds
@@ -38,12 +38,12 @@ func Start(cfg *config.Config, newParticipants []party.ID, newThreshold int, pl 
 			PartyIDs:         newParticipants,
 			Threshold:        newThreshold,
 		}
-		
+
 		helper, err := round.NewSession(info, sessionID, pl)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Start with round 1
 		return &refreshRound1{
 			Helper:          helper,
@@ -62,7 +62,7 @@ type refreshRound1 struct {
 	newParticipants []party.ID
 	newThreshold    int
 	shares          map[party.ID][]byte
-	
+
 	// New polynomial for refresh
 	newPolynomial []int
 }
@@ -98,12 +98,12 @@ func (r *refreshRound1) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	// Validate commitment
 	if len(body.Commitment) < 32 {
 		return errors.New("invalid commitment")
 	}
-	
+
 	return nil
 }
 
@@ -112,17 +112,17 @@ func (r *refreshRound1) Finalize(out chan<- *round.Message) (round.Session, erro
 	// Generate new random polynomial for refresh
 	params := r.config.GetParameters()
 	r.newPolynomial = generateRefreshPolynomial(params.N, params.Q)
-	
+
 	// Create commitment to new polynomial
 	commitment, decommit := createPolynomialCommitment(r.newPolynomial, *r.Hash())
-	
+
 	// Broadcast commitment
 	if err := r.BroadcastMessage(out, &refreshBroadcast1{
 		Commitment: commitment,
 	}); err != nil {
 		return nil, err
 	}
-	
+
 	// Move to round 2
 	return &refreshRound2{
 		Helper:          r.Helper,

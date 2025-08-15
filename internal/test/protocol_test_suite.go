@@ -102,9 +102,9 @@ func (s *ProtocolTestSuite) RunProtocol(
 // runParty executes the protocol for a single party
 func (s *ProtocolTestSuite) runParty(id party.ID, wg *sync.WaitGroup) {
 	defer wg.Done()
-	
+
 	handler := s.handlers[id]
-	
+
 	// Message routing goroutine
 	go func() {
 		for {
@@ -138,10 +138,10 @@ func (s *ProtocolTestSuite) runParty(id party.ID, wg *sync.WaitGroup) {
 
 	// Wait for result
 	result, err := handler.WaitForResult()
-	
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if err != nil {
 		s.errors[id] = err
 	} else {
@@ -153,7 +153,7 @@ func (s *ProtocolTestSuite) runParty(id party.ID, wg *sync.WaitGroup) {
 func RunKeygenRefreshSign(t *testing.T, n, threshold int, pool *pool.Pool) {
 	parties := PartyIDs(n)
 	suite := NewProtocolTestSuite(t, parties)
-	
+
 	// Phase 1: Keygen
 	t.Log("Running keygen...")
 	keygenResults, err := suite.RunProtocol(60*time.Second, func(id party.ID) protocol.StartFunc {
@@ -162,8 +162,8 @@ func RunKeygenRefreshSign(t *testing.T, n, threshold int, pool *pool.Pool) {
 	})
 	require.NoError(t, err, "keygen should complete")
 	require.Len(t, keygenResults, n, "all parties should complete keygen")
-	
-	// Phase 2: Refresh  
+
+	// Phase 2: Refresh
 	t.Log("Running refresh...")
 	// Reset network for clean phase separation
 	suite.network = NewNetwork(parties)
@@ -173,7 +173,7 @@ func RunKeygenRefreshSign(t *testing.T, n, threshold int, pool *pool.Pool) {
 		return nil // Placeholder
 	})
 	require.NoError(t, err, "refresh should complete")
-	
+
 	// Phase 3: Sign
 	t.Log("Running sign...")
 	suite.network = NewNetwork(parties)
@@ -183,7 +183,7 @@ func RunKeygenRefreshSign(t *testing.T, n, threshold int, pool *pool.Pool) {
 		return nil // Placeholder
 	})
 	require.NoError(t, err, "sign should complete")
-	
+
 	t.Log("All phases completed successfully")
 }
 

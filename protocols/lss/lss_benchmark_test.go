@@ -38,17 +38,17 @@ func BenchmarkLSSKeygen(b *testing.B) {
 
 			b.ResetTimer()
 			start := time.Now()
-			
+
 			for i := 0; i < b.N; i++ {
 				pl := pool.NewPool(0)
 				_ = lss.Keygen(group, partyIDs[0], partyIDs, tc.threshold, pl)
 				pl.TearDown()
 			}
-			
+
 			elapsed := time.Since(start)
 			avgMs := float64(elapsed.Milliseconds()) / float64(b.N)
 			b.ReportMetric(avgMs, "ms/op")
-			
+
 			// Report actual timing for documentation
 			if b.N == 1 {
 				fmt.Printf("Key generation (%d-of-%d): ~%.2f ms\n", tc.threshold, tc.parties, avgMs)
@@ -96,7 +96,7 @@ func BenchmarkLSSSigning(b *testing.B) {
 			elapsed := time.Since(start)
 			avgMs := float64(elapsed.Milliseconds()) / float64(b.N)
 			b.ReportMetric(avgMs, "ms/op")
-			
+
 			// Report actual timing for documentation
 			if b.N == 1 {
 				fmt.Printf("Signing (%d parties): ~%.2f ms\n", tc.threshold, avgMs)
@@ -108,11 +108,11 @@ func BenchmarkLSSSigning(b *testing.B) {
 // BenchmarkLSSResharing benchmarks dynamic resharing
 func BenchmarkLSSResharing(b *testing.B) {
 	cases := []struct {
-		name        string
-		oldParties  int
-		newParties  int
-		addParties  int
-		threshold   int
+		name       string
+		oldParties int
+		newParties int
+		addParties int
+		threshold  int
 	}{
 		{"Add 2 parties (5->7)", 5, 7, 2, 3},
 		{"Add 3 parties (7->10)", 7, 10, 3, 5},
@@ -122,7 +122,7 @@ func BenchmarkLSSResharing(b *testing.B) {
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
 			group := curve.Secp256k1{}
-			
+
 			// Setup old parties
 			oldPartyIDs := make([]party.ID, tc.oldParties)
 			for i := 0; i < tc.oldParties; i++ {
@@ -158,7 +158,7 @@ func BenchmarkLSSResharing(b *testing.B) {
 			elapsed := time.Since(start)
 			avgMs := float64(elapsed.Milliseconds()) / float64(b.N)
 			b.ReportMetric(avgMs, "ms/op")
-			
+
 			// Report actual timing for documentation
 			if b.N == 1 {
 				if tc.addParties > 0 {
@@ -187,15 +187,15 @@ func BenchmarkFROSTDynamicReshare(b *testing.B) {
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
 			group := curve.Secp256k1{}
-			
+
 			// Setup old FROST configs
 			oldPartyIDs := make([]party.ID, tc.oldParties)
 			for i := 0; i < tc.oldParties; i++ {
 				oldPartyIDs[i] = party.ID(fmt.Sprintf("party_%d", i))
 			}
-			
+
 			oldConfigs := generateFROSTConfigs(group, oldPartyIDs, tc.threshold)
-			
+
 			// Setup new party IDs
 			newPartyIDs := make([]party.ID, tc.newParties)
 			for i := 0; i < tc.newParties; i++ {
@@ -212,7 +212,7 @@ func BenchmarkFROSTDynamicReshare(b *testing.B) {
 			elapsed := time.Since(start)
 			avgMs := float64(elapsed.Milliseconds()) / float64(b.N)
 			b.ReportMetric(avgMs, "ms/op")
-			
+
 			// Report actual timing
 			if b.N == 1 {
 				fmt.Printf("FROST Resharing (%d->%d parties): ~%.2f ms\n", tc.oldParties, tc.newParties, avgMs)
@@ -225,7 +225,7 @@ func BenchmarkFROSTDynamicReshare(b *testing.B) {
 func BenchmarkRollback(b *testing.B) {
 	mgr := lss.NewRollbackManager(100)
 	group := curve.Secp256k1{}
-	
+
 	// Create test configs
 	cfg := &config.Config{
 		ID:         "test",
@@ -245,12 +245,12 @@ func BenchmarkRollback(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		targetGen := uint64(i % 25) // Rollback to various generations
 		_, _ = mgr.Rollback(targetGen)
 	}
-	
+
 	b.ReportMetric(float64(b.N), "rollbacks/sec")
 }
 
@@ -258,13 +258,13 @@ func BenchmarkRollback(b *testing.B) {
 
 func generateTestConfigs(group curve.Curve, partyIDs []party.ID, threshold int) map[party.ID]*config.Config {
 	configs := make(map[party.ID]*config.Config)
-	
+
 	// Create shares using simplified Shamir's secret sharing
 	shares := make(map[party.ID]curve.Scalar)
 	for _, id := range partyIDs {
 		shares[id] = sample.Scalar(rand.Reader, group)
 	}
-	
+
 	// Create configs
 	for _, id := range partyIDs {
 		cfg := &config.Config{
@@ -277,37 +277,37 @@ func generateTestConfigs(group curve.Curve, partyIDs []party.ID, threshold int) 
 			ChainKey:   []byte("test-chainkey"),
 			RID:        []byte("test-rid"),
 		}
-		
+
 		// Add public shares
 		for _, otherID := range partyIDs {
 			cfg.Public[otherID] = &config.Public{
 				ECDSA: shares[otherID].ActOnBase(),
 			}
 		}
-		
+
 		configs[id] = cfg
 	}
-	
+
 	return configs
 }
 
 func generateFROSTConfigs(group curve.Curve, partyIDs []party.ID, threshold int) map[party.ID]*keygen.Config {
 	configs := make(map[party.ID]*keygen.Config)
-	
+
 	// Generate master key
 	masterSecret := sample.Scalar(rand.Reader, group)
 	publicKey := masterSecret.ActOnBase()
-	
+
 	// Create verification shares
 	verificationShares := make(map[party.ID]curve.Point)
 	privateShares := make(map[party.ID]curve.Scalar)
-	
+
 	for _, id := range partyIDs {
 		privateShare := sample.Scalar(rand.Reader, group)
 		privateShares[id] = privateShare
 		verificationShares[id] = privateShare.ActOnBase()
 	}
-	
+
 	// Create FROST configs
 	for _, id := range partyIDs {
 		cfg := &keygen.Config{
@@ -319,7 +319,7 @@ func generateFROSTConfigs(group curve.Curve, partyIDs []party.ID, threshold int)
 		}
 		configs[id] = cfg
 	}
-	
+
 	return configs
 }
 
@@ -330,7 +330,7 @@ func TestPrintBenchmarkSummary(t *testing.T) {
 		t.Log("Run with -v flag to see benchmark summary")
 		return
 	}
-	
+
 	fmt.Println("\n=== LSS Performance Benchmark Results ===")
 	fmt.Println("\nOn standard hardware (Apple M1/Intel i7):")
 	fmt.Println()

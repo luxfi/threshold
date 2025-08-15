@@ -38,7 +38,7 @@ func NewPhaseHarness(t testing.TB, ids []party.ID) *PhaseHarness {
 func (h *PhaseHarness) RunPhase(timeout time.Duration, startFor func(id party.ID) protocol.StartFunc) (map[party.ID]interface{}, error) {
 	// 1) fresh session id
 	sessionID := []byte(fmt.Sprintf("session-%d-%d", time.Now().UnixNano(), rand.Int63()))
-	
+
 	// Configure network to only route messages for this session
 	h.net.SetSession(sessionID)
 
@@ -71,12 +71,12 @@ func (h *PhaseHarness) RunPhase(timeout time.Duration, startFor func(id party.ID
 	// 4) start all loops before any party progresses
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(h.ids))
-	
+
 	for id, hd := range handlers {
 		wg.Add(1)
 		go func(id party.ID, hd *protocol.Handler) {
 			defer wg.Done()
-			
+
 			// Run handler loop - this routes messages on h.net and blocks until hd finishes
 			for {
 				select {
@@ -104,33 +104,33 @@ func (h *PhaseHarness) RunPhase(timeout time.Duration, startFor func(id party.ID
 	// 5) wait for results from all parties
 	results := make(map[party.ID]interface{}, len(h.ids))
 	resultsMu := sync.Mutex{}
-	
+
 	// Collect results in parallel
 	var resultWg sync.WaitGroup
 	for id, hd := range handlers {
 		resultWg.Add(1)
 		go func(id party.ID, hd *protocol.Handler) {
 			defer resultWg.Done()
-			
+
 			res, err := hd.WaitForResult()
 			if err != nil {
 				errChan <- fmt.Errorf("party %s result: %w", id, err)
 				return
 			}
-			
+
 			resultsMu.Lock()
 			results[id] = res
 			resultsMu.Unlock()
 		}(id, hd)
 	}
-	
+
 	// Wait for all results or timeout
 	done := make(chan struct{})
 	go func() {
 		resultWg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		// All results collected successfully
@@ -149,7 +149,7 @@ func (h *PhaseHarness) RunPhase(timeout time.Duration, startFor func(id party.ID
 	// 6) all results acquired – now wait for loops to exit cleanly
 	cancel() // Signal loops to exit
 	wg.Wait()
-	
+
 	// Check for any errors
 	close(errChan)
 	for err := range errChan {
@@ -157,7 +157,7 @@ func (h *PhaseHarness) RunPhase(timeout time.Duration, startFor func(id party.ID
 			return nil, err
 		}
 	}
-	
+
 	return results, nil
 }
 
