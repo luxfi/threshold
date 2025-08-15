@@ -44,10 +44,10 @@ type Handler struct {
 	stopped      atomic.Bool  // tracks if handler is stopped
 
 	// Sharded message storage for zero contention
-	messages     *MessageStore
-	broadcast    *MessageStore
+	messages        *MessageStore
+	broadcast       *MessageStore
 	broadcastHashes sync.Map // round.Number -> []byte
-	
+
 	// Processed message tracking - prevents race conditions
 	processedBroadcasts sync.Map // "round:from" -> bool
 	processedMessages   sync.Map // "round:from" -> bool
@@ -97,53 +97,53 @@ type roundWrapper struct {
 // Config for handler - optimized for maximum performance
 type Config struct {
 	// Worker pools
-	Workers          int           // CPU cores * 2 by default
-	PriorityWorkers  int           // 4 by default
-	
+	Workers         int // CPU cores * 2 by default
+	PriorityWorkers int // 4 by default
+
 	// Channels
-	BufferSize       int           // 10000 by default
-	PriorityBuffer   int           // 1000 by default
-	
+	BufferSize     int // 10000 by default
+	PriorityBuffer int // 1000 by default
+
 	// Timeouts
-	MessageTimeout   time.Duration // 30s by default
-	RoundTimeout     time.Duration // 60s by default
-	ProtocolTimeout  time.Duration // 5m by default
-	
+	MessageTimeout  time.Duration // 30s by default
+	RoundTimeout    time.Duration // 60s by default
+	ProtocolTimeout time.Duration // 5m by default
+
 	// Performance
-	EnableBatching   bool          // true by default
-	BatchSize        int           // 100 by default
-	BatchTimeout     time.Duration // 10ms by default
-	EnableCompression bool         // true for large messages
-	CompressionThreshold int      // 1KB by default
-	
+	EnableBatching       bool          // true by default
+	BatchSize            int           // 100 by default
+	BatchTimeout         time.Duration // 10ms by default
+	EnableCompression    bool          // true for large messages
+	CompressionThreshold int           // 1KB by default
+
 	// Memory
-	EnablePooling    bool          // true by default
-	MaxMessageSize   int           // 10MB by default
-	
+	EnablePooling  bool // true by default
+	MaxMessageSize int  // 10MB by default
+
 	// Reliability
-	RetryAttempts    int           // 3 by default
-	RetryBackoff     time.Duration // 1s by default
+	RetryAttempts int           // 3 by default
+	RetryBackoff  time.Duration // 1s by default
 }
 
 // DefaultConfig returns the perfect configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Workers:          runtime.NumCPU() * 2,
-		PriorityWorkers:  4,
-		BufferSize:       10000,
-		PriorityBuffer:   1000,
-		MessageTimeout:   30 * time.Second,
-		RoundTimeout:     60 * time.Second,
-		ProtocolTimeout:  5 * time.Minute,
-		EnableBatching:   true,
-		BatchSize:        100,
-		BatchTimeout:     10 * time.Millisecond,
-		EnableCompression: true,
+		Workers:              runtime.NumCPU() * 2,
+		PriorityWorkers:      4,
+		BufferSize:           10000,
+		PriorityBuffer:       1000,
+		MessageTimeout:       30 * time.Second,
+		RoundTimeout:         60 * time.Second,
+		ProtocolTimeout:      5 * time.Minute,
+		EnableBatching:       true,
+		BatchSize:            100,
+		BatchTimeout:         10 * time.Millisecond,
+		EnableCompression:    true,
 		CompressionThreshold: 1024,
-		EnablePooling:    true,
-		MaxMessageSize:   10 * 1024 * 1024, // 10MB
-		RetryAttempts:    3,
-		RetryBackoff:     time.Second,
+		EnablePooling:        true,
+		MaxMessageSize:       10 * 1024 * 1024, // 10MB
+		RetryAttempts:        3,
+		RetryBackoff:         time.Second,
 	}
 }
 
@@ -156,22 +156,22 @@ type Metrics struct {
 	roundsCompleted    prometheus.Counter
 	protocolsCompleted prometheus.Counter
 	protocolsFailed    prometheus.Counter
-	
+
 	// Gauges
-	activeWorkers      prometheus.Gauge
-	queuedMessages     prometheus.Gauge
-	currentRound       prometheus.Gauge
-	memoryUsage        prometheus.Gauge
-	
+	activeWorkers  prometheus.Gauge
+	queuedMessages prometheus.Gauge
+	currentRound   prometheus.Gauge
+	memoryUsage    prometheus.Gauge
+
 	// Histograms
-	messageLatency     prometheus.Histogram
-	roundDuration      prometheus.Histogram
-	protocolDuration   prometheus.Histogram
-	queueWaitTime      prometheus.Histogram
-	
+	messageLatency   prometheus.Histogram
+	roundDuration    prometheus.Histogram
+	protocolDuration prometheus.Histogram
+	queueWaitTime    prometheus.Histogram
+
 	// Summaries
-	messageSize        prometheus.Summary
-	batchSize          prometheus.Summary
+	messageSize prometheus.Summary
+	batchSize   prometheus.Summary
 }
 
 // NewHandler creates the perfect protocol handler
@@ -186,24 +186,24 @@ func NewHandler(
 	if config == nil {
 		config = DefaultConfig()
 	}
-	
+
 	if logger == nil {
 		return nil, errors.New("logger is required")
 	}
-	
+
 	// Create initial round
 	r, err := create(sessionID)
 	if err != nil {
 		logger.Error("failed to create initial round", log.Err(err))
 		return nil, fmt.Errorf("protocol: failed to create round: %w", err)
 	}
-	
+
 	// Create metrics if registry provided
 	var metrics *Metrics
 	if registry != nil {
 		metrics = createMetrics(r.ProtocolID(), registry)
 	}
-	
+
 	// Only add timeout if context doesn't already have one
 	var cancel context.CancelFunc
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline && config.ProtocolTimeout > 0 {
@@ -212,48 +212,46 @@ func NewHandler(
 		// Create a cancel func anyway for cleanup
 		ctx, cancel = context.WithCancel(ctx)
 	}
-	
+
 	h := &Handler{
 		messages:          newMessageStore(),
 		broadcast:         newMessageStore(),
-		out:              make(chan *Message, config.BufferSize),
-		incoming:         make(chan *Message, config.BufferSize),
-		priority:         make(chan *Message, config.PriorityBuffer),
-		ctx:              ctx,
-		cancel:           cancel,
-		done:             make(chan struct{}),
-		workers:          config.Workers,
-		log:              logger,
-		metrics:          metrics,
-		protocolID:       r.ProtocolID(),
-		sessionID:        sessionID,
-		config:           config,
+		out:               make(chan *Message, config.BufferSize),
+		incoming:          make(chan *Message, config.BufferSize),
+		priority:          make(chan *Message, config.PriorityBuffer),
+		ctx:               ctx,
+		cancel:            cancel,
+		done:              make(chan struct{}),
+		workers:           config.Workers,
+		log:               logger,
+		metrics:           metrics,
+		protocolID:        r.ProtocolID(),
+		sessionID:         sessionID,
+		config:            config,
 		protocolStartTime: time.Now(),
 	}
-	
 
-	
 	// Store initial round with wrapper for atomic.Value type consistency
 	h.currentRound.Store(&roundWrapper{round: r})
 	h.rounds.Store(r.Number(), &roundWrapper{round: r})
-	
+
 	logger.Info("starting protocol handler",
 		log.String("protocol", h.protocolID),
 		log.Int("workers", config.Workers),
 		log.Int("parties", r.N()),
 		log.Int("threshold", r.Threshold()))
-	
+
 	// Start worker pools
 	h.startWorkers()
-	
+
 	// Initialize first round
 	go h.initializeRound(r)
-	
+
 	// Update metrics
 	if metrics != nil {
 		metrics.activeWorkers.Set(float64(config.Workers + config.PriorityWorkers))
 	}
-	
+
 	return h, nil
 }
 
@@ -300,37 +298,37 @@ func createMetrics(protocolID string, registry prometheus.Registerer) *Metrics {
 			Help: "Memory usage in bytes",
 		}),
 		messageLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name: fmt.Sprintf("threshold_%s_message_latency_seconds", protocolID),
-			Help: "Message processing latency",
+			Name:    fmt.Sprintf("threshold_%s_message_latency_seconds", protocolID),
+			Help:    "Message processing latency",
 			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
 		}),
 		roundDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name: fmt.Sprintf("threshold_%s_round_duration_seconds", protocolID),
-			Help: "Round completion duration",
+			Name:    fmt.Sprintf("threshold_%s_round_duration_seconds", protocolID),
+			Help:    "Round completion duration",
 			Buckets: prometheus.ExponentialBuckets(0.01, 2, 10),
 		}),
 		protocolDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name: fmt.Sprintf("threshold_%s_protocol_duration_seconds", protocolID),
-			Help: "Total protocol duration",
+			Name:    fmt.Sprintf("threshold_%s_protocol_duration_seconds", protocolID),
+			Help:    "Total protocol duration",
 			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
 		}),
 		queueWaitTime: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name: fmt.Sprintf("threshold_%s_queue_wait_seconds", protocolID),
-			Help: "Queue wait time",
+			Name:    fmt.Sprintf("threshold_%s_queue_wait_seconds", protocolID),
+			Help:    "Queue wait time",
 			Buckets: prometheus.ExponentialBuckets(0.0001, 2, 10),
 		}),
 		messageSize: prometheus.NewSummary(prometheus.SummaryOpts{
-			Name: fmt.Sprintf("threshold_%s_message_size_bytes", protocolID),
-			Help: "Message size distribution",
+			Name:       fmt.Sprintf("threshold_%s_message_size_bytes", protocolID),
+			Help:       "Message size distribution",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		}),
 		batchSize: prometheus.NewSummary(prometheus.SummaryOpts{
-			Name: fmt.Sprintf("threshold_%s_batch_size", protocolID),
-			Help: "Batch processing size",
+			Name:       fmt.Sprintf("threshold_%s_batch_size", protocolID),
+			Help:       "Batch processing size",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		}),
 	}
-	
+
 	// Register all metrics
 	registry.MustRegister(
 		m.messagesReceived, m.messagesSent, m.messagesDropped,
@@ -339,7 +337,7 @@ func createMetrics(protocolID string, registry prometheus.Registerer) *Metrics {
 		m.messageLatency, m.roundDuration, m.protocolDuration, m.queueWaitTime,
 		m.messageSize, m.batchSize,
 	)
-	
+
 	return m
 }
 
@@ -348,28 +346,28 @@ func (h *Handler) startWorkers() {
 	h.log.Debug("starting worker pools",
 		log.Int("workers", h.workers),
 		log.Int("priority", h.config.PriorityWorkers))
-	
+
 	// Start regular workers
 	for i := 0; i < h.workers; i++ {
 		h.workerGroup.Add(1)
 		go h.messageWorker(i, false)
 	}
-	
+
 	// Start priority workers
 	for i := 0; i < h.config.PriorityWorkers; i++ {
 		h.workerGroup.Add(1)
 		go h.messageWorker(i, true)
 	}
-	
+
 	// Start batch processor
 	if h.config.EnableBatching {
 		h.workerGroup.Add(1)
 		go h.batchProcessor()
 	}
-	
+
 	// Start round processor
 	go h.roundProcessor()
-	
+
 	// Start metrics updater
 	if h.metrics != nil {
 		go h.metricsUpdater()
@@ -379,26 +377,26 @@ func (h *Handler) startWorkers() {
 // messageWorker processes messages with maximum efficiency
 func (h *Handler) messageWorker(id int, isPriority bool) {
 	defer h.workerGroup.Done()
-	
+
 	h.log.Debug("worker started",
 		log.Int("id", id),
 		log.Bool("priority", isPriority))
-	
+
 	source := h.incoming
 	if isPriority {
 		source = h.priority
 	}
-	
+
 	for {
 		select {
 		case <-h.ctx.Done():
 			h.log.Debug("worker stopping", log.Int("id", id))
 			return
-			
+
 		case msg := <-source:
 			start := time.Now()
 			h.processMessage(msg)
-			
+
 			if h.metrics != nil {
 				h.metrics.messageLatency.Observe(time.Since(start).Seconds())
 			}
@@ -411,40 +409,40 @@ func (h *Handler) processMessage(msg *Message) {
 	if msg == nil {
 		return
 	}
-	
+
 	atomic.AddUint64(&h.messagesProcessed, 1)
-	
+
 	if h.metrics != nil {
 		h.metrics.messagesReceived.Inc()
 		h.metrics.messageSize.Observe(float64(len(msg.Data)))
 	}
-	
+
 	// Extra debug for p2p round 3
 	if msg.RoundNumber == 3 && !msg.Broadcast {
 		h.log.Debug("processMessage: p2p round 3 START",
 			log.String("from", string(msg.From)),
 			log.String("to", string(msg.To)))
 	}
-	
+
 	h.log.Debug("processing message",
 		log.String("from", string(msg.From)),
 		log.String("to", string(msg.To)),
 		log.Uint16("round", uint16(msg.RoundNumber)),
 		log.Bool("broadcast", msg.Broadcast),
 		log.String("self", string(h.currentRound.Load().(*roundWrapper).round.SelfID())))
-	
+
 	// Check if already errored or completed
 	if h.err.Load() != nil || h.result.Load() != nil {
 		h.log.Debug("dropping message - protocol finished")
 		return
 	}
-	
+
 	// Handle abort messages
 	if msg.RoundNumber == 0 {
 		h.handleAbort(msg)
 		return
 	}
-	
+
 	// Decompress if needed
 	if msg.Compressed {
 		msg = h.decompressMessage(msg)
@@ -452,10 +450,10 @@ func (h *Handler) processMessage(msg *Message) {
 			return
 		}
 	}
-	
+
 	// Store message for any round (needed for buffering future rounds)
 	h.storeMessage(msg)
-	
+
 	// Get current round
 	r := h.currentRound.Load().(*roundWrapper).round
 	if r.Number() != msg.RoundNumber {
@@ -466,14 +464,14 @@ func (h *Handler) processMessage(msg *Message) {
 		h.tryAdvanceRound()
 		return
 	}
-	
+
 	// Verify and process message for current round
 	if msg.Broadcast {
 		h.verifyBroadcast(msg)
 	} else {
 		h.verifyNormal(msg)
 	}
-	
+
 	// Try to advance round
 	h.tryAdvanceRound()
 }
@@ -481,25 +479,25 @@ func (h *Handler) processMessage(msg *Message) {
 // batchProcessor handles batch message processing for maximum throughput
 func (h *Handler) batchProcessor() {
 	defer h.workerGroup.Done()
-	
+
 	ticker := time.NewTicker(h.config.BatchTimeout)
 	defer ticker.Stop()
-	
+
 	batch := make([]*Message, 0, h.config.BatchSize)
-	
+
 	for {
 		select {
 		case <-h.ctx.Done():
 			return
-			
+
 		case msg := <-h.incoming:
 			batch = append(batch, msg)
-			
+
 			if len(batch) >= h.config.BatchSize {
 				h.processBatch(batch)
 				batch = batch[:0]
 			}
-			
+
 		case <-ticker.C:
 			if len(batch) > 0 {
 				h.processBatch(batch)
@@ -512,11 +510,11 @@ func (h *Handler) batchProcessor() {
 // processBatch processes multiple messages together
 func (h *Handler) processBatch(batch []*Message) {
 	h.log.Debug("processing batch", log.Int("size", len(batch)))
-	
+
 	if h.metrics != nil {
 		h.metrics.batchSize.Observe(float64(len(batch)))
 	}
-	
+
 	for _, msg := range batch {
 		h.processMessage(msg)
 	}
@@ -526,40 +524,40 @@ func (h *Handler) processBatch(batch []*Message) {
 func (h *Handler) roundProcessor() {
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	var lastRound round.Number = 0
 	var roundStartTime time.Time
-	
+
 	for {
 		select {
 		case <-h.ctx.Done():
 			return
-			
+
 		case <-ticker.C:
 			r := h.currentRound.Load().(*roundWrapper).round
-			
+
 			// Track round transitions
 			if r.Number() != lastRound {
 				if lastRound > 0 {
 					atomic.AddUint64(&h.roundsCompleted, 1)
-					
+
 					if h.metrics != nil {
 						h.metrics.roundsCompleted.Inc()
 						h.metrics.roundDuration.Observe(time.Since(roundStartTime).Seconds())
 					}
 				}
-				
+
 				h.log.Info("advanced to round", log.Uint16("round", uint16(r.Number())))
 				lastRound = r.Number()
 				roundStartTime = time.Now()
-				
+
 				if h.metrics != nil {
 					h.metrics.currentRound.Set(float64(r.Number()))
 				}
 			}
-			
+
 			h.tryAdvanceRound()
-			
+
 		case <-h.done:
 			return
 		}
@@ -569,19 +567,19 @@ func (h *Handler) roundProcessor() {
 // tryAdvanceRound attempts to advance to the next round
 func (h *Handler) tryAdvanceRound() {
 	r := h.currentRound.Load().(*roundWrapper).round
-	
+
 	h.log.Debug("tryAdvanceRound called",
 		log.Uint16("current_round", uint16(r.Number())),
 		log.String("self", string(r.SelfID())))
-	
+
 	// First, retry any unprocessed messages that might have returned ErrNotReady
 	// This handles the case where round 3 messages arrive before round 2 completes
 	h.retryUnprocessedMessages(r.Number())
-	
+
 	if !h.hasAllMessages(r) {
 		return
 	}
-	
+
 	// Use compare-and-swap for lock-free round advancement
 	// The LoadOrStore returns the existing value if present, or stores and returns the new value
 	if finalized, loaded := h.finalized.LoadOrStore(r.Number(), true); loaded && finalized.(bool) {
@@ -607,16 +605,16 @@ func (h *Handler) tryAdvanceRound() {
 		}
 		return // Already finalized this round
 	}
-	
+
 	h.log.Debug("finalizing round", log.Uint16("round", uint16(r.Number())))
-	
+
 	// Finalize round and get next round
 	nextRound := h.finalizeRound(r)
 	if nextRound == nil {
 		h.log.Debug("finalizeRound returned nil")
 		return
 	}
-	
+
 	if nextRound.Number() == r.Number() {
 		// Round returned itself - not ready to advance yet
 		// This happens in LSS keygen round 1 when it doesn't have all broadcasts yet
@@ -626,25 +624,25 @@ func (h *Handler) tryAdvanceRound() {
 		h.finalized.Delete(r.Number())
 		return
 	}
-	
+
 	if nextRound.Number() > r.Number() {
 		h.currentRound.Store(&roundWrapper{round: nextRound})
 		h.rounds.Store(nextRound.Number(), &roundWrapper{round: nextRound})
-		
+
 		h.log.Info("storing new currentRound",
 			log.Uint16("from", uint16(r.Number())),
 			log.Uint16("to", uint16(nextRound.Number())))
-		
+
 		// First process any unverified messages from the previous round
 		if r.Number() > 0 {
 			h.processQueuedMessages(r.Number())
 		}
-		
+
 		// Check if the new round needs immediate initialization
 		// This happens when a round has MessageContent (sends P2P messages) but doesn't
 		// expect any incoming messages initially (like LSS round 2)
 		// We need to finalize it immediately to send those messages
-		// 
+		//
 		// For LSS specifically: round 2 doesn't implement BroadcastRound but does have MessageContent
 		// It needs to be initialized immediately to send its initial P2P messages
 		needsImmediateInit := false
@@ -656,7 +654,7 @@ func (h *Handler) tryAdvanceRound() {
 			h.log.Debug("round needs immediate initialization (P2P-only round)",
 				log.Uint16("round", uint16(nextRound.Number())))
 		}
-		
+
 		if needsImmediateInit {
 			// Initialize the round immediately to send its messages
 			go h.initializeRound(nextRound)
@@ -672,12 +670,12 @@ func (h *Handler) Accept(msg *Message) {
 	if h.metrics != nil {
 		h.metrics.queuedMessages.Inc()
 	}
-	
+
 	// Debug log
 	// if msg.RoundNumber == 3 && !msg.Broadcast {
 	// 	fmt.Printf("Accept: p2p round 3 from %s to %s\n", msg.From, msg.To)
 	// }
-	
+
 	// Try priority queue for important messages
 	if msg.RoundNumber == 0 || msg.Broadcast {
 		select {
@@ -687,19 +685,19 @@ func (h *Handler) Accept(msg *Message) {
 			// Fall through to regular queue
 		}
 	}
-	
+
 	// Try regular queue
 	select {
 	case h.incoming <- msg:
-		
+
 	case <-h.ctx.Done():
 		h.log.Debug("dropping message - context cancelled")
-		
+
 	default:
 		// Queue full, drop message
 		h.log.Warn("message queue full, dropping message",
 			log.String("from", string(msg.From)))
-		
+
 		if h.metrics != nil {
 			h.metrics.messagesDropped.Inc()
 		}
@@ -712,40 +710,40 @@ func (h *Handler) Result() (interface{}, error) {
 	if result := h.result.Load(); result != nil {
 		duration := time.Since(h.protocolStartTime)
 		h.log.Info("protocol completed successfully", log.Duration("duration", duration))
-		
+
 		if h.metrics != nil {
 			h.metrics.protocolsCompleted.Inc()
 			h.metrics.protocolDuration.Observe(duration.Seconds())
 		}
-		
+
 		return result, nil
 	}
-	
+
 	// Check if we have an error
 	if err := h.err.Load(); err != nil {
 		e := err.(*Error)
 		h.log.Error("protocol failed", log.Err(e.Err))
-		
+
 		if h.metrics != nil {
 			h.metrics.protocolsFailed.Inc()
 		}
-		
+
 		return nil, *e
 	}
-	
+
 	// Check if context was cancelled
 	select {
 	case <-h.ctx.Done():
 		h.log.Error("protocol cancelled")
-		
+
 		if h.metrics != nil {
 			h.metrics.protocolsFailed.Inc()
 		}
-		
+
 		return nil, h.ctx.Err()
 	default:
 	}
-	
+
 	// Protocol not finished yet
 	return nil, errors.New("protocol: not finished")
 }
@@ -758,52 +756,52 @@ func (h *Handler) WaitForResult() (interface{}, error) {
 	}
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
-	
+
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-timer.C:
 			h.log.Error("protocol timeout", log.Duration("timeout", h.config.ProtocolTimeout))
-			
+
 			if h.metrics != nil {
 				h.metrics.protocolsFailed.Inc()
 			}
-			
+
 			return nil, errors.New("protocol: timeout waiting for result")
-			
+
 		case <-ticker.C:
 			if result := h.result.Load(); result != nil {
 				duration := time.Since(h.protocolStartTime)
 				h.log.Info("protocol completed successfully", log.Duration("duration", duration))
-				
+
 				if h.metrics != nil {
 					h.metrics.protocolsCompleted.Inc()
 					h.metrics.protocolDuration.Observe(duration.Seconds())
 				}
-				
+
 				return result, nil
 			}
-			
+
 			if err := h.err.Load(); err != nil {
 				e := err.(*Error)
 				h.log.Error("protocol failed", log.Err(e.Err))
-				
+
 				if h.metrics != nil {
 					h.metrics.protocolsFailed.Inc()
 				}
-				
+
 				return nil, *e
 			}
-			
+
 		case <-h.ctx.Done():
 			h.log.Error("protocol cancelled")
-			
+
 			if h.metrics != nil {
 				h.metrics.protocolsFailed.Inc()
 			}
-			
+
 			return nil, h.ctx.Err()
 		}
 	}
@@ -817,22 +815,22 @@ func (h *Handler) Listen() <-chan *Message {
 // Stop gracefully shuts down the handler
 func (h *Handler) Stop() {
 	h.log.Info("stopping protocol handler")
-	
+
 	// Mark as stopped first
 	h.stopped.Store(true)
-	
+
 	// Cancel context to stop all workers
 	h.cancel()
-	
+
 	// Wait for workers to finish
 	h.workerGroup.Wait()
-	
+
 	// Close channels
 	close(h.out)
 	close(h.incoming)
 	close(h.priority)
 	close(h.done)
-	
+
 	h.log.Info("protocol handler stopped",
 		log.Uint64("messages_processed", h.messagesProcessed),
 		log.Uint64("rounds_completed", h.roundsCompleted))
@@ -843,37 +841,37 @@ func (h *Handler) CanAccept(msg *Message) bool {
 	if msg == nil || msg.Data == nil {
 		return false
 	}
-	
+
 	r := h.currentRound.Load().(*roundWrapper).round
-	
+
 	// Check protocol and session ID
 	if msg.Protocol != r.ProtocolID() {
 		return false
 	}
-	
+
 	if !bytes.Equal(msg.SSID, r.SSID()) {
 		return false
 	}
-	
+
 	// Check if we're the intended recipient
 	if !msg.IsFor(r.SelfID()) {
 		return false
 	}
-	
+
 	// Check sender is valid
 	if !r.PartyIDs().Contains(msg.From) {
 		return false
 	}
-	
+
 	// Check round number is valid
 	if msg.RoundNumber > r.FinalRoundNumber() {
 		return false
 	}
-	
+
 	if msg.RoundNumber < r.Number() && msg.RoundNumber > 0 {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -890,16 +888,16 @@ func (h *Handler) finalize() {
 func (h *Handler) metricsUpdater() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-h.ctx.Done():
 			return
-			
+
 		case <-ticker.C:
 			// Update queue depth
 			h.metrics.queuedMessages.Set(float64(len(h.incoming) + len(h.priority)))
-			
+
 			// Update memory usage
 			var m runtime.MemStats
 			runtime.ReadMemStats(&m)
@@ -912,15 +910,15 @@ func (h *Handler) metricsUpdater() {
 
 func (h *Handler) initializeRound(r round.Session) {
 	h.log.Debug("initializing round", log.Uint16("round", uint16(r.Number())))
-	
+
 	// For Doerner protocol: Process any messages that might already be waiting
 	// This happens when parties start on different rounds (receiver on round 1, sender on round 1)
 	// The receiver sends messages immediately, so the sender might have them waiting
 	h.processQueuedMessages(r.Number())
-	
+
 	// Give a small delay to allow message processing
 	time.Sleep(20 * time.Millisecond)
-	
+
 	// Check if we now have all the messages we need
 	// This is important for Doerner where the Sender's round1S needs messages from Receiver's round1R
 	if r.MessageContent() != nil && !h.hasAllMessages(r) {
@@ -931,49 +929,49 @@ func (h *Handler) initializeRound(r round.Session) {
 		// Don't mark as finalized - let tryAdvanceRound handle it when messages arrive
 		return
 	}
-	
+
 	// Mark this round as being finalized to prevent double finalization
 	// This is especially important for round 1 which is initialized immediately
 	if finalized, loaded := h.finalized.LoadOrStore(r.Number(), true); loaded && finalized.(bool) {
-		h.log.Debug("round already being initialized/finalized, skipping", 
+		h.log.Debug("round already being initialized/finalized, skipping",
 			log.Uint16("round", uint16(r.Number())))
 		return
 	}
-	
+
 	out := make(chan *round.Message, r.N()+1)
-	
+
 	// Start a goroutine to call Finalize and close the channel
 	var nextRound round.Session
 	var finalizeErr error
 	done := make(chan struct{})
-	
+
 	go func() {
 		defer close(out)
 		defer close(done)
 		nextRound, finalizeErr = r.Finalize(out)
 	}()
-	
+
 	// Count messages for logging
 	messageCount := 0
-	
+
 	// Process generated messages
 	for msg := range out {
 		messageCount++
 		h.sendRoundMessage(msg, r)
 	}
-	
+
 	// Wait for Finalize to complete
 	<-done
-	
+
 	if finalizeErr != nil {
 		h.handleError(finalizeErr, r.SelfID())
 		return
 	}
-	
-	h.log.Debug("generated messages", 
+
+	h.log.Debug("generated messages",
 		log.Uint16("round", uint16(r.Number())),
 		log.Int("count", messageCount))
-	
+
 	// Store next round and advance if appropriate
 	if nextRound != nil {
 		if nextRound.Number() > r.Number() {
@@ -984,10 +982,10 @@ func (h *Handler) initializeRound(r round.Session) {
 			h.log.Info("stored next round after initialization",
 				log.Uint16("from", uint16(r.Number())),
 				log.Uint16("next", uint16(nextRound.Number())))
-			
+
 			// Try to advance (which will check if we have all messages)
 			go func() {
-				time.Sleep(10 * time.Millisecond)  // Small delay for message propagation
+				time.Sleep(10 * time.Millisecond) // Small delay for message propagation
 				h.tryAdvanceRound()
 			}()
 		} else if nextRound.Number() == r.Number() {
@@ -996,11 +994,11 @@ func (h *Handler) initializeRound(r round.Session) {
 			h.log.Debug("round returned itself in initialization",
 				log.Uint16("round", uint16(r.Number())),
 				log.Bool("returned_self_in_initialize", true))
-			
+
 			// IMPORTANT: Unmark as finalized so it can be finalized again later
 			// This is critical for protocols like LSS that return themselves when not ready
 			h.finalized.Delete(r.Number())
-			
+
 			// CRITICAL FIX: Re-drive advancement immediately
 			// Process any messages that arrived while we were initializing
 			h.processQueuedMessages(r.Number())
@@ -1025,20 +1023,20 @@ func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 		log.String("to", string(msg.To)),
 		log.Uint16("round", uint16(msg.Content.RoundNumber())),
 		log.Bool("broadcast", msg.Broadcast))
-	
+
 	data, err := cbor.Marshal(msg.Content)
 	if err != nil {
 		h.handleError(err, r.SelfID())
 		return
 	}
-	
+
 	// Compress if large
 	compressed := false
 	if h.config.EnableCompression && len(data) > h.config.CompressionThreshold {
 		data = h.compressData(data)
 		compressed = true
 	}
-	
+
 	protocolMsg := &Message{
 		SSID:        r.SSID(),
 		From:        r.SelfID(),
@@ -1049,17 +1047,17 @@ func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 		Broadcast:   msg.Broadcast,
 		Compressed:  compressed,
 	}
-	
+
 	if msg.Broadcast {
 		h.storeMessage(protocolMsg)
 	}
-	
+
 	// Check if handler is stopped before sending
 	if h.stopped.Load() {
 		h.log.Debug("skipping send - handler stopped")
 		return
 	}
-	
+
 	select {
 	case h.out <- protocolMsg:
 		h.log.Debug("sent message to output channel",
@@ -1085,18 +1083,18 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 	if err == nil {
 		return
 	}
-	
+
 	protocolErr := &Error{
 		Err:      err,
 		Culprits: culprits,
 	}
-	
+
 	// Try to set error atomically
 	if h.err.CompareAndSwap(nil, protocolErr) {
-		h.log.Error("protocol error - cancelling context", 
-			log.Err(err), 
+		h.log.Error("protocol error - cancelling context",
+			log.Err(err),
 			log.String("culprits", fmt.Sprintf("%v", culprits)))
-		
+
 		// Send abort message
 		r := h.currentRound.Load().(*roundWrapper).round
 		abortMsg := &Message{
@@ -1105,14 +1103,14 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 			Protocol: r.ProtocolID(),
 			Data:     []byte(err.Error()),
 		}
-		
+
 		select {
 		case h.out <- abortMsg:
 		default:
 		}
-		
+
 		h.cancel()
-		
+
 		// Close output channel after delay to signal protocol end
 		go func() {
 			time.Sleep(50 * time.Millisecond)
@@ -1130,26 +1128,26 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 	// Check if we already have the next round stored (from initializeRound)
 	nextRoundNum := r.Number() + 1
 	if nextRoundObj, ok := h.rounds.Load(nextRoundNum); ok {
-		h.log.Debug("found existing next round", 
+		h.log.Debug("found existing next round",
 			log.Uint16("current", uint16(r.Number())),
 			log.Uint16("next", uint16(nextRoundNum)))
 		return nextRoundObj.(*roundWrapper).round
 	}
-	
+
 	// If not, we need to finalize this round
 	out := make(chan *round.Message, r.N()+1)
-	
+
 	// Use goroutine like initializeRound does to allow async message generation
 	var nextRound round.Session
 	var err error
 	done := make(chan struct{})
-	
+
 	go func() {
 		defer close(out)
 		defer close(done)
 		nextRound, err = r.Finalize(out)
 	}()
-	
+
 	// Count messages for logging
 	messageCount := 0
 	// Process generated messages
@@ -1157,20 +1155,20 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 		messageCount++
 		h.sendRoundMessage(msg, r)
 	}
-	
+
 	// Wait for Finalize to complete
 	<-done
-	
+
 	if err != nil {
 		h.handleError(err, r.SelfID())
 		return nil
 	}
-	
+
 	h.log.Debug("finalized round messages",
 		log.Uint16("round", uint16(r.Number())),
 		log.Int("messages", messageCount),
 		log.Bool("returned_self", nextRound == r))
-	
+
 	// CRITICAL FIX: If the round returns itself, immediately attempt to advance again
 	// in case inbound messages arrived while we were finalizing/sending
 	if nextRound == r {
@@ -1190,7 +1188,7 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 		}()
 		return r
 	}
-	
+
 	// Check for completion
 	switch result := nextRound.(type) {
 	case *round.Output:
@@ -1211,12 +1209,12 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 			})
 		}()
 		return nil
-		
+
 	case *round.Abort:
 		h.handleError(result.Err, result.Culprits...)
 		return nil
 	}
-	
+
 	if nextRound != nil {
 		h.log.Debug("finalize returned next round",
 			log.Uint16("current", uint16(r.Number())),
@@ -1224,7 +1222,7 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 	} else {
 		h.log.Debug("finalize returned nil")
 	}
-	
+
 	return nextRound
 }
 
@@ -1234,32 +1232,32 @@ func (h *Handler) verifyBroadcastForRound(msg *Message, roundNum round.Number) {
 	if !ok {
 		return
 	}
-	
+
 	r := roundObj.(*roundWrapper).round
 	broadcastRound, ok := r.(round.BroadcastRound)
 	if !ok {
 		h.handleError(errors.New("unexpected broadcast message"), msg.From)
 		return
 	}
-	
+
 	// Unmarshal content
 	content := broadcastRound.BroadcastContent()
 	if err := cbor.Unmarshal(msg.Data, content); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
-	
+
 	roundMsg := round.Message{
 		From:      msg.From,
 		To:        msg.To,
 		Content:   content,
 		Broadcast: true,
 	}
-	
+
 	if err := broadcastRound.StoreBroadcastMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - message remains queued
 		if err == round.ErrNotReady {
-			h.log.Debug("round not ready for broadcast message, will retry later", 
+			h.log.Debug("round not ready for broadcast message, will retry later",
 				log.String("from", string(msg.From)),
 				log.Uint16("round", uint16(roundNum)))
 			return
@@ -1279,9 +1277,9 @@ func (h *Handler) verifyNormalForRound(msg *Message, roundNum round.Number) {
 	if !ok {
 		return
 	}
-	
+
 	r := roundObj.(*roundWrapper).round
-	
+
 	// Check if we have required broadcast first
 	if _, ok := r.(round.BroadcastRound); ok {
 		broadcasts := h.broadcast.LoadAll(r.Number())
@@ -1291,36 +1289,36 @@ func (h *Handler) verifyNormalForRound(msg *Message, roundNum round.Number) {
 			return
 		}
 	}
-	
+
 	// Unmarshal content
 	content := r.MessageContent()
 	if content == nil {
 		return
 	}
-	
+
 	if err := cbor.Unmarshal(msg.Data, content); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
-	
+
 	// Create round message
 	roundMsg := round.Message{
 		From:    msg.From,
 		To:      msg.To,
 		Content: content,
 	}
-	
+
 	// Verify first
 	if err := r.VerifyMessage(roundMsg); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
-	
+
 	// Then store
 	if err := r.StoreMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - message remains queued
 		if err == round.ErrNotReady {
-			h.log.Debug("round not ready for p2p message, will retry later", 
+			h.log.Debug("round not ready for p2p message, will retry later",
 				log.String("from", string(msg.From)),
 				log.Uint16("round", uint16(roundNum)))
 			return
@@ -1342,41 +1340,41 @@ func (h *Handler) verifyBroadcast(msg *Message) {
 			log.Uint16("current_round", uint16(currentRound.Number())))
 		return
 	}
-	
+
 	roundObj, ok := h.rounds.Load(msg.RoundNumber)
 	if !ok {
 		return
 	}
-	
+
 	r := roundObj.(*roundWrapper).round
 	broadcastRound, ok := r.(round.BroadcastRound)
 	if !ok {
 		h.handleError(errors.New("unexpected broadcast message"), msg.From)
 		return
 	}
-	
+
 	// For now, skip broadcast hash verification (would implement properly)
 	// This needs proper integration with the hash package
-	
+
 	// Unmarshal content
 	content := broadcastRound.BroadcastContent()
 	if err := cbor.Unmarshal(msg.Data, content); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
-	
+
 	roundMsg := round.Message{
 		From:      msg.From,
 		To:        msg.To,
 		Content:   content,
 		Broadcast: true,
 	}
-	
+
 	if err := broadcastRound.StoreBroadcastMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - just skip for now
 		// The message will be retried when we process queued messages
 		if err == round.ErrNotReady {
-			h.log.Debug("round not ready for broadcast message, will retry later", 
+			h.log.Debug("round not ready for broadcast message, will retry later",
 				log.String("from", string(msg.From)),
 				log.Uint16("round", uint16(msg.RoundNumber)))
 			return
@@ -1398,48 +1396,48 @@ func (h *Handler) verifyNormal(msg *Message) {
 			log.Uint16("current_round", uint16(currentRound.Number())))
 		return
 	}
-	
+
 	roundObj, ok := h.rounds.Load(msg.RoundNumber)
 	if !ok {
 		return
 	}
-	
+
 	r := roundObj.(*roundWrapper).round
-	
+
 	// Check if we have required broadcast first
 	if _, isBroadcast := r.(round.BroadcastRound); isBroadcast {
 		if broadcast, _ := h.broadcast.Load(msg.RoundNumber, msg.From); broadcast == nil {
 			return // Wait for broadcast first
 		}
 	}
-	
+
 	// Unmarshal content
 	content := r.MessageContent()
 	if content == nil {
 		return // Round doesn't expect messages
 	}
-	
+
 	if err := cbor.Unmarshal(msg.Data, content); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
-	
+
 	roundMsg := round.Message{
 		From:    msg.From,
 		To:      msg.To,
 		Content: content,
 	}
-	
+
 	if err := r.VerifyMessage(roundMsg); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
-	
+
 	if err := r.StoreMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - just skip for now
 		// The message will be retried when we process queued messages
 		if err == round.ErrNotReady {
-			h.log.Debug("round not ready for p2p message, will retry later", 
+			h.log.Debug("round not ready for p2p message, will retry later",
 				log.String("from", string(msg.From)),
 				log.Uint16("round", uint16(msg.RoundNumber)))
 			return
@@ -1467,7 +1465,7 @@ func (h *Handler) retryUnprocessedMessages(roundNum round.Number) {
 			}
 		}
 	}
-	
+
 	// Process normal messages that haven't been processed yet
 	messages := h.messages.LoadAll(roundNum)
 	for from, msg := range messages {
@@ -1484,7 +1482,7 @@ func (h *Handler) retryUnprocessedMessages(roundNum round.Number) {
 
 func (h *Handler) processQueuedMessages(roundNum round.Number) {
 	h.log.Debug("processing queued messages", log.Uint16("round", uint16(roundNum)))
-	
+
 	// First process any messages from previous rounds to ensure we have all necessary data
 	if roundNum > 1 {
 		for prevRound := round.Number(1); prevRound < roundNum; prevRound++ {
@@ -1496,7 +1494,7 @@ func (h *Handler) processQueuedMessages(roundNum round.Number) {
 					h.verifyBroadcastForRound(msg, prevRound)
 				}
 			}
-			
+
 			// Process normal messages from previous rounds
 			prevMessages := h.messages.LoadAll(prevRound)
 			for _, msg := range prevMessages {
@@ -1506,12 +1504,12 @@ func (h *Handler) processQueuedMessages(roundNum round.Number) {
 			}
 		}
 	}
-	
+
 	// Now process messages for the current round with retry logic
 	// Retry up to 3 times to handle ErrNotReady cases
 	for retry := 0; retry < 3; retry++ {
 		anyRetried := false
-		
+
 		// Process broadcasts first
 		broadcasts := h.broadcast.LoadAll(roundNum)
 		r := h.currentRound.Load().(*roundWrapper).round
@@ -1527,7 +1525,7 @@ func (h *Handler) processQueuedMessages(roundNum round.Number) {
 				}
 			}
 		}
-		
+
 		// Then process normal messages
 		messages := h.messages.LoadAll(roundNum)
 		for from, msg := range messages {
@@ -1541,7 +1539,7 @@ func (h *Handler) processQueuedMessages(roundNum round.Number) {
 				}
 			}
 		}
-		
+
 		// If nothing was retried, we're done
 		if !anyRetried {
 			break
@@ -1551,13 +1549,13 @@ func (h *Handler) processQueuedMessages(roundNum round.Number) {
 
 func (h *Handler) hasAllMessages(r round.Session) bool {
 	number := r.Number()
-	
+
 	// Check broadcasts
 	if _, ok := r.(round.BroadcastRound); ok {
 		broadcasts := h.broadcast.LoadAll(number)
 		missingBroadcasts := []party.ID{}
 		unprocessedBroadcasts := []party.ID{}
-		
+
 		for _, id := range r.PartyIDs() {
 			if broadcasts[id] == nil {
 				missingBroadcasts = append(missingBroadcasts, id)
@@ -1578,7 +1576,7 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 				}
 			}
 		}
-		
+
 		if len(missingBroadcasts) > 0 {
 			h.log.Debug("waiting for broadcasts",
 				log.Uint16("round", uint16(number)),
@@ -1586,7 +1584,7 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 				log.String("self", string(r.SelfID())))
 			return false
 		}
-		
+
 		if len(unprocessedBroadcasts) > 0 {
 			h.log.Debug("waiting for broadcast processing",
 				log.Uint16("round", uint16(number)),
@@ -1595,13 +1593,13 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 			return false
 		}
 	}
-	
+
 	// Check normal messages
 	if r.MessageContent() != nil {
 		messages := h.messages.LoadAll(number)
 		missingMessages := []party.ID{}
 		unprocessedMessages := []party.ID{}
-		
+
 		for _, id := range r.OtherPartyIDs() {
 			if messages[id] == nil {
 				missingMessages = append(missingMessages, id)
@@ -1613,14 +1611,14 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 				}
 			}
 		}
-		
+
 		if len(missingMessages) > 0 {
 			h.log.Debug("waiting for messages",
 				log.Uint16("round", uint16(number)),
 				log.String("missing", fmt.Sprintf("%v", missingMessages)))
 			return false
 		}
-		
+
 		if len(unprocessedMessages) > 0 {
 			h.log.Debug("waiting for message processing",
 				log.Uint16("round", uint16(number)),
@@ -1628,7 +1626,7 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 			return false
 		}
 	}
-	
+
 	h.log.Debug("have all messages and processed",
 		log.Uint16("round", uint16(number)),
 		log.String("self", string(r.SelfID())))
@@ -1637,7 +1635,7 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 
 func (h *Handler) storeMessage(msg *Message) {
 	if msg.Broadcast {
-		h.log.Debug("storing broadcast", 
+		h.log.Debug("storing broadcast",
 			log.Uint16("round", uint16(msg.RoundNumber)),
 			log.String("from", string(msg.From)))
 		h.broadcast.Store(msg.RoundNumber, msg.From, msg)
@@ -1653,23 +1651,23 @@ func (h *Handler) getBroadcastHash(r round.Session) []byte {
 	if cached, ok := h.broadcastHashes.Load(r.Number()); ok {
 		return cached.([]byte)
 	}
-	
+
 	broadcastRound, ok := r.(round.BroadcastRound)
 	if !ok {
 		return nil
 	}
-	
+
 	content := broadcastRound.BroadcastContent()
 	if content == nil {
 		return nil
 	}
-	
+
 	// Calculate hash using the hash package
 	data, _ := cbor.Marshal(content)
 	hasher := hash.New()
 	hasher.WriteAny(hash.BytesWithDomain{TheDomain: "Broadcast", Bytes: data})
 	hashed := hasher.Sum()
-	
+
 	h.broadcastHashes.Store(r.Number(), hashed)
 	return hashed
 }
@@ -1715,7 +1713,7 @@ func (ms *MessageStore) Store(roundNum round.Number, from party.ID, msg *Message
 	shard := ms.getShard(roundNum)
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
-	
+
 	if shard.data[roundNum] == nil {
 		shard.data[roundNum] = make(map[party.ID]*Message)
 	}
@@ -1726,7 +1724,7 @@ func (ms *MessageStore) Load(roundNum round.Number, from party.ID) (*Message, bo
 	shard := ms.getShard(roundNum)
 	shard.mu.RLock()
 	defer shard.mu.RUnlock()
-	
+
 	if msgs, ok := shard.data[roundNum]; ok {
 		msg, exists := msgs[from]
 		return msg, exists
@@ -1738,12 +1736,12 @@ func (ms *MessageStore) LoadAll(roundNum round.Number) map[party.ID]*Message {
 	shard := ms.getShard(roundNum)
 	shard.mu.RLock()
 	defer shard.mu.RUnlock()
-	
+
 	msgs := shard.data[roundNum]
 	if msgs == nil {
 		return nil
 	}
-	
+
 	// Return copy to avoid concurrent modification
 	result := make(map[party.ID]*Message, len(msgs))
 	for k, v := range msgs {

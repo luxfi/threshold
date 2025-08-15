@@ -63,11 +63,11 @@ func (f *FROSTConfigAdapter) GetPublicShare(id party.ID) (curve.Point, error) {
 	if f.VerificationShares == nil {
 		return nil, fmt.Errorf("verification shares not available")
 	}
-	
+
 	if share, ok := f.VerificationShares.Points[id]; ok {
 		return share, nil
 	}
-	
+
 	return nil, fmt.Errorf("verification share for party %s not found", id)
 }
 
@@ -103,29 +103,29 @@ func (f *FROSTConfigAdapter) IsCompatible(other protocol.ThresholdConfig) bool {
 	if other == nil {
 		return false
 	}
-	
+
 	// Check if public keys match
 	myPubKey, err1 := f.GetPublicKey()
 	otherPubKey, err2 := other.GetPublicKey()
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	
+
 	if !myPubKey.Equal(otherPubKey) {
 		return false
 	}
-	
+
 	// Check if groups match
 	myGroup := f.GetGroup()
 	otherGroup := other.GetGroup()
 	if myGroup == nil || otherGroup == nil {
 		return false
 	}
-	
+
 	if myGroup.Name() != otherGroup.Name() {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -149,7 +149,7 @@ func (p *FROSTProtocolAdapter) Sign(config protocol.ThresholdConfig, signers []p
 	if !ok {
 		return nil, fmt.Errorf("config is not a FROST config")
 	}
-	
+
 	return frost.Sign(frostAdapter.Config, signers, message), nil
 }
 
@@ -159,20 +159,20 @@ func (p *FROSTProtocolAdapter) Refresh(config protocol.ThresholdConfig) (protoco
 	if !ok {
 		return nil, fmt.Errorf("config is not a FROST config")
 	}
-	
+
 	// FROST doesn't have a direct refresh, but we can use keygen with existing key material
 	// This would need to be implemented properly for production use
 	participants := make([]party.ID, 0)
 	for id := range frostAdapter.VerificationShares.Points {
 		participants = append(participants, id)
 	}
-	
+
 	// For now, just do a new keygen (not a true refresh)
 	group := frostAdapter.GetGroup()
 	if group == nil {
 		return nil, fmt.Errorf("unable to determine group from config")
 	}
-	
+
 	return frost.Keygen(group, frostAdapter.ID, participants, frostAdapter.Threshold), nil
 }
 

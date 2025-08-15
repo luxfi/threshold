@@ -206,8 +206,8 @@ func MigrateECDSAExtensions(
 	// This is a simplified version - full implementation would coordinate this
 
 	newExtensions := &config.ECDSAExtensions{
-		PaillierKey:        oldExtensions.PaillierKey,    // Keep if same party
-		PedersenParams:     oldExtensions.PedersenParams, // Shared params remain
+		PaillierKey:    oldExtensions.PaillierKey,    // Keep if same party
+		PedersenParams: oldExtensions.PedersenParams, // Shared params remain
 		// PublicPaillierKeys: make(map[party.ID]*paillier.PublicKey),
 	}
 
@@ -234,9 +234,9 @@ func CompleteReshare(cfg *config.UnifiedConfig) (*config.UnifiedConfig, error) {
 		PartyIDs:           cfg.ReshareData.NewParties,
 		SignatureScheme:    cfg.SignatureScheme,
 		Group:              cfg.Group,
-		SecretShare:        cfg.SecretShare, // Will be updated with new share
-		PublicKey:          cfg.PublicKey,   // Remains unchanged
-		VerificationShares: make(map[party.ID]curve.Point),
+		SecretShare:        cfg.SecretShare,        // Will be updated with new share
+		PublicKey:          cfg.PublicKey,          // Remains unchanged
+		VerificationShares: cfg.VerificationShares, // Copy existing verification shares
 		ChainKey:           cfg.ChainKey,
 	}
 

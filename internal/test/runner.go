@@ -21,7 +21,7 @@ type ProtocolRunner struct {
 	network  *Network
 	logger   log.Logger
 	registry *prometheus.Registry
-	
+
 	mu       sync.RWMutex
 	handlers map[party.ID]*protocol.Handler
 	results  map[party.ID]interface{}
@@ -33,14 +33,14 @@ func NewRunner(t testing.TB, config *TestConfig) *ProtocolRunner {
 	if config == nil {
 		config = DefaultTestConfig()
 	}
-	
+
 	var logger log.Logger
 	if config.EnableLogging {
 		logger = log.NewTestLogger(level.Info)
 	} else {
 		logger = log.NewTestLogger(level.Error) // Use Error level to suppress most logs
 	}
-	
+
 	return &ProtocolRunner{
 		t:        t,
 		config:   config,
@@ -55,7 +55,7 @@ func NewRunner(t testing.TB, config *TestConfig) *ProtocolRunner {
 // SetupParties initializes the network and handlers for the given parties
 func (r *ProtocolRunner) SetupParties(partyIDs []party.ID, startFuncs map[party.ID]protocol.StartFunc, sessionID []byte) error {
 	r.network = NewNetwork(partyIDs)
-	
+
 	// Create protocol config from test config
 	protocolConfig := &protocol.Config{
 		Workers:         r.config.Workers,
@@ -66,12 +66,12 @@ func (r *ProtocolRunner) SetupParties(partyIDs []party.ID, startFuncs map[party.
 		RoundTimeout:    r.config.RoundTimeout,
 		ProtocolTimeout: r.config.ProtocolTimeout,
 	}
-	
+
 	// Create handlers for each party
 	for id, startFunc := range startFuncs {
 		// Each handler needs its own registry to avoid duplicate registration
 		registry := prometheus.NewRegistry()
-		
+
 		handler, err := protocol.NewHandler(
 			context.Background(), // Don't use timeout context here
 			r.logger,
@@ -85,7 +85,7 @@ func (r *ProtocolRunner) SetupParties(partyIDs []party.ID, startFuncs map[party.
 		}
 		r.handlers[id] = handler
 	}
-	
+
 	return nil
 }
 
@@ -93,7 +93,7 @@ func (r *ProtocolRunner) SetupParties(partyIDs []party.ID, startFuncs map[party.
 func (r *ProtocolRunner) Run() error {
 	ctx, cancel := r.config.WithContext(r.t)
 	defer cancel()
-	
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(r.handlers))
 	resultChan := make(chan struct {
@@ -101,45 +101,45 @@ func (r *ProtocolRunner) Run() error {
 		result interface{}
 		err    error
 	}, len(r.handlers))
-	
+
 	// Start handler loops
 	for id, handler := range r.handlers {
 		wg.Add(1)
 		go func(partyID party.ID, h *protocol.Handler) {
 			defer wg.Done()
-			
+
 			// Run handler with message routing
 			err := r.runHandler(ctx, partyID, h)
-			
+
 			// Get result or error
 			var result interface{}
 			if err == nil {
 				result, err = h.Result()
 			}
-			
+
 			resultChan <- struct {
 				id     party.ID
 				result interface{}
 				err    error
 			}{id: partyID, result: result, err: err}
-			
+
 		}(id, handler)
 	}
-	
+
 	// Wait for completion or timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	// Collect results with timeout
 	select {
 	case <-done:
 		// All handlers completed
 		close(resultChan)
 		close(errChan)
-		
+
 		// Collect results
 		for res := range resultChan {
 			if res.err != nil {
@@ -148,21 +148,21 @@ func (r *ProtocolRunner) Run() error {
 				r.results[res.id] = res.result
 			}
 		}
-		
+
 		// Check for errors
 		if len(r.errors) > 0 {
 			return fmt.Errorf("protocol failed for %d parties: %v", len(r.errors), r.errors)
 		}
-		
+
 		return nil
-		
+
 	case <-ctx.Done():
 		// Timeout occurred
 		cancel()
-		
+
 		// Give handlers a moment to clean up
 		time.Sleep(100 * time.Millisecond)
-		
+
 		return fmt.Errorf("protocol timed out after %v", r.config.TestTimeout)
 	}
 }
@@ -172,21 +172,21 @@ func (r *ProtocolRunner) runHandler(ctx context.Context, id party.ID, handler *p
 	// Create a sub-context for this handler
 	handlerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	
+
 	// Channel for coordinating shutdown
 	done := make(chan struct{})
 	defer close(done)
-	
+
 	// Route incoming messages
 	go func() {
 		defer func() {
 			// Ensure no panic escapes
 			if p := recover(); p != nil {
-				r.logger.Debug("recovered from panic in incoming message handler", 
+				r.logger.Debug("recovered from panic in incoming message handler",
 					log.Any("panic", p), log.String("party", string(id)))
 			}
 		}()
-		
+
 		for {
 			select {
 			case <-done:
@@ -205,7 +205,7 @@ func (r *ProtocolRunner) runHandler(ctx context.Context, id party.ID, handler *p
 			}
 		}
 	}()
-	
+
 	// Route outgoing messages
 	go func() {
 		defer func() {
@@ -215,7 +215,7 @@ func (r *ProtocolRunner) runHandler(ctx context.Context, id party.ID, handler *p
 					log.Any("panic", p), log.String("party", string(id)))
 			}
 		}()
-		
+
 		for {
 			select {
 			case <-done:
@@ -235,14 +235,14 @@ func (r *ProtocolRunner) runHandler(ctx context.Context, id party.ID, handler *p
 			}
 		}
 	}()
-	
+
 	// Wait for handler to complete or context to cancel
 	resultChan := make(chan error, 1)
 	go func() {
 		_, err := handler.WaitForResult()
 		resultChan <- err
 	}()
-	
+
 	select {
 	case err := <-resultChan:
 		cancel() // Clean up goroutines
@@ -262,7 +262,7 @@ func (r *ProtocolRunner) runHandler(ctx context.Context, id party.ID, handler *p
 func (r *ProtocolRunner) Results() map[party.ID]interface{} {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	results := make(map[party.ID]interface{})
 	for id, result := range r.results {
 		results[id] = result
@@ -274,7 +274,7 @@ func (r *ProtocolRunner) Results() map[party.ID]interface{} {
 func (r *ProtocolRunner) Errors() map[party.ID]error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	errors := make(map[party.ID]error)
 	for id, err := range r.errors {
 		errors[id] = err
@@ -289,7 +289,7 @@ func (r *ProtocolRunner) Cleanup() {
 		// Handler cleanup if needed
 		_ = h
 	}
-	
+
 	// Clean up network
 	if r.network != nil {
 		// Network cleanup if needed

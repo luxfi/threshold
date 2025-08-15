@@ -27,18 +27,18 @@ func TestFROSTKeygen(t *testing.T) {
 			Validate: func(t *testing.T, results map[party.ID]interface{}) {
 				// All parties should have configs
 				require.Len(t, results, 3)
-				
+
 				// All configs should have the same public key
 				var firstPubKey curve.Point
 				for id, result := range results {
 					config, ok := result.(*frost.Config)
 					require.True(t, ok, "result should be *frost.Config for party %s", id)
 					require.NotNil(t, config)
-					
+
 					if firstPubKey == nil {
 						firstPubKey = config.PublicKey
 					} else {
-						assert.True(t, firstPubKey.Equal(config.PublicKey), 
+						assert.True(t, firstPubKey.Equal(config.PublicKey),
 							"all parties should have same public key")
 					}
 				}
@@ -54,13 +54,13 @@ func TestFROSTKeygen(t *testing.T) {
 			},
 			Validate: func(t *testing.T, results map[party.ID]interface{}) {
 				require.Len(t, results, 5)
-				
+
 				var firstPubKey curve.Point
 				for id, result := range results {
 					config, ok := result.(*frost.Config)
 					require.True(t, ok, "result should be *frost.Config for party %s", id)
 					require.NotNil(t, config)
-					
+
 					if firstPubKey == nil {
 						firstPubKey = config.PublicKey
 					} else {
@@ -79,13 +79,13 @@ func TestFROSTKeygen(t *testing.T) {
 			},
 			Validate: func(t *testing.T, results map[party.ID]interface{}) {
 				require.Len(t, results, 7)
-				
+
 				var firstPubKey curve.Point
 				for id, result := range results {
 					config, ok := result.(*frost.Config)
 					require.True(t, ok, "result should be *frost.Config for party %s", id)
 					require.NotNil(t, config)
-					
+
 					if firstPubKey == nil {
 						firstPubKey = config.PublicKey
 					} else {
@@ -95,7 +95,7 @@ func TestFROSTKeygen(t *testing.T) {
 			},
 		},
 	}
-	
+
 	test.RunMultipleProtocolTests(t, tests)
 }
 
@@ -108,7 +108,7 @@ func TestFROSTKeygenAndSign(t *testing.T) {
 		h.Write(msg)
 		return h.Sum(nil)
 	}
-	
+
 	tests := []test.KeygenAndSign{
 		{
 			Name:       "2-of-3 signature",
@@ -201,7 +201,7 @@ func TestFROSTKeygenAndSign(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, test := range tests {
 		test.Run(t)
 	}
@@ -211,17 +211,17 @@ func TestFROSTRefresh(t *testing.T) {
 	// First run keygen
 	partyIDs := test.PartyIDs(5)
 	threshold := 3
-	
+
 	keygenResults, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
 		return frost.Keygen(curve.Secp256k1{}, id, partyIDs, threshold)
 	})
 	require.NoError(t, err)
 	require.Len(t, keygenResults, 5)
-	
+
 	// Get the original public key
 	firstConfig := keygenResults[partyIDs[0]].(*frost.Config)
 	originalPubKey := firstConfig.PublicKey
-	
+
 	// Run refresh with a new session ID
 	refreshResults, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
 		config := keygenResults[id].(*frost.Config)
@@ -229,12 +229,12 @@ func TestFROSTRefresh(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, refreshResults, 5)
-	
+
 	// Verify refresh maintained the same public key
 	for id, result := range refreshResults {
 		refreshedConfig := result.(*frost.Config)
 		require.NotNil(t, refreshedConfig)
-		assert.True(t, originalPubKey.Equal(refreshedConfig.PublicKey), 
+		assert.True(t, originalPubKey.Equal(refreshedConfig.PublicKey),
 			"party %s should have same public key after refresh", id)
 	}
 }
@@ -266,7 +266,7 @@ func BenchmarkFROSTKeygen(b *testing.B) {
 			},
 		},
 	}
-	
+
 	test.RunProtocolBenchmarks(b, benchmarks)
 }
 
@@ -276,12 +276,12 @@ func BenchmarkFROSTSign(b *testing.B) {
 	threshold := 3
 	signers := partyIDs[:threshold]
 	message := []byte("benchmark message")
-	
+
 	keygenResults, err := test.RunProtocol(b, partyIDs, nil, func(id party.ID) protocol.StartFunc {
 		return frost.Keygen(curve.Secp256k1{}, id, partyIDs, threshold)
 	})
 	require.NoError(b, err)
-	
+
 	// Benchmark signing
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -298,10 +298,10 @@ func BenchmarkFROSTSign(b *testing.B) {
 func TestFROSTWithPool(t *testing.T) {
 	pl := pool.NewPool(4) // Use 4 workers
 	defer pl.TearDown()
-	
+
 	partyIDs := test.PartyIDs(5)
 	threshold := 3
-	
+
 	// Create keygen with pool
 	keygenResults, err := test.RunProtocol(t, partyIDs, nil, func(id party.ID) protocol.StartFunc {
 		// Note: FROST doesn't use pool in its current implementation
@@ -310,7 +310,7 @@ func TestFROSTWithPool(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, keygenResults, 5)
-	
+
 	// Verify all configs have the same public key
 	var firstPubKey curve.Point
 	for _, result := range keygenResults {

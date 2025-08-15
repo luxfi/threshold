@@ -3,12 +3,12 @@ package protocols_test
 import (
 	"testing"
 
+	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/internal/test"
-	lssconfig "github.com/luxfi/threshold/protocols/lss/config"
 	cmpconfig "github.com/luxfi/threshold/protocols/cmp/config"
 	"github.com/luxfi/threshold/protocols/frost"
+	lssconfig "github.com/luxfi/threshold/protocols/lss/config"
 )
 
 func TestSimpleLSSConfig(t *testing.T) {
@@ -17,7 +17,7 @@ func TestSimpleLSSConfig(t *testing.T) {
 	threshold := 2
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	
+
 	configs := make([]*lssconfig.Config, n)
 	for i, id := range partyIDs {
 		configs[i] = &lssconfig.Config{
@@ -26,7 +26,7 @@ func TestSimpleLSSConfig(t *testing.T) {
 			Threshold: threshold,
 		}
 	}
-	
+
 	if len(configs) != n {
 		t.Errorf("Expected %d configs, got %d", n, len(configs))
 	}
@@ -38,7 +38,7 @@ func TestSimpleCMPConfig(t *testing.T) {
 	threshold := 2
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	
+
 	configs := make([]*cmpconfig.Config, n)
 	for i, id := range partyIDs {
 		configs[i] = &cmpconfig.Config{
@@ -47,7 +47,7 @@ func TestSimpleCMPConfig(t *testing.T) {
 			Threshold: threshold,
 		}
 	}
-	
+
 	if len(configs) != n {
 		t.Errorf("Expected %d configs, got %d", n, len(configs))
 	}
@@ -59,10 +59,10 @@ func TestSimpleFROSTConfig(t *testing.T) {
 	threshold := 3
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	
+
 	configs := make([]*frost.Config, n)
 	publicKey := group.NewPoint()
-	
+
 	for i, id := range partyIDs {
 		configs[i] = &frost.Config{
 			ID:        id,
@@ -70,7 +70,7 @@ func TestSimpleFROSTConfig(t *testing.T) {
 			PublicKey: publicKey,
 		}
 	}
-	
+
 	if len(configs) != n {
 		t.Errorf("Expected %d configs, got %d", n, len(configs))
 	}
@@ -83,7 +83,7 @@ func TestPartyIDCreation(t *testing.T) {
 		if len(partyIDs) != n {
 			t.Errorf("Expected %d party IDs, got %d", n, len(partyIDs))
 		}
-		
+
 		// Check for uniqueness
 		seen := make(map[party.ID]bool)
 		for _, id := range partyIDs {
@@ -110,7 +110,7 @@ func TestThresholdValues(t *testing.T) {
 		{5, 0, false}, // threshold = 0
 		{7, 1, true},  // threshold = 1 (valid but not secure)
 	}
-	
+
 	for _, tc := range testCases {
 		if tc.valid {
 			if tc.threshold > tc.n {
@@ -128,20 +128,20 @@ func TestCurveOperations(t *testing.T) {
 	curves := []curve.Curve{
 		curve.Secp256k1{},
 	}
-	
+
 	for _, c := range curves {
 		// Test point creation
 		point := c.NewPoint()
 		if point == nil {
 			t.Error("Failed to create new point")
 		}
-		
+
 		// Test scalar creation
 		scalar := c.NewScalar()
 		if scalar == nil {
 			t.Error("Failed to create new scalar")
 		}
-		
+
 		// Test curve name
 		name := c.Name()
 		if name == "" {

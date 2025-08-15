@@ -14,18 +14,18 @@ import (
 // round1 generates lattice polynomial and broadcasts commitments
 type round1 struct {
 	*round.Helper
-	
+
 	config *config.Config
-	
+
 	// Our lattice polynomial coefficients
 	polynomial []int
-	
+
 	// Received shares from other parties
 	shares map[party.ID][]byte
-	
+
 	// Commitment to our polynomial
 	commitment hash.Commitment
-	
+
 	// Decommitment data
 	decommit hash.Decommitment
 }
@@ -33,7 +33,7 @@ type round1 struct {
 // broadcast1 contains the polynomial commitment
 type broadcast1 struct {
 	round.NormalBroadcastContent
-	
+
 	// Commitment to the polynomial
 	Commitment hash.Commitment
 }
@@ -74,16 +74,16 @@ func (r *round1) StoreBroadcastMessage(msg round.Message) error {
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
-	
+
 	// Validate commitment
 	if err := body.Commitment.Validate(); err != nil {
 		return err
 	}
-	
+
 	// Store for later verification
 	// In real implementation, we'd store the commitment
 	// to verify against the polynomial revealed later
-	
+
 	return nil
 }
 
@@ -92,7 +92,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Generate random lattice polynomial
 	params := r.config.GetParameters()
 	r.polynomial = make([]int, params.N)
-	
+
 	// Generate random coefficients modulo Q
 	for i := 0; i < params.N; i++ {
 		var buf [8]byte
@@ -101,7 +101,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		}
 		r.polynomial[i] = int(binary.LittleEndian.Uint64(buf[:]) % uint64(params.Q))
 	}
-	
+
 	// Create commitment to polynomial
 	h, _ := blake2b.New256(nil)
 	for _, coeff := range r.polynomial {
@@ -110,7 +110,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		h.Write(coeffBytes)
 	}
 	polyHash := h.Sum(nil)
-	
+
 	// Create commitment and decommitment
 	commitment, decommit, err := r.Hash().Commit(polyHash)
 	if err != nil {
@@ -118,14 +118,14 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 	r.commitment = commitment
 	r.decommit = decommit
-	
+
 	// Broadcast commitment
 	if err := r.BroadcastMessage(out, &broadcast1{
 		Commitment: commitment,
 	}); err != nil {
 		return nil, err
 	}
-	
+
 	// Move to round 2
 	return &round2{
 		Helper:     r.Helper,

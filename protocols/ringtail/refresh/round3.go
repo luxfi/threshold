@@ -44,25 +44,25 @@ func (r *refreshRound3) Finalize(_ chan<- *round.Message) (round.Session, error)
 	if len(r.refreshShares) < r.newThreshold {
 		return nil, errors.New("insufficient refresh shares")
 	}
-	
+
 	// Combine old share with refresh shares
 	newPrivateShare := make([]byte, len(r.config.PrivateShare))
 	copy(newPrivateShare, r.config.PrivateShare)
-	
+
 	// Add refresh shares to old share
 	for _, refreshShare := range r.refreshShares {
 		for i := 0; i < len(newPrivateShare) && i < len(refreshShare); i++ {
 			newPrivateShare[i] ^= refreshShare[i]
 		}
 	}
-	
+
 	// Public key remains the same (property of refresh)
 	// but we recompute it for verification
 	h, _ := blake2b.New256(nil)
 	h.Write(r.config.PublicKey)
 	h.Write([]byte("refresh"))
 	verificationHash := h.Sum(nil)
-	
+
 	// Create refreshed configuration
 	refreshedConfig := &config.Config{
 		ID:           r.SelfID(),
@@ -72,7 +72,7 @@ func (r *refreshRound3) Finalize(_ chan<- *round.Message) (round.Session, error)
 		PrivateShare: newPrivateShare,
 		Participants: r.newParticipants,
 	}
-	
+
 	// Return the result
 	return r.ResultRound(&RefreshOutput{
 		Config:           refreshedConfig,

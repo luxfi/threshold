@@ -110,13 +110,13 @@ func (r *round2) StoreMessage(msg round.Message) error {
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Check if we've already sent shares
 	_, hasSelfShare := r.shares.Load(r.SelfID())
-	
+
 	// First time: Send shares to each party
 	if !hasSelfShare {
 		for _, id := range r.OtherPartyIDs() {
 			x := id.Scalar(r.Group())
 			share := r.poly.Evaluate(x)
-			
+
 			// Marshal the share for CBOR
 			shareBytes, err := share.MarshalBinary()
 			if err != nil {
@@ -133,7 +133,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		// Our own share
 		ownX := r.SelfID().Scalar(r.Group())
 		r.shares.Store(r.SelfID(), r.poly.Evaluate(ownX))
-		
+
 		// Return self to wait for incoming shares
 		return r, nil
 	}
@@ -144,7 +144,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		shareCount++
 		return true
 	})
-	
+
 	// Check if we have all shares before advancing
 	if shareCount < r.N() {
 		// Still waiting for shares
