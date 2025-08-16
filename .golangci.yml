@@ -88,6 +88,8 @@ linters-settings:
   govet:
     enable-all: true
     # Removed check-shadowing as it's deprecated
+    disable:
+      - fieldalignment  # Not critical for our use case
 
   lll:
     line-length: 140
@@ -129,6 +131,10 @@ issues:
       linters:
         - dupl
         - gosec
+    
+    - path: internal/
+      linters:
+        - stylecheck  # Internal packages don't need package comments
 
     - path: cmd/threshold-cli/
       linters:
