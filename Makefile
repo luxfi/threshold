@@ -46,9 +46,8 @@ help:
 ## all: Build and test everything
 all: clean deps lint test build
 
-## build: Build all packages
-build:
-	$(GOBUILD) $(BUILDFLAGS) ./...
+## build: Build the CLI tool
+build: build-cli
 
 ## build-cli: Build the threshold CLI tool
 build-cli:
