@@ -23,6 +23,10 @@ const (
 	protocolCMP   = "cmp"
 	protocolFROST = "frost"
 	operationAll  = "all"
+	suiteFunctional = "functional"
+	suiteSecurity   = "security"
+	suiteProperty   = "property"
+	suiteFuzz       = "fuzz"
 )
 
 var (
@@ -484,14 +488,20 @@ func runReshare(cmd *cobra.Command, args []string) error {
 
 func runVerify(cmd *cobra.Command, args []string) error {
 	// Load signature
-	sigFile, _ := cmd.Flags().GetString("signature")
+	sigFile, sigErr := cmd.Flags().GetString("signature")
+	if sigErr != nil {
+		return fmt.Errorf("failed to get signature flag: %w", sigErr)
+	}
 	sigData, err := os.ReadFile(sigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read signature: %w", err)
 	}
 
 	// Load public key
-	pkFile, _ := cmd.Flags().GetString("public-key")
+	pkFile, pkErr := cmd.Flags().GetString("public-key")
+	if pkErr != nil {
+		return fmt.Errorf("failed to get public-key flag: %w", pkErr)
+	}
 	pkData, err := os.ReadFile(pkFile)
 	if err != nil {
 		return fmt.Errorf("failed to read public key: %w", err)
@@ -602,9 +612,18 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 }
 
 func runTests(cmd *cobra.Command, args []string) error {
-	suite, _ := cmd.Flags().GetString("suite")
-	useGinkgo, _ := cmd.Flags().GetBool("ginkgo")
-	timeout, _ := cmd.Flags().GetDuration("timeout")
+	suite, suiteErr := cmd.Flags().GetString("suite")
+	if suiteErr != nil {
+		return fmt.Errorf("failed to get suite flag: %w", suiteErr)
+	}
+	useGinkgo, ginkgoErr := cmd.Flags().GetBool("ginkgo")
+	if ginkgoErr != nil {
+		return fmt.Errorf("failed to get ginkgo flag: %w", ginkgoErr)
+	}
+	timeout, timeoutErr := cmd.Flags().GetDuration("timeout")
+	if timeoutErr != nil {
+		return fmt.Errorf("failed to get timeout flag: %w", timeoutErr)
+	}
 
 	fmt.Printf("Running %s test suite for %s protocol...\n", suite, protocolName)
 
@@ -616,13 +635,13 @@ func runTests(cmd *cobra.Command, args []string) error {
 
 	// Run standard Go tests
 	switch suite {
-	case "functional":
+	case suiteFunctional:
 		return runFunctionalTests(protocolName)
-	case "security":
+	case suiteSecurity:
 		return runSecurityTests(protocolName)
-	case "property":
+	case suiteProperty:
 		return runPropertyTests(protocolName)
-	case "fuzz":
+	case suiteFuzz:
 		return runFuzzTests(protocolName)
 	case operationAll:
 		if err := runFunctionalTests(protocolName); err != nil {
