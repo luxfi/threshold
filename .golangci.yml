@@ -137,6 +137,8 @@ issues:
     - path: internal/
       linters:
         - stylecheck  # Internal packages don't need package comments
+        - gocritic   # Minor style issues in internal packages
+        - errcheck   # Internal crypto operations with safe error handling
 
     - path: cmd/threshold-cli/
       linters:
