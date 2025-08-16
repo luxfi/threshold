@@ -25,7 +25,7 @@ func DeriveScalar(public *curve.Secp256k1Point, chaining []byte, i uint32) (*cur
 	}
 
 	h := hmac.New(sha512.New, chaining)
-	compressed, _ := public.MarshalBinary()
+	compressed, _ := public.MarshalBinary() //nolint:errcheck // MarshalBinary never fails for curve points
 	_, _ = h.Write(compressed)
 	iBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(iBytes, i)
