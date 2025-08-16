@@ -57,10 +57,10 @@ func checkOutput(t *testing.T, rounds []round.Session, parties party.IDSlice) {
 			expected := shares[id].ActOnBase()
 			require.True(t, result.VerificationShares.Points[id].Equal(expected), "different verification shares", id)
 		}
-		marshalled, err := cbor.Marshal(result)
+		marshaled, err := cbor.Marshal(result)
 		require.NoError(t, err)
 		unmarshalledResult := EmptyConfig(group)
-		err = cbor.Unmarshal(marshalled, unmarshalledResult)
+		err = cbor.Unmarshal(marshaled, unmarshalledResult)
 		require.NoError(t, err)
 		for _, id := range parties {
 			expected := shares[id].ActOnBase()
@@ -151,7 +151,6 @@ func TestKeygenTaproot(t *testing.T) {
 		r, err := StartKeygenCommon(true, group, partyIDs, N-1, partyID, nil, nil, nil)(nil)
 		require.NoError(t, err, "round creation should not result in an error")
 		rounds = append(rounds, r)
-
 	}
 
 	for {

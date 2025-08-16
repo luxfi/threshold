@@ -23,21 +23,21 @@ type MLDSAThresholdAdapter struct {
 type MLDSAParams struct {
 	Name          string // ML-DSA-44, ML-DSA-65, ML-DSA-87
 	SecurityLevel int    // NIST level: 2, 3, or 5
-	
+
 	// Core parameters
-	Q       int64 // 8380417 (prime modulus)
-	N       int   // 256 (polynomial degree)
-	K       int   // Vector dimension
-	L       int   // Matrix dimension
-	D       int   // Dropped bits
-	Tau     int   // Challenge weight
-	Eta     int   // Secret key range
-	Beta    int   // Rejection bound
-	Gamma1  int   // y coefficient range
-	Gamma2  int   // Low-order rounding range
-	Alpha2G2 int  // 2*Gamma2 for HighBits
-	Omega   int   // Max hints per row
-	
+	Q        int64 // 8380417 (prime modulus)
+	N        int   // 256 (polynomial degree)
+	K        int   // Vector dimension
+	L        int   // Matrix dimension
+	D        int   // Dropped bits
+	Tau      int   // Challenge weight
+	Eta      int   // Secret key range
+	Beta     int   // Rejection bound
+	Gamma1   int   // y coefficient range
+	Gamma2   int   // Low-order rounding range
+	Alpha2G2 int   // 2*Gamma2 for HighBits
+	Omega    int   // Max hints per row
+
 	// Sizes
 	SignatureSize int
 	PublicKeySize int
@@ -57,11 +57,11 @@ type SecretPoly struct {
 
 // ThresholdConfig describes the active subset and Shamir parameters
 type ThresholdConfig struct {
-	Subset []party.ID          // Active signers (m >= t)
-	Alpha  map[party.ID]F      // Shamir x-coordinates (non-zero)
-	T      int                 // Threshold
-	N      int                 // Total parties
-	Q      F                   // Field modulus
+	Subset []party.ID     // Active signers (m >= t)
+	Alpha  map[party.ID]F // Shamir x-coordinates (non-zero)
+	T      int            // Threshold
+	N      int            // Total parties
+	Q      F              // Field modulus
 }
 
 // Hints represent hint positions for signature compression
@@ -71,7 +71,7 @@ type Hints struct {
 
 // Sig is an ML-DSA signature
 type Sig struct {
-	C Poly  // Challenge polynomial
+	C Poly   // Challenge polynomial
 	Z []Poly // Response vector
 	H Hints  // Hint positions
 }
@@ -125,9 +125,9 @@ func GetMLDSAParams(level int) *MLDSAParams {
 			Tau:           39,
 			Eta:           2,
 			Beta:          78,
-			Gamma1:        131072,  // 2^17
-			Gamma2:        95232,   // (q-1)/88
-			Alpha2G2:      190464,  // 2*Gamma2
+			Gamma1:        131072, // 2^17
+			Gamma2:        95232,  // (q-1)/88
+			Alpha2G2:      190464, // 2*Gamma2
 			Omega:         80,
 			SignatureSize: 2420,
 			PublicKeySize: 1312,
@@ -145,9 +145,9 @@ func GetMLDSAParams(level int) *MLDSAParams {
 			Tau:           49,
 			Eta:           4,
 			Beta:          196,
-			Gamma1:        524288,  // 2^19
-			Gamma2:        261888,  // (q-1)/32
-			Alpha2G2:      523776,  // 2*Gamma2
+			Gamma1:        524288, // 2^19
+			Gamma2:        261888, // (q-1)/32
+			Alpha2G2:      523776, // 2*Gamma2
 			Omega:         55,
 			SignatureSize: 3293,
 			PublicKeySize: 1952,
@@ -165,9 +165,9 @@ func GetMLDSAParams(level int) *MLDSAParams {
 			Tau:           60,
 			Eta:           2,
 			Beta:          120,
-			Gamma1:        524288,  // 2^19
-			Gamma2:        261888,  // (q-1)/32
-			Alpha2G2:      523776,  // 2*Gamma2
+			Gamma1:        524288, // 2^19
+			Gamma2:        261888, // (q-1)/32
+			Alpha2G2:      523776, // 2*Gamma2
 			Omega:         75,
 			SignatureSize: 4595,
 			PublicKeySize: 2592,
@@ -194,13 +194,13 @@ func LagrangeAtZero(th *ThresholdConfig) (map[party.ID]F, error) {
 	if m < th.T {
 		return nil, fmt.Errorf("insufficient signers: have %d need %d", m, th.T)
 	}
-	
+
 	lambda := make(map[party.ID]F, m)
 	for _, i := range th.Subset {
 		ai := th.Alpha[i]
 		num := F(1)
 		den := F(1)
-		
+
 		for _, j := range th.Subset {
 			if j == i {
 				continue
@@ -210,14 +210,14 @@ func LagrangeAtZero(th *ThresholdConfig) (map[party.ID]F, error) {
 			num = num.MulMod(F(0).SubMod(aj, th.Q), th.Q)
 			den = den.MulMod(ai.SubMod(aj, th.Q), th.Q)
 		}
-		
+
 		invDen, ok := den.InvMod(th.Q)
 		if !ok {
 			return nil, fmt.Errorf("non-invertible denominator for %s", i)
 		}
 		lambda[i] = num.MulMod(invDen, th.Q)
 	}
-	
+
 	return lambda, nil
 }
 
@@ -232,7 +232,7 @@ func BuildHintsPublic(
 	mul func(a, b Poly) Poly,
 ) (Hints, error) {
 	if len(A) != params.K || len(A[0]) != params.L {
-		return Hints{}, fmt.Errorf("A dims mismatch: got %dx%d need %dx%d", 
+		return Hints{}, fmt.Errorf("A dims mismatch: got %dx%d need %dx%d",
 			len(A), len(A[0]), params.K, params.L)
 	}
 	if len(Z) != params.L || len(t) != params.K || len(t0) != params.K {
@@ -276,14 +276,14 @@ func BuildHintsPublic(
 			if h1[j][i] != h2[j][i] {
 				idx = append(idx, i)
 				if len(idx) > omega {
-					return Hints{}, fmt.Errorf("too many hints in row %d: %d > %d", 
+					return Hints{}, fmt.Errorf("too many hints in row %d: %d > %d",
 						j, len(idx), omega)
 				}
 			}
 		}
 		out.Idx[j] = idx
 	}
-	
+
 	return out, nil
 }
 
@@ -388,24 +388,24 @@ func (m *MLDSAThresholdAdapter) RejectionCheck(zs, rL []SecretPoly, params *MLDS
 // PrecomputeT generates precomputation for threshold signing
 func (m *MLDSAThresholdAdapter) PrecomputeT(A [][]Poly) (Precomp, error) {
 	P := m.params
-	
+
 	// Sample y with correct distribution (Shamir-shared)
 	Y := m.sampleMaskingVector(P.L, P.Gamma1)
-	
+
 	// W = A*Y (secret)
 	W := m.pub.MatrixVectorMul(A, Y)
-	
+
 	// WH = HighBits(W) then open
 	WH_secret, err := m.mpc.HighBitsVec(W, P.Alpha2G2)
 	if err != nil {
 		return Precomp{}, fmt.Errorf("highbits: %w", err)
 	}
-	
+
 	WH, err := m.mpc.Open(WH_secret)
 	if err != nil {
 		return Precomp{}, fmt.Errorf("open wH: %w", err)
 	}
-	
+
 	return Precomp{Y: Y, W: W, WH: WH}, nil
 }
 
@@ -543,14 +543,14 @@ func TranscriptBinding(
 	h.Write([]byte("MLDSA-THRESHOLD"))
 	h.Write([]byte(chainID))
 	h.Write([]byte(keyID))
-	
+
 	// Epoch ID
 	epochBytes := make([]byte, 8)
 	for i := 0; i < 8; i++ {
 		epochBytes[i] = byte(epochID >> (8 * i))
 	}
 	h.Write(epochBytes)
-	
+
 	// Sorted participants
 	sorted := make([]party.ID, len(participants))
 	copy(sorted, participants)
@@ -566,10 +566,10 @@ func TranscriptBinding(
 		}
 		h.Write(alphaBytes)
 	}
-	
+
 	// Precomputation nonce
 	h.Write(precompNonce)
-	
+
 	// Public wH
 	for _, w := range wH {
 		for i := 0; i < 256; i++ {
@@ -580,10 +580,10 @@ func TranscriptBinding(
 			h.Write(wBytes)
 		}
 	}
-	
+
 	// Message
 	h.Write(mu)
-	
+
 	return h.Sum(nil)
 }
 
@@ -592,11 +592,11 @@ func ValidateThresholdConfig(config *ThresholdConfig) error {
 	if config.T < 1 || config.T > config.N {
 		return fmt.Errorf("invalid threshold: %d not in [1, %d]", config.T, config.N)
 	}
-	
+
 	if len(config.Subset) < config.T {
 		return fmt.Errorf("insufficient subset: %d < %d", len(config.Subset), config.T)
 	}
-	
+
 	// Check all alphas are distinct and non-zero
 	seen := make(map[F]bool)
 	for _, id := range config.Subset {
@@ -612,7 +612,7 @@ func ValidateThresholdConfig(config *ThresholdConfig) error {
 		}
 		seen[alpha] = true
 	}
-	
+
 	return nil
 }
 
@@ -620,9 +620,9 @@ func ValidateThresholdConfig(config *ThresholdConfig) error {
 func TestMLDSAThreshold() error {
 	// Test Lagrange reconstruction
 	config := &ThresholdConfig{
-		T: 2,
-		N: 3,
-		Q: 8380417,
+		T:      2,
+		N:      3,
+		Q:      8380417,
 		Subset: []party.ID{"alice", "bob"},
 		Alpha: map[party.ID]F{
 			"alice":   1,
@@ -630,12 +630,12 @@ func TestMLDSAThreshold() error {
 			"charlie": 3,
 		},
 	}
-	
+
 	lambda, err := LagrangeAtZero(config)
 	if err != nil {
 		return fmt.Errorf("lagrange failed: %w", err)
 	}
-	
+
 	// Verify sum of lambdas equals 1 for valid reconstruction
 	sum := F(0)
 	for _, l := range lambda {
@@ -644,25 +644,25 @@ func TestMLDSAThreshold() error {
 	if sum != F(1) {
 		return fmt.Errorf("lagrange coefficients don't sum to 1: got %d", sum)
 	}
-	
+
 	// Test public hints computation
 	params := GetMLDSAParams(2)
 	A := make([][]Poly, params.K)
 	for i := range A {
 		A[i] = make([]Poly, params.L)
 	}
-	
+
 	Z := make([]Poly, params.L)
 	var c Poly
 	t := make([]Poly, params.K)
 	t0 := make([]Poly, params.K)
-	
+
 	mul := func(a, b Poly) Poly { return a } // Placeholder
-	
+
 	_, err = BuildHintsPublic(A, Z, c, t, t0, params, params.Omega, mul)
 	if err != nil {
 		return fmt.Errorf("hints failed: %w", err)
 	}
-	
+
 	return nil
 }

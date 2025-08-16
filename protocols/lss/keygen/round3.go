@@ -103,8 +103,8 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 		Generation: 0, // Initial generation
 		ECDSA:      ecdsaShare,
 		Public:     publicShares,
-		ChainKey:   finalChainKey[:],
-		RID:        finalRID[:],
+		ChainKey:   finalChainKey,
+		RID:        finalRID,
 	}
 
 	// Validate the config before returning

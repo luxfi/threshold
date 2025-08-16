@@ -247,7 +247,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 			ID:                 r.SelfID(),
 			Threshold:          r.threshold,
 			PrivateShare:       r.privateShare.(*curve.Secp256k1Scalar),
-			PublicKey:          YSecp.XBytes()[:],
+			PublicKey:          YSecp.XBytes(),
 			ChainKey:           ChainKey,
 			VerificationShares: secpVerificationShares,
 		}), nil

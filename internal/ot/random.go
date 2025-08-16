@@ -267,7 +267,7 @@ func (r *RandomOTSender) Round1(msg *RandomOTReceiveRound1Message) (outMsg Rando
 	//    rand1 = H(b * (A - B))
 	_A := r.group.NewPoint()
 	if err = _A.UnmarshalBinary(msg.ABytes); err != nil {
-		return
+		return outMsg, err
 	}
 	bA := r.b.Act(_A)
 
@@ -309,7 +309,7 @@ func (r *RandomOTSender) Round1(msg *RandomOTReceiveRound1Message) (outMsg Rando
 		outMsg.Challenge[i] ^= r.hDecommit0[i]
 	}
 
-	return
+	return outMsg, err
 }
 
 // RandomOTSendRound2Message is the message sent by the sender in round 2 of a Random OT.

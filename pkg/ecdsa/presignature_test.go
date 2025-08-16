@@ -61,7 +61,7 @@ func NewPreSignatures(group curve.Curve, N int) (x curve.Scalar, X curve.Point, 
 			ChiShare: chiShares[id],
 		}
 	}
-	return
+	return x, X, preSignatures
 }
 
 func TestPreSignature_Verify(t *testing.T) {

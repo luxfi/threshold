@@ -165,7 +165,7 @@ type PublicKey struct {
 type KeyType byte
 
 const (
-	ED25519KeyType KeyType = 0
+	ED25519KeyType   KeyType = 0
 	SECP256K1KeyType KeyType = 1
 )
 
@@ -215,8 +215,8 @@ type StakeAction struct {
 func (s *StakeAction) Type() ActionType { return Stake }
 
 type AddKeyAction struct {
-	PublicKey   PublicKey
-	AccessKey   AccessKey
+	PublicKey PublicKey
+	AccessKey AccessKey
 }
 
 func (a *AddKeyAction) Type() ActionType { return AddKey }
@@ -318,18 +318,18 @@ func (n *NEARAdapter) serializeActionToBorsh(action NEARAction) []byte {
 		binary.LittleEndian.PutUint32(lenBytes, uint32(len(methodBytes)))
 		borsh = append(borsh, lenBytes...)
 		borsh = append(borsh, methodBytes...)
-		
+
 		// Args
 		lenBytes = make([]byte, 4)
 		binary.LittleEndian.PutUint32(lenBytes, uint32(len(a.Args)))
 		borsh = append(borsh, lenBytes...)
 		borsh = append(borsh, a.Args...)
-		
+
 		// Gas
 		gasBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(gasBytes, a.Gas)
 		borsh = append(borsh, gasBytes...)
-		
+
 		// Deposit
 		borsh = append(borsh, a.Deposit.Amount[:]...)
 	}
@@ -348,7 +348,7 @@ func (n *NEARAdapter) GenerateNEARAddress(publicKey [32]byte, accountID string) 
 		hash := h.Sum(nil)
 		accountID = fmt.Sprintf("%x", hash[:8])
 	}
-	
+
 	// Add network suffix
 	switch n.networkID {
 	case "mainnet":
@@ -364,7 +364,7 @@ func (n *NEARAdapter) GenerateNEARAddress(publicKey [32]byte, accountID string) 
 func (n *NEARAdapter) EstimateGas(tx *NEARTransaction) uint64 {
 	// Base cost in TGas (10^12 gas units)
 	baseCost := uint64(1_000_000_000_000)
-	
+
 	// Add cost per action
 	actionCost := uint64(0)
 	for _, action := range tx.Actions {
@@ -379,15 +379,15 @@ func (n *NEARAdapter) EstimateGas(tx *NEARTransaction) uint64 {
 			actionCost += 1_000_000_000_000
 		}
 	}
-	
+
 	return baseCost + actionCost
 }
 
 // GetNEARConfig returns default NEAR configuration
 func GetDefaultNEARConfig(networkID string) map[string]interface{} {
 	return map[string]interface{}{
-		"network_id":      networkID,
-		"signature_type":  SignatureEdDSA,
+		"network_id":     networkID,
+		"signature_type": SignatureEdDSA,
 		"curve":          "Ed25519",
 		"hash_algorithm": "SHA3-256",
 		"serialization":  "Borsh",
