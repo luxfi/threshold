@@ -602,7 +602,8 @@ func performSign(protocolName string, configs []interface{}, signers []party.ID,
 	return nil, fmt.Errorf("no valid signature produced")
 }
 
-func attemptSign(protocolName string, configs []interface{}, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) error {
+func attemptSign(protocolName string, configs []interface{}, signers []party.ID,
+	message []byte, pl *pool.Pool, network *test.Network) error {
 	// This should fail with insufficient signers
 	_, err := performSign(protocolName, configs, signers, message, pl, network)
 	return err
