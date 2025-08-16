@@ -105,5 +105,4 @@ func Test_newMtA(t *testing.T) {
 		}))
 		verifyMtA(Di, Dj, betaI, betaJ)
 	}
-
 }

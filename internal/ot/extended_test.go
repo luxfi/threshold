@@ -47,7 +47,6 @@ func TestExtendedOT(t *testing.T) {
 			if !bytes.Equal(receiveResult._VChoices[i][:], expected) {
 				t.Error("incorrect Extended OT")
 			}
-
 		}
 	}
 }

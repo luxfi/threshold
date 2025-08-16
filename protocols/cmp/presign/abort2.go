@@ -85,7 +85,6 @@ func (r *abort2) Finalize(chan<- *round.Message) (round.Session, error) {
 			M = M.Add(r.ChiAlphas[j][l].ActOnBase()) // α̂ⱼₗ⋅G
 			M = M.Add(r.KShares[l].Act(r.ECDSA[j]))  // kₗ⋅Xⱼ
 			M = M.Sub(r.ChiAlphas[l][j].ActOnBase()) // -α̂ₗⱼ⋅G
-
 		}
 
 		if !M.Equal(r.ElGamalChi[j].M) {

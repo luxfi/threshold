@@ -112,7 +112,6 @@ func TestRefresh(t *testing.T) {
 		r, err := Start(info, pl, c)(nil)
 		require.NoError(t, err, "round creation should not result in an error")
 		rounds = append(rounds, r)
-
 	}
 
 	for {
