@@ -46,7 +46,6 @@ type Handler struct {
 	// Sharded message storage for zero contention
 	messages        *MessageStore
 	broadcast       *MessageStore
-	broadcastHashes sync.Map // round.Number -> []byte
 
 	// Processed message tracking - prevents race conditions
 	processedBroadcasts sync.Map // "round:from" -> bool
@@ -893,14 +892,7 @@ func (h *Handler) CanAccept(msg *Message) bool {
 	return true
 }
 
-// finalize method for test compatibility
-func (h *Handler) finalize() {
-	// This method is called by tests expecting initial messages to be generated
-	// The original handler would generate initial messages here
-	// Our optimized handler already does this in NewHandler via initializeRound
-	// but we may need to trigger additional processing
-	h.tryAdvanceRound()
-}
+// finalize method removed - functionality integrated into NewHandler
 
 // metricsUpdater periodically updates gauge metrics
 func (h *Handler) metricsUpdater() {
@@ -1666,30 +1658,7 @@ func (h *Handler) storeMessage(msg *Message) {
 	}
 }
 
-func (h *Handler) getBroadcastHash(r round.Session) []byte {
-	if cached, ok := h.broadcastHashes.Load(r.Number()); ok {
-		return cached.([]byte)
-	}
-
-	broadcastRound, ok := r.(round.BroadcastRound)
-	if !ok {
-		return nil
-	}
-
-	content := broadcastRound.BroadcastContent()
-	if content == nil {
-		return nil
-	}
-
-	// Calculate hash using the hash package
-	data, _ := cbor.Marshal(content)
-	hasher := hash.New()
-	hasher.WriteAny(hash.BytesWithDomain{TheDomain: "Broadcast", Bytes: data})
-	hashed := hasher.Sum()
-
-	h.broadcastHashes.Store(r.Number(), hashed)
-	return hashed
-}
+// getBroadcastHash removed - not needed in optimized implementation
 
 func (h *Handler) compressData(data []byte) []byte {
 	// Simple compression placeholder - would use gzip/zstd in production
