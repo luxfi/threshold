@@ -24,40 +24,40 @@ import (
 
 // Mock round implementation for testing
 type mockRound struct {
-	number           round.Number
-	threshold        int
-	n                int
-	protocolID       string
-	ssid             []byte
-	selfID           party.ID
-	partyIDs         []party.ID
-	otherPartyIDs    []party.ID
-	finalRoundNumber round.Number
-	messageContent   round.Content
-	messages         map[party.ID]*round.Message
-	broadcasts       map[party.ID]*round.Message
-	finalizeCalled   bool
+	number            round.Number
+	threshold         int
+	n                 int
+	protocolID        string
+	ssid              []byte
+	selfID            party.ID
+	partyIDs          []party.ID
+	otherPartyIDs     []party.ID
+	finalRoundNumber  round.Number
+	messageContent    round.Content
+	messages          map[party.ID]*round.Message
+	broadcasts        map[party.ID]*round.Message
+	finalizeCalled    bool
 	finalizeShouldErr bool
 	finalizeNextRound round.Session
-	storeShouldErr   bool
-	verifyShouldErr  bool
-	isAbort          bool
-	isOutput         bool
-	group            curve.Curve
+	storeShouldErr    bool
+	verifyShouldErr   bool
+	isAbort           bool
+	isOutput          bool
+	group             curve.Curve
 }
 
-func (m *mockRound) Number() round.Number                          { return m.number }
-func (m *mockRound) Threshold() int                                { return m.threshold }
-func (m *mockRound) N() int                                        { return m.n }
-func (m *mockRound) ProtocolID() string                            { return m.protocolID }
-func (m *mockRound) SSID() []byte                                  { return m.ssid }
-func (m *mockRound) SelfID() party.ID                              { return m.selfID }
-func (m *mockRound) PartyIDs() party.IDSlice                       { return m.partyIDs }
-func (m *mockRound) OtherPartyIDs() party.IDSlice                  { return m.otherPartyIDs }
-func (m *mockRound) FinalRoundNumber() round.Number                { return m.finalRoundNumber }
-func (m *mockRound) MessageContent() round.Content                 { return m.messageContent }
-func (m *mockRound) Group() curve.Curve                            { return m.group }
-func (m *mockRound) Hash() *hash.Hash                              { return hash.New() }
+func (m *mockRound) Number() round.Number           { return m.number }
+func (m *mockRound) Threshold() int                 { return m.threshold }
+func (m *mockRound) N() int                         { return m.n }
+func (m *mockRound) ProtocolID() string             { return m.protocolID }
+func (m *mockRound) SSID() []byte                   { return m.ssid }
+func (m *mockRound) SelfID() party.ID               { return m.selfID }
+func (m *mockRound) PartyIDs() party.IDSlice        { return m.partyIDs }
+func (m *mockRound) OtherPartyIDs() party.IDSlice   { return m.otherPartyIDs }
+func (m *mockRound) FinalRoundNumber() round.Number { return m.finalRoundNumber }
+func (m *mockRound) MessageContent() round.Content  { return m.messageContent }
+func (m *mockRound) Group() curve.Curve             { return m.group }
+func (m *mockRound) Hash() *hash.Hash               { return hash.New() }
 
 func (m *mockRound) VerifyMessage(msg round.Message) error {
 	if m.verifyShouldErr {
@@ -79,11 +79,11 @@ func (m *mockRound) StoreMessage(msg round.Message) error {
 
 func (m *mockRound) Finalize(out chan<- *round.Message) (round.Session, error) {
 	m.finalizeCalled = true
-	
+
 	if m.finalizeShouldErr {
 		return nil, errors.New("finalize error")
 	}
-	
+
 	// Send some messages
 	if m.messageContent != nil {
 		for _, id := range m.otherPartyIDs {
@@ -94,23 +94,23 @@ func (m *mockRound) Finalize(out chan<- *round.Message) (round.Session, error) {
 			}
 		}
 	}
-	
+
 	if m.isAbort {
 		return &round.Abort{
 			Err: errors.New("protocol aborted"),
 		}, nil
 	}
-	
+
 	if m.isOutput {
 		return &round.Output{
 			Result: "test result",
 		}, nil
 	}
-	
+
 	if m.finalizeNextRound != nil {
 		return m.finalizeNextRound, nil
 	}
-	
+
 	// Return next round
 	return &mockRound{
 		number:           m.number + 1,
@@ -161,7 +161,7 @@ func TestNewHandler(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -175,16 +175,16 @@ func TestNewHandler(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	config := DefaultConfig()
 	config.Workers = 2
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, config)
 	require.NoError(t, err)
 	require.NotNil(t, h)
-	
+
 	defer h.Stop()
-	
+
 	assert.Equal(t, "test-protocol", h.protocolID)
 	assert.Equal(t, sessionID, h.sessionID)
 	assert.Equal(t, 2, h.workers)
@@ -194,11 +194,11 @@ func TestNewHandler(t *testing.T) {
 func TestNewHandler_NilLogger(t *testing.T) {
 	ctx := context.Background()
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{}, nil
 	}
-	
+
 	_, err := NewHandler(ctx, nil, nil, create, sessionID, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "logger is required")
@@ -209,11 +209,11 @@ func TestNewHandler_CreateError(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return nil, errors.New("create failed")
 	}
-	
+
 	_, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create round")
@@ -224,7 +224,7 @@ func TestHandler_Accept(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -238,11 +238,11 @@ func TestHandler_Accept(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Test accepting a valid message
 	msg := &Message{
 		SSID:        sessionID,
@@ -253,9 +253,9 @@ func TestHandler_Accept(t *testing.T) {
 		Data:        []byte("test data"),
 		Broadcast:   false,
 	}
-	
+
 	h.Accept(msg)
-	
+
 	// Give time for processing
 	time.Sleep(50 * time.Millisecond)
 }
@@ -265,7 +265,7 @@ func TestHandler_CanAccept(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -279,11 +279,11 @@ func TestHandler_CanAccept(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	tests := []struct {
 		name   string
 		msg    *Message
@@ -302,8 +302,8 @@ func TestHandler_CanAccept(t *testing.T) {
 			expect: true,
 		},
 		{
-			name: "nil message",
-			msg: nil,
+			name:   "nil message",
+			msg:    nil,
 			expect: false,
 		},
 		{
@@ -358,7 +358,7 @@ func TestHandler_CanAccept(t *testing.T) {
 			expect: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := h.CanAccept(tt.msg)
@@ -372,7 +372,7 @@ func TestHandler_ProtocolCompletion(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -387,14 +387,14 @@ func TestHandler_ProtocolCompletion(t *testing.T) {
 			isOutput:         true,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Wait for protocol to complete
 	time.Sleep(100 * time.Millisecond)
-	
+
 	result, err := h.Result()
 	assert.NoError(t, err)
 	assert.Equal(t, "test result", result)
@@ -405,7 +405,7 @@ func TestHandler_ProtocolAbort(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -420,14 +420,14 @@ func TestHandler_ProtocolAbort(t *testing.T) {
 			isAbort:          true,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Wait for protocol to abort
 	time.Sleep(100 * time.Millisecond)
-	
+
 	_, err = h.Result()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "protocol aborted")
@@ -438,7 +438,7 @@ func TestHandler_ConcurrentMessages(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -453,30 +453,30 @@ func TestHandler_ConcurrentMessages(t *testing.T) {
 			messageContent:   &mockContent{roundNumber: 1, data: "test"},
 		}, nil
 	}
-	
+
 	config := DefaultConfig()
 	config.Workers = 4
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, config)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Send many messages concurrently
 	var wg sync.WaitGroup
 	messageCount := 100
-	
+
 	for i := 0; i < messageCount; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			
+
 			content := &mockContent{
 				roundNumber: 1,
 				data:        fmt.Sprintf("message %d", idx),
 			}
-			
+
 			data, _ := cbor.Marshal(content)
-			
+
 			msg := &Message{
 				SSID:        sessionID,
 				From:        "party2",
@@ -486,16 +486,16 @@ func TestHandler_ConcurrentMessages(t *testing.T) {
 				Data:        data,
 				Broadcast:   false,
 			}
-			
+
 			h.Accept(msg)
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Give time for processing
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Check that messages were processed
 	assert.Greater(t, atomic.LoadUint64(&h.messagesProcessed), uint64(0))
 }
@@ -505,7 +505,7 @@ func TestHandler_WaitForResultTimeout(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -519,14 +519,14 @@ func TestHandler_WaitForResultTimeout(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	config := DefaultConfig()
 	config.ProtocolTimeout = 100 * time.Millisecond
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, config)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Wait for timeout
 	_, err = h.WaitForResult()
 	assert.Error(t, err)
@@ -536,34 +536,34 @@ func TestHandler_WaitForResultTimeout(t *testing.T) {
 // Test message store
 func TestMessageStore(t *testing.T) {
 	ms := newMessageStore()
-	
+
 	msg1 := &Message{
 		From:        "party1",
 		RoundNumber: 1,
 		Data:        []byte("message 1"),
 	}
-	
+
 	msg2 := &Message{
 		From:        "party2",
 		RoundNumber: 1,
 		Data:        []byte("message 2"),
 	}
-	
+
 	// Store messages
 	ms.Store(1, "party1", msg1)
 	ms.Store(1, "party2", msg2)
-	
+
 	// Load individual message
 	loaded, ok := ms.Load(1, "party1")
 	assert.True(t, ok)
 	assert.Equal(t, msg1, loaded)
-	
+
 	// Load all messages for round
 	all := ms.LoadAll(1)
 	assert.Len(t, all, 2)
 	assert.Equal(t, msg1, all["party1"])
 	assert.Equal(t, msg2, all["party2"])
-	
+
 	// Try loading non-existent message
 	_, ok = ms.Load(2, "party1")
 	assert.False(t, ok)
@@ -574,12 +574,12 @@ func TestHandler_BroadcastMessages(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	broadcastContent := &mockContent{
 		roundNumber: 1,
 		data:        "broadcast",
 	}
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockBroadcastRound{
 			mockRound: &mockRound{
@@ -596,14 +596,14 @@ func TestHandler_BroadcastMessages(t *testing.T) {
 			broadcastContent: broadcastContent,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Send broadcast message
 	data, _ := cbor.Marshal(broadcastContent)
-	
+
 	msg := &Message{
 		SSID:        sessionID,
 		From:        "party2",
@@ -613,12 +613,12 @@ func TestHandler_BroadcastMessages(t *testing.T) {
 		Data:        data,
 		Broadcast:   true,
 	}
-	
+
 	h.Accept(msg)
-	
+
 	// Give time for processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Verify message was stored
 	stored, ok := h.broadcast.Load(1, "party2")
 	assert.True(t, ok)
@@ -631,7 +631,7 @@ func TestHandler_Metrics(t *testing.T) {
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
 	registry := prometheus.NewRegistry()
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -645,12 +645,12 @@ func TestHandler_Metrics(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, registry, create, sessionID, nil)
 	require.NoError(t, err)
 	require.NotNil(t, h.metrics)
 	defer h.Stop()
-	
+
 	// Send a message to trigger metrics
 	msg := &Message{
 		SSID:        sessionID,
@@ -661,12 +661,12 @@ func TestHandler_Metrics(t *testing.T) {
 		Data:        []byte("test"),
 		Broadcast:   false,
 	}
-	
+
 	h.Accept(msg)
-	
+
 	// Give time for processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Check that metrics were updated
 	families, err := registry.Gather()
 	assert.NoError(t, err)
@@ -678,7 +678,7 @@ func TestHandler_Stop(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -692,14 +692,14 @@ func TestHandler_Stop(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
-	
+
 	// Stop multiple times should be safe
 	h.Stop()
 	h.Stop()
-	
+
 	// Verify handler is stopped
 	assert.True(t, h.stopped.Load())
 }
@@ -707,7 +707,7 @@ func TestHandler_Stop(t *testing.T) {
 // Test NewMultiHandler for compatibility
 func TestNewMultiHandler(t *testing.T) {
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -721,12 +721,12 @@ func TestNewMultiHandler(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	h, err := NewMultiHandler(create, sessionID)
 	require.NoError(t, err)
 	require.NotNil(t, h)
 	defer h.Stop()
-	
+
 	assert.Equal(t, "test-protocol", h.protocolID)
 }
 
@@ -735,7 +735,7 @@ func TestHandler_ErrorHandling(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -750,19 +750,19 @@ func TestHandler_ErrorHandling(t *testing.T) {
 			verifyShouldErr:  true,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Send message that will fail verification
 	content := &mockContent{
 		roundNumber: 1,
 		data:        "test",
 	}
-	
+
 	data, _ := cbor.Marshal(content)
-	
+
 	msg := &Message{
 		SSID:        sessionID,
 		From:        "party2",
@@ -772,12 +772,12 @@ func TestHandler_ErrorHandling(t *testing.T) {
 		Data:        data,
 		Broadcast:   false,
 	}
-	
+
 	h.Accept(msg)
-	
+
 	// Give more time for processing and error propagation
 	time.Sleep(300 * time.Millisecond)
-	
+
 	// Check the error directly from the handler's error store
 	if errVal := h.err.Load(); errVal != nil {
 		e := errVal.(*Error)
@@ -797,7 +797,7 @@ func TestHandler_AbortMessage(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -811,11 +811,11 @@ func TestHandler_AbortMessage(t *testing.T) {
 			finalRoundNumber: 3,
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Send abort message (round number 0)
 	msg := &Message{
 		SSID:        sessionID,
@@ -826,12 +826,12 @@ func TestHandler_AbortMessage(t *testing.T) {
 		Data:        []byte("abort reason"),
 		Broadcast:   false,
 	}
-	
+
 	h.Accept(msg)
-	
+
 	// Give time for processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Check that error was recorded
 	_, err = h.Result()
 	assert.Error(t, err)
@@ -843,7 +843,7 @@ func TestHandler_Listen(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -858,15 +858,15 @@ func TestHandler_Listen(t *testing.T) {
 			messageContent:   &mockContent{roundNumber: 1, data: "test"},
 		}, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Get listen channel
 	out := h.Listen()
 	require.NotNil(t, out)
-	
+
 	// Should receive messages generated by the handler
 	select {
 	case msg := <-out:
@@ -882,7 +882,7 @@ func TestHandler_Finalize(t *testing.T) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Debug)
 	sessionID := []byte("test-session")
-	
+
 	mockR := &mockRound{
 		number:           1,
 		threshold:        2,
@@ -895,19 +895,19 @@ func TestHandler_Finalize(t *testing.T) {
 		finalRoundNumber: 3,
 		messageContent:   &mockContent{roundNumber: 1, data: "test"},
 	}
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return mockR, nil
 	}
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, nil)
 	require.NoError(t, err)
 	defer h.Stop()
-	
+
 	// Send messages to trigger finalization
 	content := &mockContent{roundNumber: 1, data: "test"}
 	data, _ := cbor.Marshal(content)
-	
+
 	// Send message from party2
 	msg2 := &Message{
 		SSID:        sessionID,
@@ -918,7 +918,7 @@ func TestHandler_Finalize(t *testing.T) {
 		Data:        data,
 	}
 	h.Accept(msg2)
-	
+
 	// Send message from party3
 	msg3 := &Message{
 		SSID:        sessionID,
@@ -929,10 +929,10 @@ func TestHandler_Finalize(t *testing.T) {
 		Data:        data,
 	}
 	h.Accept(msg3)
-	
+
 	// Give time for processing and finalization
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Check that round was finalized
 	assert.True(t, mockR.finalizeCalled)
 }
@@ -942,7 +942,7 @@ func BenchmarkHandler_Accept(b *testing.B) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Error)
 	sessionID := []byte("bench-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -957,21 +957,21 @@ func BenchmarkHandler_Accept(b *testing.B) {
 			messageContent:   &mockContent{roundNumber: 1, data: "test"},
 		}, nil
 	}
-	
+
 	config := DefaultConfig()
 	config.Workers = runtime.NumCPU()
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, config)
 	require.NoError(b, err)
 	defer h.Stop()
-	
+
 	content := &mockContent{
 		roundNumber: 1,
 		data:        "benchmark data",
 	}
-	
+
 	data, _ := cbor.Marshal(content)
-	
+
 	msg := &Message{
 		SSID:        sessionID,
 		From:        "party2",
@@ -981,9 +981,9 @@ func BenchmarkHandler_Accept(b *testing.B) {
 		Data:        data,
 		Broadcast:   false,
 	}
-	
+
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		h.Accept(msg)
 	}
@@ -994,7 +994,7 @@ func BenchmarkHandler_ConcurrentAccept(b *testing.B) {
 	ctx := context.Background()
 	logger := log.NewTestLogger(level.Error)
 	sessionID := []byte("bench-session")
-	
+
 	create := func(ssid []byte) (round.Session, error) {
 		return &mockRound{
 			number:           1,
@@ -1009,22 +1009,22 @@ func BenchmarkHandler_ConcurrentAccept(b *testing.B) {
 			messageContent:   &mockContent{roundNumber: 1, data: "test"},
 		}, nil
 	}
-	
+
 	config := DefaultConfig()
 	config.Workers = runtime.NumCPU() * 2
 	config.BufferSize = 100000
-	
+
 	h, err := NewHandler(ctx, logger, nil, create, sessionID, config)
 	require.NoError(b, err)
 	defer h.Stop()
-	
+
 	content := &mockContent{
 		roundNumber: 1,
 		data:        "benchmark data",
 	}
-	
+
 	data, _ := cbor.Marshal(content)
-	
+
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		msg := &Message{
@@ -1036,7 +1036,7 @@ func BenchmarkHandler_ConcurrentAccept(b *testing.B) {
 			Data:        data,
 			Broadcast:   false,
 		}
-		
+
 		for pb.Next() {
 			h.Accept(msg)
 		}

@@ -56,7 +56,7 @@ func TestSecp256k1_NewScalar(t *testing.T) {
 // Test scalar marshaling
 func TestSecp256k1Scalar_MarshalBinary(t *testing.T) {
 	curve := Secp256k1{}
-	
+
 	// Test zero scalar
 	s := curve.NewScalar()
 	data, err := s.MarshalBinary()
@@ -155,10 +155,10 @@ func TestSecp256k1Scalar_SetNat(t *testing.T) {
 	nat := new(saferith.Nat).SetUint64(12345)
 	modNat := new(saferith.Nat).Mod(nat, curve.Order())
 	s.SetNat(modNat)
-	
+
 	data, err := s.MarshalBinary()
 	require.NoError(t, err)
-	
+
 	// Verify the value is correct
 	expected := make([]byte, 32)
 	natBytes := nat.Bytes()
@@ -477,7 +477,7 @@ func TestSecp256k1_KnownValues(t *testing.T) {
 
 	// The x-coordinate of the base point
 	expectedX, _ := hex.DecodeString("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
-	
+
 	// For compressed format, check x-coordinate is correct
 	// (skip the first byte which is the compression flag)
 	xCoord := g.XScalar()
@@ -521,7 +521,7 @@ func TestSecp256k1Scalar_ComplexArithmetic(t *testing.T) {
 	// Test inverse properties: a * a^(-1) = 1
 	aInv := curve.NewScalar().Set(a).Invert()
 	one := curve.NewScalar().Set(a).Mul(aInv)
-	
+
 	expectedOne := scalarFromUint64(curve, 1)
 	assert.True(t, one.Equal(expectedOne))
 }
