@@ -328,7 +328,7 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 	var wg sync.WaitGroup
 	wg.Add(n)
 
-	for i, config := range configs {
+	for _, config := range configs {
 		go func(cfg interface{}) {
 			defer wg.Done()
 
