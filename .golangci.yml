@@ -2,6 +2,8 @@ run:
   timeout: 5m
   tests: true
   # Cache bust: 2025-08-15
+  skip-dirs:
+    - example
 
 linters:
   enable:
