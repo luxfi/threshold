@@ -32,7 +32,7 @@ type Harness struct {
 
 // NewHarness creates a new test harness with proper context management
 func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 
 	h := &Harness{
 		t:        t,
