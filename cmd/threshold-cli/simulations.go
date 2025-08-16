@@ -279,7 +279,7 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 	// Create Byzantine network wrapper
 	byzantineNetwork := &ByzantineNetwork{
 		Network:          network,
-		ByzantineParties: byzantinePartiesMap,
+		ByzantineParties: byzantinePartiesMap, //nolint:govet // Field is used in Send method
 	}
 
 	// Run protocol with Byzantine parties
