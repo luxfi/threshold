@@ -22,7 +22,7 @@ func NewSuiAdapter() *SuiAdapter {
 	return &SuiAdapter{
 		// TODO: Add Ed25519 curve support when available
 		group:     curve.Secp256k1{}, // Placeholder until Ed25519 is available
-		intentApp: 0x00,               // Transaction by default
+		intentApp: 0x00,              // Transaction by default
 	}
 }
 
@@ -62,7 +62,7 @@ func (s *SuiAdapter) hashWithIntent(data []byte) []byte {
 		0x00, // IntentVersion: V0
 		s.intentApp,
 	}
-	
+
 	h, _ := blake2b.New256(nil)
 	h.Write(intent)
 	h.Write(data)
@@ -118,7 +118,7 @@ func (s *SuiAdapter) Encode(full FullSig) ([]byte, error) {
 	// Sui signature format: Flag (1) || Signature (64) || PublicKey (32)
 	// Flag: 0x00 for Ed25519
 	sig := make([]byte, 97) // 1 + 64 + 32
-	sig[0] = 0x00 // Ed25519 flag
+	sig[0] = 0x00           // Ed25519 flag
 
 	// Copy R (32 bytes)
 	rBytes, _ := eddsaSig.R.MarshalBinary()

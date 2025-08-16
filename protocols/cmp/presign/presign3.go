@@ -149,7 +149,7 @@ func (r *presign3) Finalize(out chan<- *round.Message) (round.Session, error) {
 			culprits = append(culprits, j)
 			continue
 		}
-		//δᵢ += αᵢⱼ + βᵢⱼ
+		// δᵢ += αᵢⱼ + βᵢⱼ
 		DeltaShare.Add(DeltaShare, DeltaSharesAlpha[j], -1)
 		DeltaShare.Add(DeltaShare, r.DeltaShareBeta[j], -1)
 

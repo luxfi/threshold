@@ -50,22 +50,22 @@ func (c *CeloAdapter) Digest(tx interface{}) ([]byte, error) {
 func (c *CeloAdapter) digestTransaction(tx *CeloTransaction) ([]byte, error) {
 	// Celo adds gateway fee fields to Ethereum transactions
 	h := sha3.NewLegacyKeccak256()
-	
+
 	// RLP encoding with Celo-specific fields
 	encoded := c.rlpEncodeCelo(tx)
 	h.Write(encoded)
-	
+
 	return h.Sum(nil), nil
 }
 
 // digestLegacyTransaction for backwards compatibility
 func (c *CeloAdapter) digestLegacyTransaction(tx *CeloLegacyTransaction) ([]byte, error) {
 	h := sha3.NewLegacyKeccak256()
-	
+
 	// Legacy Celo transaction format
 	encoded := c.rlpEncodeLegacy(tx)
 	h.Write(encoded)
-	
+
 	return h.Sum(nil), nil
 }
 
@@ -346,11 +346,11 @@ func (c *CeloAdapter) rlpEncodeLegacy(tx *CeloLegacyTransaction) []byte {
 func (c *CeloAdapter) GenerateCeloAddress(publicKey curve.Point) [20]byte {
 	// Same as Ethereum: Keccak256(pubkey)[12:]
 	pubBytes, _ := publicKey.MarshalBinary()
-	
+
 	h := sha3.NewLegacyKeccak256()
 	h.Write(pubBytes[1:]) // Skip format byte
 	hash := h.Sum(nil)
-	
+
 	var addr [20]byte
 	copy(addr[:], hash[12:])
 	return addr
@@ -370,29 +370,29 @@ func (c *CeloAdapter) MapPhoneNumberToAddress(phoneHash [32]byte) [20]byte {
 func (c *CeloAdapter) EstimateFee(tx *CeloTransaction) uint64 {
 	// Base fee calculation
 	gasLimit := tx.GasLimit
-	
+
 	var gasPrice uint64
 	if tx.MaxFeePerGas != nil {
 		gasPrice = tx.MaxFeePerGas.Uint64()
 	} else {
 		gasPrice = 5000000000 // 5 gwei default
 	}
-	
+
 	fee := gasLimit * gasPrice
-	
+
 	// Add gateway fee if present
 	if tx.GatewayFee != nil {
 		fee += tx.GatewayFee.Uint64()
 	}
-	
+
 	return fee
 }
 
 // GetCeloConfig returns default Celo configuration
 func GetDefaultCeloConfig(chainID *big.Int) map[string]interface{} {
 	return map[string]interface{}{
-		"chain_id":        chainID,
-		"signature_type":  SignatureECDSA,
+		"chain_id":       chainID,
+		"signature_type": SignatureECDSA,
 		"curve":          "Secp256k1",
 		"hash_algorithm": "Keccak256",
 		"fee_currency":   "CELO", // Can be cUSD, cEUR, etc.

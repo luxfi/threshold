@@ -92,7 +92,7 @@ func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []
 	// Test that we can create handlers
 	sessionID := []byte(fmt.Sprintf("test-%s-init", s.protocolType))
 	handlers := make([]*protocol.Handler, 0, len(partyIDs))
-	
+
 	for _, id := range partyIDs {
 		startFunc := createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
 
@@ -110,10 +110,10 @@ func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []
 			"%s: Failed to create handler for party %s", s.protocolType, id)
 		require.NotNil(s.t, h,
 			"%s: Handler should not be nil for party %s", s.protocolType, id)
-		
+
 		handlers = append(handlers, h)
 	}
-	
+
 	// Clean up all handlers
 	for _, h := range handlers {
 		h.Stop()
@@ -264,7 +264,6 @@ func (h *MPCTestHelper) GetAllResults() map[party.ID]interface{} {
 // StandardMPCTest runs a standard test sequence for an MPC protocol
 func StandardMPCTest(t *testing.T, protocolType MPCProtocolType, partyCount, threshold int,
 	createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
-
 	suite := NewMPCTestSuite(t, protocolType, partyCount, threshold)
 	defer suite.Cleanup()
 
@@ -286,7 +285,6 @@ func StandardMPCTest(t *testing.T, protocolType MPCProtocolType, partyCount, thr
 // StandardMPCBenchmark runs a standard benchmark for an MPC protocol
 func StandardMPCBenchmark(b *testing.B, protocolType MPCProtocolType, partyCount, threshold int,
 	createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
-
 	// testing.B embeds testing.TB, so we can pass it directly
 	suite := NewMPCTestSuite(&testing.T{}, protocolType, partyCount, threshold)
 	defer suite.Cleanup()
@@ -297,7 +295,6 @@ func StandardMPCBenchmark(b *testing.B, protocolType MPCProtocolType, partyCount
 // QuickMPCTest runs a quick test suitable for CI/fast feedback
 func QuickMPCTest(t *testing.T, protocolType MPCProtocolType, partyCount, threshold int,
 	createStartFunc func(id party.ID, partyIDs []party.ID, threshold int, group curve.Curve, pl *pool.Pool) protocol.StartFunc) {
-
 	suite := NewMPCTestSuite(t, protocolType, partyCount, threshold).
 		WithTimeout(5 * time.Second)
 	defer suite.Cleanup()

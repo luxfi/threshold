@@ -71,7 +71,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	hashKey := make([]byte, 32)
-	blake3.DeriveKey(deriveHashKeyContext, sIBytes[:], hashKey)
+	blake3.DeriveKey(deriveHashKeyContext, sIBytes, hashKey)
 	nonceHasher, _ := blake3.NewKeyed(hashKey)
 	_, _ = nonceHasher.Write(r.Hash().Sum())
 	_, _ = nonceHasher.Write(r.M)

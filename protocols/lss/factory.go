@@ -36,36 +36,36 @@ const (
 	XRPL      Chain = "xrpl"
 	Polkadot  Chain = "polkadot"
 	Kusama    Chain = "kusama"
-	
+
 	// Layer 2 & Sidechains
-	Arbitrum  Chain = "arbitrum"
-	Optimism  Chain = "optimism"
-	Base      Chain = "base"
-	zkSync    Chain = "zksync"
-	Scroll    Chain = "scroll"
-	Linea     Chain = "linea"
-	Mantle    Chain = "mantle"
-	Metis     Chain = "metis"
-	
+	Arbitrum Chain = "arbitrum"
+	Optimism Chain = "optimism"
+	Base     Chain = "base"
+	zkSync   Chain = "zksync"
+	Scroll   Chain = "scroll"
+	Linea    Chain = "linea"
+	Mantle   Chain = "mantle"
+	Metis    Chain = "metis"
+
 	// EVM Compatible Chains
-	BSC       Chain = "bsc"
-	Celo      Chain = "celo"
-	Fantom    Chain = "fantom"
-	Cronos    Chain = "cronos"
-	Harmony   Chain = "harmony"
-	Moonbeam  Chain = "moonbeam"
-	Aurora    Chain = "aurora"
-	Gnosis    Chain = "gnosis"
-	Kava      Chain = "kava"
-	Klaytn    Chain = "klaytn"
-	
+	BSC      Chain = "bsc"
+	Celo     Chain = "celo"
+	Fantom   Chain = "fantom"
+	Cronos   Chain = "cronos"
+	Harmony  Chain = "harmony"
+	Moonbeam Chain = "moonbeam"
+	Aurora   Chain = "aurora"
+	Gnosis   Chain = "gnosis"
+	Kava     Chain = "kava"
+	Klaytn   Chain = "klaytn"
+
 	// Specialized Chains
-	Monero    Chain = "monero"
-	Dash      Chain = "dash"
-	Zcash     Chain = "zcash"
-	
+	Monero Chain = "monero"
+	Dash   Chain = "dash"
+	Zcash  Chain = "zcash"
+
 	// Post-Quantum
-	Ringtail  Chain = "ringtail"
+	Ringtail Chain = "ringtail"
 )
 
 // ChainType represents the type of blockchain
@@ -241,11 +241,11 @@ func GetChainInfo(chain Chain) *ChainInfo {
 			Decimals:      0,
 		},
 	}
-	
+
 	if info, ok := chainMap[chain]; ok {
 		return info
 	}
-	
+
 	// Default to Ethereum-compatible
 	return chainMap[Ethereum]
 }
@@ -272,21 +272,21 @@ func New(config *FactoryConfig) (*LSS, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config required")
 	}
-	
+
 	// Get chain info
 	info := GetChainInfo(config.Chain)
-	
+
 	// Create appropriate adapter
 	adapter, err := createAdapter(config.Chain, info)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create adapter: %w", err)
 	}
-	
+
 	// Override signature scheme if specified
 	if config.SignatureScheme != 0 {
 		info.SignatureType = config.SignatureScheme
 	}
-	
+
 	return &LSS{
 		chain:   config.Chain,
 		adapter: adapter,
@@ -298,13 +298,13 @@ func New(config *FactoryConfig) (*LSS, error) {
 func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error) {
 	// Normalize chain name
 	chainLower := strings.ToLower(string(chain))
-	
+
 	switch info.Type {
 	case TypeEVM:
 		// All EVM chains use the same adapter
 		evmChain := adapters.EVMChain(chainLower)
 		return adapters.NewEVMAdapter(evmChain), nil
-		
+
 	case TypeBitcoin:
 		// Bitcoin and similar UTXO chains
 		sigType := info.SignatureType
@@ -314,7 +314,7 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 		}
 		// Other UTXO chains would go here
 		return adapters.NewBitcoinAdapter(adapters.SignatureECDSA), nil
-		
+
 	case TypeEdDSA:
 		// Ed25519-based chains
 		switch chain {
@@ -332,7 +332,7 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 			// Generic Ed25519 adapter
 			return adapters.NewSolanaAdapter(), nil
 		}
-		
+
 	case TypeCustom:
 		// Custom implementations
 		switch chain {
@@ -341,14 +341,14 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 		default:
 			return nil, fmt.Errorf("unsupported custom chain: %s", chain)
 		}
-		
+
 	case TypePostQuantum:
 		// Post-quantum chains
 		if chain == Ringtail {
 			return adapters.NewRingtailAdapter(128, 100), nil
 		}
 		return nil, fmt.Errorf("unsupported post-quantum chain: %s", chain)
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported chain type: %s", info.Type)
 	}

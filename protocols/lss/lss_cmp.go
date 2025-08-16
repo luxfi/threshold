@@ -38,7 +38,6 @@ func DynamicReshareCMP(
 	newThreshold int,
 	_ *pool.Pool,
 ) (map[party.ID]*config.Config, error) {
-
 	if len(oldConfigs) == 0 {
 		return nil, errors.New("lss-cmp: no old configurations provided")
 	}

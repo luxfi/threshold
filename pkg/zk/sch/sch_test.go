@@ -32,7 +32,6 @@ func TestSchPass(t *testing.T) {
 	require.NoError(t, cbor.Unmarshal(out2, proof3), "failed to unmarshal 2nd proof")
 
 	assert.True(t, proof3.Verify(hash.New(), X, a.Commitment(), nil))
-
 }
 func TestSchFail(t *testing.T) {
 	group := curve.Secp256k1{}

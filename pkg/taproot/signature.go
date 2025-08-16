@@ -138,7 +138,7 @@ func (s SecretKey) Sign(rand io.Reader, m []byte) (Signature, error) {
 			t[i] ^= aHash[i]
 		}
 
-		randHash := TaggedHash("BIP0340/nonce", t[:], PBytes, m)
+		randHash := TaggedHash("BIP0340/nonce", t, PBytes, m)
 
 		_ = k.UnmarshalBinary(randHash)
 		if k.IsZero() {
@@ -152,7 +152,7 @@ func (s SecretKey) Sign(rand io.Reader, m []byte) (Signature, error) {
 		k.Negate()
 	}
 
-	RBytes := R.XBytes()[:]
+	RBytes := R.XBytes()
 
 	eHash := TaggedHash("BIP0340/challenge", RBytes, PBytes, m)
 	e := new(curve.Secp256k1Scalar)
@@ -163,7 +163,7 @@ func (s SecretKey) Sign(rand io.Reader, m []byte) (Signature, error) {
 
 	sig := make([]byte, 0, SignatureLen)
 	sig = append(sig, RBytes...)
-	sig = append(sig, zBytes[:]...)
+	sig = append(sig, zBytes...)
 
 	return Signature(sig), nil
 }

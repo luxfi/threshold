@@ -22,20 +22,20 @@ type DilithiumAdapter struct {
 type DilithiumParams struct {
 	SecurityLevel int    // NIST security level (2, 3, or 5)
 	Name          string // ML-DSA-44, ML-DSA-65, ML-DSA-87
-	
+
 	// Lattice parameters
-	N      int     // Polynomial degree (256)
-	Q      int64   // Modulus (8380417)
-	D      int     // Dropped bits from t
-	K      int     // Number of polynomials in vector
-	L      int     // Number of polynomials in matrix
-	Eta    int     // Secret key range
-	Beta   int     // Tau bound
-	Gamma1 int     // y coefficient range
-	Gamma2 int     // Low-order rounding range
-	Omega  int     // Number of ±1 in c
-	Tau    int     // Number of ±1 in c (threshold)
-	
+	N      int   // Polynomial degree (256)
+	Q      int64 // Modulus (8380417)
+	D      int   // Dropped bits from t
+	K      int   // Number of polynomials in vector
+	L      int   // Number of polynomials in matrix
+	Eta    int   // Secret key range
+	Beta   int   // Tau bound
+	Gamma1 int   // y coefficient range
+	Gamma2 int   // Low-order rounding range
+	Omega  int   // Number of ±1 in c
+	Tau    int   // Number of ±1 in c (threshold)
+
 	// Signature parameters
 	SignatureSize int // Signature size in bytes
 	PublicKeySize int // Public key size in bytes
@@ -53,8 +53,8 @@ type DilithiumState struct {
 
 // DilithiumPublicKey represents a Dilithium public key
 type DilithiumPublicKey struct {
-	Seed []byte      // Public seed ρ
-	T1   [][]int32   // High-order bits of t = As + e
+	Seed   []byte    // Public seed ρ
+	T1     [][]int32 // High-order bits of t = As + e
 	Params *DilithiumParams
 }
 
@@ -110,10 +110,10 @@ func (d *DilithiumPartialSig) Serialize() []byte {
 
 // DilithiumFullSig represents a full Dilithium signature
 type DilithiumFullSig struct {
-	Z         [][]int32 // Response vector
-	H         []byte    // Hint
-	C         []int32   // Challenge
-	Size      int       // Total size in bytes
+	Z    [][]int32 // Response vector
+	H    []byte    // Hint
+	C    []int32   // Challenge
+	Size int       // Total size in bytes
 }
 
 // Verify verifies the signature against a public key and message
@@ -131,12 +131,12 @@ func (d *DilithiumFullSig) Serialize() []byte {
 // encodeLatticeSignature encodes the signature to bytes
 func (d *DilithiumFullSig) encodeLatticeSignature() []byte {
 	var encoded []byte
-	
+
 	// Encode challenge polynomial (packed)
 	for _, coeff := range d.C {
 		encoded = append(encoded, byte(coeff&0xFF), byte((coeff>>8)&0xFF))
 	}
-	
+
 	// Encode z vectors
 	for _, vec := range d.Z {
 		for _, coeff := range vec {
@@ -148,10 +148,10 @@ func (d *DilithiumFullSig) encodeLatticeSignature() []byte {
 			encoded = append(encoded, bytes...)
 		}
 	}
-	
+
 	// Append hint
 	encoded = append(encoded, d.H...)
-	
+
 	return encoded
 }
 
@@ -161,18 +161,18 @@ func GetDilithiumParams(level int) *DilithiumParams {
 	case 2: // ML-DSA-44 (NIST Level 2)
 		return &DilithiumParams{
 			SecurityLevel: 2,
-			Name:         "ML-DSA-44",
-			N:            256,
-			Q:            8380417,
-			D:            13,
-			K:            4,
-			L:            4,
-			Eta:          2,
-			Beta:         78,
-			Gamma1:       131072,  // 2^17
-			Gamma2:       95232,   // (q-1)/88
-			Omega:        80,
-			Tau:          39,
+			Name:          "ML-DSA-44",
+			N:             256,
+			Q:             8380417,
+			D:             13,
+			K:             4,
+			L:             4,
+			Eta:           2,
+			Beta:          78,
+			Gamma1:        131072, // 2^17
+			Gamma2:        95232,  // (q-1)/88
+			Omega:         80,
+			Tau:           39,
 			SignatureSize: 2420,
 			PublicKeySize: 1312,
 			SecretKeySize: 2528,
@@ -180,18 +180,18 @@ func GetDilithiumParams(level int) *DilithiumParams {
 	case 3: // ML-DSA-65 (NIST Level 3)
 		return &DilithiumParams{
 			SecurityLevel: 3,
-			Name:         "ML-DSA-65",
-			N:            256,
-			Q:            8380417,
-			D:            13,
-			K:            6,
-			L:            5,
-			Eta:          4,
-			Beta:         196,
-			Gamma1:       524288,  // 2^19
-			Gamma2:       261888,  // (q-1)/32
-			Omega:        55,
-			Tau:          49,
+			Name:          "ML-DSA-65",
+			N:             256,
+			Q:             8380417,
+			D:             13,
+			K:             6,
+			L:             5,
+			Eta:           4,
+			Beta:          196,
+			Gamma1:        524288, // 2^19
+			Gamma2:        261888, // (q-1)/32
+			Omega:         55,
+			Tau:           49,
 			SignatureSize: 3293,
 			PublicKeySize: 1952,
 			SecretKeySize: 4000,
@@ -199,18 +199,18 @@ func GetDilithiumParams(level int) *DilithiumParams {
 	case 5: // ML-DSA-87 (NIST Level 5)
 		return &DilithiumParams{
 			SecurityLevel: 5,
-			Name:         "ML-DSA-87",
-			N:            256,
-			Q:            8380417,
-			D:            13,
-			K:            8,
-			L:            7,
-			Eta:          2,
-			Beta:         120,
-			Gamma1:       524288,  // 2^19
-			Gamma2:       261888,  // (q-1)/32
-			Omega:        75,
-			Tau:          60,
+			Name:          "ML-DSA-87",
+			N:             256,
+			Q:             8380417,
+			D:             13,
+			K:             8,
+			L:             7,
+			Eta:           2,
+			Beta:          120,
+			Gamma1:        524288, // 2^19
+			Gamma2:        261888, // (q-1)/32
+			Omega:         75,
+			Tau:           60,
 			SignatureSize: 4595,
 			PublicKeySize: 2592,
 			SecretKeySize: 4864,
@@ -247,7 +247,7 @@ func (d *DilithiumAdapter) DilithiumDKG(parties []party.ID, threshold int) (*Dil
 	// Each party generates secret shares
 	shares := make(map[party.ID]*DilithiumSecretShare)
 	combinedT1 := make([][]int32, d.params.K)
-	
+
 	for i := 0; i < d.params.K; i++ {
 		combinedT1[i] = make([]int32, d.params.N)
 	}
@@ -256,7 +256,7 @@ func (d *DilithiumAdapter) DilithiumDKG(parties []party.ID, threshold int) (*Dil
 		// Generate secret polynomial vectors
 		s := d.sampleSecret(d.params.L)
 		e := d.sampleError(d.params.K)
-		
+
 		// Compute t = As + e
 		t := d.matrixVectorMultiply(A, s)
 		for i := range t {
@@ -264,10 +264,10 @@ func (d *DilithiumAdapter) DilithiumDKG(parties []party.ID, threshold int) (*Dil
 				t[i][j] = d.modQ(t[i][j] + e[i][j])
 			}
 		}
-		
+
 		// Extract t1 (high-order bits)
 		t1 := d.power2Round(t)
-		
+
 		shares[pid] = &DilithiumSecretShare{
 			PartyID: pid,
 			S:       s,
@@ -275,7 +275,7 @@ func (d *DilithiumAdapter) DilithiumDKG(parties []party.ID, threshold int) (*Dil
 			T:       t,
 			Index:   idx,
 		}
-		
+
 		// Accumulate for public key
 		for i := range t1 {
 			for j := range t1[i] {
@@ -323,15 +323,15 @@ func (d *DilithiumAdapter) SignEC(digest []byte, share Share) (PartialSig, error
 
 	// Generate masking polynomial y
 	y := d.sampleMask()
-	
+
 	// Compute w = Ay
 	A := d.expandA(d.state.PublicKey.Seed)
 	w := d.matrixVectorMultiply(A, y)
-	
+
 	// Generate challenge c from (μ, w1)
 	w1 := d.highBits(w)
 	c := d.hashToChallenge(digest, w1)
-	
+
 	// Compute z = y + cs
 	z := make([][]int32, d.params.L)
 	for i := range z {
@@ -341,10 +341,10 @@ func (d *DilithiumAdapter) SignEC(digest []byte, share Share) (PartialSig, error
 			z[i][j] = y[i][j] + cs[j]
 		}
 	}
-	
+
 	// Generate hint h
 	h := d.makeHint(w, z, c)
-	
+
 	return &DilithiumPartialSig{
 		PartyID:   share.ID,
 		Z:         z,
@@ -365,21 +365,21 @@ func (d *DilithiumAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	for i := range aggregatedZ {
 		aggregatedZ[i] = make([]int32, d.params.N)
 	}
-	
+
 	var challenge []int32
 	var hint []byte
-	
+
 	for _, part := range parts {
 		dilithiumPart, ok := part.(*DilithiumPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Dilithium partial signature")
 		}
-		
+
 		if challenge == nil {
 			challenge = dilithiumPart.Challenge
 			hint = dilithiumPart.H
 		}
-		
+
 		// Aggregate z values
 		for i := range aggregatedZ {
 			for j := range aggregatedZ[i] {
@@ -394,10 +394,10 @@ func (d *DilithiumAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	}
 
 	return &DilithiumFullSig{
-		Z:         aggregatedZ,
-		H:         hint,
-		C:         challenge,
-		Size:      d.params.SignatureSize,
+		Z:    aggregatedZ,
+		H:    hint,
+		C:    challenge,
+		Size: d.params.SignatureSize,
 	}, nil
 }
 
@@ -410,7 +410,7 @@ func (d *DilithiumAdapter) Encode(full FullSig) ([]byte, error) {
 
 	// Encode signature components
 	encoded := d.encodeLatticeSignature(dilithiumSig)
-	
+
 	// Ensure size matches expected
 	if len(encoded) > d.params.SignatureSize {
 		return nil, fmt.Errorf("signature too large: %d > %d",
@@ -548,7 +548,7 @@ func (d *DilithiumAdapter) hashToChallenge(msg []byte, w1 [][]int32) []int32 {
 	// Hash message and w1 to create challenge polynomial
 	// Simplified: create sparse polynomial with Omega ±1s
 	c := make([]int32, d.params.N)
-	
+
 	// Use message bytes to determine positions
 	positions := make(map[int]bool)
 	for i := 0; i < d.params.Omega && i < len(msg); i++ {
@@ -562,7 +562,7 @@ func (d *DilithiumAdapter) hashToChallenge(msg []byte, w1 [][]int32) []int32 {
 			}
 		}
 	}
-	
+
 	return c
 }
 
@@ -605,20 +605,20 @@ func (d *DilithiumAdapter) shake256(data []byte, outputLen int) []byte {
 
 // DilithiumBenchmark provides performance metrics
 type DilithiumBenchmark struct {
-	DKGTime           int64 // microseconds
-	SigningTime       int64 // microseconds
-	VerificationTime  int64 // microseconds
-	SignatureSize     int   // bytes
-	PublicKeySize     int   // bytes
+	DKGTime          int64 // microseconds
+	SigningTime      int64 // microseconds
+	VerificationTime int64 // microseconds
+	SignatureSize    int   // bytes
+	PublicKeySize    int   // bytes
 }
 
 // Benchmark runs performance tests for Dilithium
 func (d *DilithiumAdapter) Benchmark(parties int, threshold int) *DilithiumBenchmark {
 	// Placeholder benchmarks based on NIST submissions
 	return &DilithiumBenchmark{
-		DKGTime:          500000,  // 500ms for DKG
-		SigningTime:      10000,   // 10ms for signing
-		VerificationTime: 5000,    // 5ms for verification
+		DKGTime:          500000, // 500ms for DKG
+		SigningTime:      10000,  // 10ms for signing
+		VerificationTime: 5000,   // 5ms for verification
 		SignatureSize:    d.params.SignatureSize,
 		PublicKeySize:    d.params.PublicKeySize,
 	}
