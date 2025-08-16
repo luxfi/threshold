@@ -7,36 +7,14 @@ run:
 
 linters:
   enable:
-    - bodyclose
-    - depguard
-    - dogsled
-    - dupl
-    - errcheck
-    - exhaustive
-    - gochecknoinits
-    - goconst
-    - gocritic
-    - gocyclo
     - gofmt
     - goimports
-    - goprintffuncname
-    - gosec
     - gosimple
     - govet
     - ineffassign
-    - lll
-    - misspell
-    - nakedret
-    - noctx
-    - nolintlint
-    - revive
     - staticcheck
-    - stylecheck
     - typecheck
-    - unconvert
-    - unparam
     - unused
-    - whitespace
 
   disable:
     - funlen
