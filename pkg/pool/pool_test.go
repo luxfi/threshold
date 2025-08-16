@@ -55,14 +55,14 @@ func TestPool_TearDown(t *testing.T) {
 	// Test normal teardown
 	p := NewPool(2)
 	require.NotNil(t, p)
-	
+
 	p.TearDown()
 	assert.True(t, p.closed)
-	
+
 	// Test double teardown (should not panic)
 	p.TearDown()
 	assert.True(t, p.closed)
-	
+
 	// Test nil pool teardown (should not panic)
 	var nilPool *Pool
 	nilPool.TearDown()
@@ -72,7 +72,7 @@ func TestPool_TearDown(t *testing.T) {
 func TestPool_Search_Nil(t *testing.T) {
 	var p *Pool
 	count := 0
-	
+
 	results := p.Search(3, func() interface{} {
 		count++
 		if count%2 == 0 {
@@ -80,7 +80,7 @@ func TestPool_Search_Nil(t *testing.T) {
 		}
 		return nil
 	})
-	
+
 	assert.Len(t, results, 3)
 	assert.Equal(t, 2, results[0])
 	assert.Equal(t, 4, results[1])
@@ -91,7 +91,7 @@ func TestPool_Search_Nil(t *testing.T) {
 func TestPool_Search(t *testing.T) {
 	p := NewPool(4)
 	defer p.TearDown()
-	
+
 	var counter int32
 	results := p.Search(5, func() interface{} {
 		val := atomic.AddInt32(&counter, 1)
@@ -101,7 +101,7 @@ func TestPool_Search(t *testing.T) {
 		}
 		return nil
 	})
-	
+
 	assert.Len(t, results, 5)
 	// Check that we have 5 even values
 	for _, r := range results {
@@ -114,13 +114,13 @@ func TestPool_Search(t *testing.T) {
 func TestPool_Search_Closed(t *testing.T) {
 	p := NewPool(2)
 	p.TearDown()
-	
+
 	count := 0
 	results := p.Search(2, func() interface{} {
 		count++
 		return count
 	})
-	
+
 	assert.Len(t, results, 2)
 	assert.Equal(t, 1, results[0])
 	assert.Equal(t, 2, results[1])
@@ -129,11 +129,11 @@ func TestPool_Search_Closed(t *testing.T) {
 // Test Parallelize with nil pool
 func TestPool_Parallelize_Nil(t *testing.T) {
 	var p *Pool
-	
+
 	results := p.Parallelize(5, func(i int) interface{} {
 		return i * 2
 	})
-	
+
 	assert.Len(t, results, 5)
 	for i := 0; i < 5; i++ {
 		assert.Equal(t, i*2, results[i])
@@ -144,11 +144,11 @@ func TestPool_Parallelize_Nil(t *testing.T) {
 func TestPool_Parallelize(t *testing.T) {
 	p := NewPool(4)
 	defer p.TearDown()
-	
+
 	results := p.Parallelize(10, func(i int) interface{} {
 		return i * i
 	})
-	
+
 	assert.Len(t, results, 10)
 	for i := 0; i < 10; i++ {
 		assert.Equal(t, i*i, results[i])
@@ -159,11 +159,11 @@ func TestPool_Parallelize(t *testing.T) {
 func TestPool_Parallelize_Closed(t *testing.T) {
 	p := NewPool(2)
 	p.TearDown()
-	
+
 	results := p.Parallelize(3, func(i int) interface{} {
 		return i + 10
 	})
-	
+
 	assert.Len(t, results, 3)
 	for i := 0; i < 3; i++ {
 		assert.Equal(t, i+10, results[i])
@@ -174,13 +174,13 @@ func TestPool_Parallelize_Closed(t *testing.T) {
 func TestPool_Search_Concurrent(t *testing.T) {
 	p := NewPool(8)
 	defer p.TearDown()
-	
+
 	// Run multiple searches concurrently (from different goroutines)
 	// Note: Pool is designed for single-goroutine use, but we test
 	// the behavior when used incorrectly
 	var wg sync.WaitGroup
 	results := make([][]interface{}, 3)
-	
+
 	for i := 0; i < 3; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -195,9 +195,9 @@ func TestPool_Search_Concurrent(t *testing.T) {
 			})
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Each search should have found 3 results
 	for i := 0; i < 3; i++ {
 		assert.Len(t, results[i], 3)
@@ -208,7 +208,7 @@ func TestPool_Search_Concurrent(t *testing.T) {
 func TestPool_Parallelize_Large(t *testing.T) {
 	p := NewPool(16)
 	defer p.TearDown()
-	
+
 	count := 1000
 	results := p.Parallelize(count, func(i int) interface{} {
 		// Simulate some work
@@ -218,7 +218,7 @@ func TestPool_Parallelize_Large(t *testing.T) {
 		}
 		return sum
 	})
-	
+
 	assert.Len(t, results, count)
 	for i := 0; i < count; i++ {
 		expected := 0
@@ -233,10 +233,10 @@ func TestPool_Parallelize_Large(t *testing.T) {
 func TestPool_Search_Slow(t *testing.T) {
 	p := NewPool(2)
 	defer p.TearDown()
-	
+
 	var counter int32
 	start := time.Now()
-	
+
 	results := p.Search(2, func() interface{} {
 		val := atomic.AddInt32(&counter, 1)
 		if val <= 2 {
@@ -245,9 +245,9 @@ func TestPool_Search_Slow(t *testing.T) {
 		}
 		return nil
 	})
-	
+
 	elapsed := time.Since(start)
-	
+
 	assert.Len(t, results, 2)
 	// With 2 workers, should take around 50ms (parallel execution)
 	assert.Less(t, elapsed, 150*time.Millisecond)
@@ -258,25 +258,25 @@ func TestLockedReader(t *testing.T) {
 	data := []byte("hello world")
 	reader := bytes.NewReader(data)
 	lr := NewLockedReader(reader)
-	
+
 	// Test single read
 	buf := make([]byte, 5)
 	n, err := lr.Read(buf)
 	assert.NoError(t, err)
 	assert.Equal(t, 5, n)
 	assert.Equal(t, "hello", string(buf))
-	
+
 	// Test second read
 	n, err = lr.Read(buf)
 	assert.NoError(t, err)
 	assert.Equal(t, 5, n)
 	assert.Equal(t, " worl", string(buf))
-	
+
 	// Test EOF
-	n, err = lr.Read(buf)
+	n, _ = lr.Read(buf)
 	assert.Equal(t, 1, n)
 	assert.Equal(t, "d", string(buf[:1]))
-	
+
 	n, err = lr.Read(buf)
 	assert.Equal(t, 0, n)
 	assert.Equal(t, io.EOF, err)
@@ -290,17 +290,17 @@ func TestLockedReader_Concurrent(t *testing.T) {
 	for i := 0; i < size; i++ {
 		data[i] = byte(i % 256)
 	}
-	
+
 	reader := bytes.NewReader(data)
 	lr := NewLockedReader(reader)
-	
+
 	// Read concurrently from multiple goroutines
 	numReaders := 10
 	bufSize := size / numReaders
-	
+
 	var wg sync.WaitGroup
 	results := make([][]byte, numReaders)
-	
+
 	for i := 0; i < numReaders; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -313,18 +313,18 @@ func TestLockedReader_Concurrent(t *testing.T) {
 			results[idx] = buf[:n]
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Combine all results
 	var combined []byte
 	for _, result := range results {
 		combined = append(combined, result...)
 	}
-	
+
 	// Should have read all data exactly once
 	assert.Equal(t, size, len(combined))
-	
+
 	// Verify data integrity (no duplicates or missing data)
 	seen := make(map[int]bool)
 	for i, b := range combined {
@@ -347,10 +347,10 @@ func TestWorker(t *testing.T) {
 	results := make([]interface{}, 1)
 	var ctr int64 = 1
 	ctrChanged := make(chan struct{}, 1)
-	
+
 	// Start worker
 	go worker(commands)
-	
+
 	// Send non-search command
 	cmd := command{
 		search:     false,
@@ -362,13 +362,13 @@ func TestWorker(t *testing.T) {
 		},
 		results: results,
 	}
-	
+
 	commands <- cmd
 	<-ctrChanged
-	
+
 	assert.Equal(t, 100, results[0])
 	assert.Equal(t, int64(0), atomic.LoadInt64(&ctr))
-	
+
 	close(commands)
 }
 
@@ -378,7 +378,7 @@ func TestWorkerSearch(t *testing.T) {
 	var ctr int64 = 2
 	ctrChanged := make(chan struct{}, 2)
 	mu := &sync.Mutex{}
-	
+
 	var attempts int32
 	f := func(i int) interface{} {
 		val := atomic.AddInt32(&attempts, 1)
@@ -387,14 +387,14 @@ func TestWorkerSearch(t *testing.T) {
 		}
 		return nil
 	}
-	
+
 	// Run workerSearch in a goroutine
 	go workerSearch(results, ctrChanged, f, &ctr, mu)
-	
+
 	// Wait for results
 	<-ctrChanged
 	<-ctrChanged
-	
+
 	// Check results
 	assert.Equal(t, int64(0), atomic.LoadInt64(&ctr))
 	// Results should contain two even values
@@ -407,24 +407,24 @@ func TestPool_EdgeCases(t *testing.T) {
 	// Test with 0 tasks
 	p := NewPool(2)
 	defer p.TearDown()
-	
+
 	results := p.Parallelize(0, func(i int) interface{} {
 		return i
 	})
 	assert.Len(t, results, 0)
-	
+
 	results = p.Search(0, func() interface{} {
 		return 1
 	})
 	assert.Len(t, results, 0)
-	
+
 	// Test with single task
 	results = p.Parallelize(1, func(i int) interface{} {
 		return i * 10
 	})
 	assert.Len(t, results, 1)
 	assert.Equal(t, 0, results[0])
-	
+
 	results = p.Search(1, func() interface{} {
 		return "found"
 	})
@@ -435,15 +435,15 @@ func TestPool_EdgeCases(t *testing.T) {
 // Test panic recovery in Parallelize
 func TestPool_Parallelize_PanicRecovery(t *testing.T) {
 	p := NewPool(2)
-	
+
 	// Close the pool to trigger panic recovery
 	p.TearDown()
-	
+
 	// This should recover and execute serially
 	results := p.Parallelize(3, func(i int) interface{} {
 		return i * 2
 	})
-	
+
 	assert.Len(t, results, 3)
 	for i := 0; i < 3; i++ {
 		assert.Equal(t, i*2, results[i])
@@ -453,20 +453,20 @@ func TestPool_Parallelize_PanicRecovery(t *testing.T) {
 // Test panic recovery in Search
 func TestPool_Search_PanicRecovery(t *testing.T) {
 	p := NewPool(2)
-	
+
 	// Start a search operation
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		p.TearDown() // Close pool mid-operation
 	}()
-	
+
 	count := 0
 	results := p.Search(3, func() interface{} {
 		time.Sleep(5 * time.Millisecond)
 		count++
 		return count
 	})
-	
+
 	// Should still get results (either from pool or serial fallback)
 	assert.Len(t, results, 3)
 }
@@ -475,7 +475,7 @@ func TestPool_Search_PanicRecovery(t *testing.T) {
 func BenchmarkPool_Parallelize(b *testing.B) {
 	p := NewPool(runtime.NumCPU())
 	defer p.TearDown()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		p.Parallelize(100, func(idx int) interface{} {
@@ -491,7 +491,7 @@ func BenchmarkPool_Parallelize(b *testing.B) {
 func BenchmarkPool_Search(b *testing.B) {
 	p := NewPool(runtime.NumCPU())
 	defer p.TearDown()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var counter int32
@@ -510,12 +510,12 @@ func BenchmarkLockedReader(b *testing.B) {
 	for i := range data {
 		data[i] = byte(i % 256)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader := bytes.NewReader(data)
 		lr := NewLockedReader(reader)
-		
+
 		buf := make([]byte, 1024)
 		for {
 			_, err := lr.Read(buf)
@@ -536,7 +536,7 @@ func TestSearchAlone(t *testing.T) {
 		}
 		return nil
 	}, 3)
-	
+
 	assert.Len(t, results, 3)
 	assert.Equal(t, 2, results[0])
 	assert.Equal(t, 4, results[1])
@@ -547,7 +547,7 @@ func TestParallelizeAlone(t *testing.T) {
 	results := parallelizeAlone(func(i int) interface{} {
 		return i * 3
 	}, 4)
-	
+
 	assert.Len(t, results, 4)
 	for i := 0; i < 4; i++ {
 		assert.Equal(t, i*3, results[i])
@@ -567,10 +567,10 @@ func TestLockedReader_Error(t *testing.T) {
 	customErr := errors.New("custom read error")
 	reader := &errorReader{err: customErr}
 	lr := NewLockedReader(reader)
-	
+
 	buf := make([]byte, 10)
 	n, err := lr.Read(buf)
-	
+
 	assert.Equal(t, 0, n)
 	assert.Equal(t, customErr, err)
 }

@@ -27,11 +27,11 @@ func TestLengthParameters(t *testing.T) {
 	assert.Equal(t, 256, L, "L should be 256")
 	assert.Equal(t, 1280, LPrime, "LPrime should be 1280")
 	assert.Equal(t, 512, Epsilon, "Epsilon should be 512")
-	
+
 	// Test computed values
 	assert.Equal(t, 768, LPlusEpsilon, "LPlusEpsilon should be 768")
 	assert.Equal(t, L+Epsilon, LPlusEpsilon, "LPlusEpsilon should equal L + Epsilon")
-	
+
 	assert.Equal(t, 1792, LPrimePlusEpsilon, "LPrimePlusEpsilon should be 1792")
 	assert.Equal(t, LPrime+Epsilon, LPrimePlusEpsilon, "LPrimePlusEpsilon should equal LPrime + Epsilon")
 }
@@ -48,30 +48,30 @@ func TestPaillierParameters(t *testing.T) {
 	assert.Equal(t, 1024, BitsBlumPrime, "BitsBlumPrime should be 1024")
 	assert.Equal(t, 2048, BitsPaillier, "BitsPaillier should be 2048")
 	assert.Equal(t, 2*BitsBlumPrime, BitsPaillier, "BitsPaillier should be 2*BitsBlumPrime")
-	
+
 	assert.Equal(t, 256, BytesPaillier, "BytesPaillier should be 256")
 	assert.Equal(t, BitsPaillier/8, BytesPaillier, "BytesPaillier should be BitsPaillier/8")
-	
+
 	assert.Equal(t, 512, BytesCiphertext, "BytesCiphertext should be 512")
 	assert.Equal(t, 2*BytesPaillier, BytesCiphertext, "BytesCiphertext should be 2*BytesPaillier")
 }
 
 func TestParameterRelationships(t *testing.T) {
 	// Test that parameters have expected relationships
-	
+
 	// Security parameter relationships
 	assert.Equal(t, SecParam*1, L, "L should be 1*SecParam")
 	assert.Equal(t, SecParam*5, LPrime, "LPrime should be 5*SecParam")
 	assert.Equal(t, SecParam*2, Epsilon, "Epsilon should be 2*SecParam")
-	
+
 	// Bit/byte conversions
 	assert.Equal(t, SecParam/8, SecBytes, "SecBytes should be SecParam/8")
 	assert.Equal(t, OTParam/8, OTBytes, "OTBytes should be OTParam/8")
-	
+
 	// Modulus size relationships
 	assert.Equal(t, 8*SecParam, BitsIntModN, "BitsIntModN should be 8*SecParam")
 	assert.Equal(t, 4*SecParam, BitsBlumPrime, "BitsBlumPrime should be 4*SecParam")
-	
+
 	// Paillier relationships
 	assert.Greater(t, BitsPaillier, BitsBlumPrime, "BitsPaillier should be greater than BitsBlumPrime")
 	assert.Greater(t, BytesCiphertext, BytesPaillier, "BytesCiphertext should be greater than BytesPaillier")

@@ -162,12 +162,12 @@ func tryBlumPrime(rand io.Reader) *saferith.Nat {
 func Paillier(rand io.Reader, pl *pool.Pool) (p, q *saferith.Nat) {
 	reader := pool.NewLockedReader(rand)
 	results := pl.Search(2, func() interface{} {
-		q := tryBlumPrime(reader)
+		prime := tryBlumPrime(reader)
 		// You have to do this, because of how Go handles nil.
-		if q == nil {
+		if prime == nil {
 			return nil
 		}
-		return q
+		return prime
 	})
 	p, q = results[0].(*saferith.Nat), results[1].(*saferith.Nat)
 	return

@@ -290,7 +290,5 @@ func (r *ProtocolRunner) Cleanup() {
 	}
 
 	// Clean up network
-	if r.network != nil {
-		// Network cleanup if needed
-	}
+	// Network cleanup handled separately if needed
 }
