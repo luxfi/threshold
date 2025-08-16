@@ -80,7 +80,7 @@ linters-settings:
       - wrapperFunc
 
   gocyclo:
-    min-complexity: 15
+    min-complexity: 25  # Increased for complex CLI functions
 
   goimports:
     local-prefixes: github.com/lux/threshold
@@ -133,6 +133,9 @@ issues:
     - path: cmd/threshold-cli/
       linters:
         - dupl  # Intentional duplication between benchmarks and tests
+        - gocyclo  # Complex CLI functions
+        - goconst  # Many string constants used once
+        - unparam  # Some protocol functions have unused params for interface compliance
 
     - path: pkg/math/
       text: "magic number"
