@@ -1,10 +1,10 @@
 package main
 
 import (
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"fmt"
 	"math"
-	mathrand "math/rand"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -168,7 +168,7 @@ func simulateConcurrentSigning(protocolName string, rounds int) error {
 					defer wg.Done()
 
 					message := make([]byte, 32)
-					if _, err := rand.Read(message); err != nil {
+					if _, err := cryptorand.Read(message); err != nil {
 						return
 					}
 
@@ -290,7 +290,7 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 
 	// Try to sign
 	message := make([]byte, 32)
-	if _, readErr := rand.Read(message); readErr != nil {
+	if _, readErr := cryptorand.Read(message); readErr != nil {
 		return false, readErr
 	}
 
@@ -320,7 +320,7 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 
 	// Try to sign with all parties
 	message := make([]byte, 32)
-	if _, err := rand.Read(message); err != nil {
+	if _, err := cryptorand.Read(message); err != nil {
 		return "failure", err
 	}
 
@@ -366,7 +366,7 @@ func runLargeScaleRound(protocolName string, n, threshold int) error {
 
 	// Sign
 	message := make([]byte, 32)
-	if _, err := rand.Read(message); err != nil {
+	if _, err := cryptorand.Read(message); err != nil {
 		return err
 	}
 
@@ -485,9 +485,9 @@ type ByzantineNetwork struct {
 
 func (b *ByzantineNetwork) Send(msg *protocol.Message) {
 	// Byzantine parties send corrupted messages
-	if b.ByzantineParties[msg.From] {
-		// Randomly corrupt or drop message
-		if mathrand.Float64() < 0.5 {
+	if _, isByzantine := b.ByzantineParties[msg.From]; isByzantine {
+		// Use deterministic random for simulation
+		if rand.Float64() < 0.5 { //nolint:gosec // Simulation randomness
 			return // Drop
 		}
 		// Otherwise send corrupted version (in real impl)
@@ -502,12 +502,12 @@ type UnreliableNetwork struct {
 
 func (u *UnreliableNetwork) Send(msg *protocol.Message) {
 	// Randomly drop messages
-	if mathrand.Float64() < u.FailureRate {
+	if rand.Float64() < u.FailureRate { //nolint:gosec // Simulation randomness
 		return
 	}
 
 	// Add random delay
-	delay := time.Duration(mathrand.Intn(100)) * time.Millisecond
+	delay := time.Duration(rand.Intn(100)) * time.Millisecond //nolint:gosec // Simulation delay
 	time.Sleep(delay)
 
 	u.Network.Send(msg)
