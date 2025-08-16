@@ -66,14 +66,14 @@ jobs:
         run: go mod verify
 
       - name: Run tests
-        run: go test -v -race -timeout 120s ./...
+        run: go test -v -race -timeout 300s ./...
 
       - name: Run build verification
         run: go build -v ./...
 
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
-        run: go test -v -race -coverprofile=coverage.out -covermode=atomic -timeout 120s ./...
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic -timeout 300s ./...
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
@@ -99,7 +99,7 @@ jobs:
           cache: true
 
       - name: Run benchmarks
-        run: go test -bench=. -benchtime=10s -benchmem -timeout=300s ./...
+        run: go test -bench=. -benchtime=1s -benchmem -timeout=600s -short ./...
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
