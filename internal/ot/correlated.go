@@ -242,7 +242,7 @@ type CorreOTSendResult struct {
 // CorreOTSend runs the Sender's end of the Correlated OT protocol.
 //
 // The Sender will get binary vectors q_j, and the Receiver will get vectors t_j
-// satsifying t_j = q_j ^ (choices_j * Delta).
+// satisfying t_j = q_j ^ (choices_j * Delta).
 //
 // This follows the extend section of Figure 3 in https://eprint.iacr.org/2015/546.
 //
@@ -292,7 +292,7 @@ type CorreOTReceiveResult struct {
 // CorreOTReceive runs the Receiver's end of the Correlated OT protocol.
 //
 // The Sender will get binary vectors q_j, and the Receiver will get vectors t_j
-// satsifying t_j = q_j ^ (choices_j * Delta).
+// satisfying t_j = q_j ^ (choices_j * Delta).
 //
 // This follows the extend section of Figure 3 in https://eprint.iacr.org/2015/546.
 //

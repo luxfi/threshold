@@ -58,11 +58,11 @@ type Handler struct {
 	priority chan *Message // High-priority messages
 
 	// Lifecycle management
-	ctx       context.Context
-	cancel    context.CancelFunc
-	done      chan struct{}
-	closeOnce sync.Once
-	stopOnce  sync.Once
+	ctx           context.Context
+	cancel        context.CancelFunc
+	done          chan struct{}
+	closeOnce     sync.Once
+	stopOnce      sync.Once
 	closeDoneOnce sync.Once
 
 	// Worker pool
@@ -701,7 +701,7 @@ func (h *Handler) Accept(msg *Message) {
 	case h.incoming <- msg:
 
 	case <-h.ctx.Done():
-		h.log.Debug("dropping message - context cancelled")
+		h.log.Debug("dropping message - context canceled")
 
 	default:
 		// Queue full, drop message
@@ -741,10 +741,10 @@ func (h *Handler) Result() (interface{}, error) {
 		return nil, *e
 	}
 
-	// Check if context was cancelled
+	// Check if context was canceled
 	select {
 	case <-h.ctx.Done():
-		h.log.Error("protocol cancelled")
+		h.log.Error("protocol canceled")
 
 		if h.metrics != nil {
 			h.metrics.protocolsFailed.Inc()
@@ -806,7 +806,7 @@ func (h *Handler) WaitForResult() (interface{}, error) {
 			}
 
 		case <-h.ctx.Done():
-			h.log.Error("protocol cancelled")
+			h.log.Error("protocol canceled")
 
 			if h.metrics != nil {
 				h.metrics.protocolsFailed.Inc()
@@ -840,7 +840,7 @@ func (h *Handler) Stop() {
 		h.closeOnce.Do(func() {
 			close(h.out)
 		})
-		
+
 		// Close other channels
 		close(h.incoming)
 		close(h.priority)
@@ -1027,7 +1027,7 @@ func (h *Handler) initializeRound(r round.Session) {
 				case <-time.After(10 * time.Millisecond):
 					h.tryAdvanceRound()
 				case <-h.ctx.Done():
-					// Context cancelled, don't try to advance
+					// Context canceled, don't try to advance
 					return
 				}
 			}()
@@ -1087,7 +1087,7 @@ func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 			h.metrics.messagesSent.Inc()
 		}
 	case <-h.ctx.Done():
-		h.log.Debug("failed to send message - context cancelled")
+		h.log.Debug("failed to send message - context canceled")
 	}
 }
 
@@ -1109,7 +1109,7 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 
 	// Try to set error atomically
 	if h.err.CompareAndSwap(nil, protocolErr) {
-		h.log.Error("protocol error - cancelling context",
+		h.log.Error("protocol error - canceling context",
 			log.Err(err),
 			log.String("culprits", fmt.Sprintf("%v", culprits)))
 
@@ -1197,7 +1197,7 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 			case <-time.After(10 * time.Millisecond):
 				h.tryAdvanceRound()
 			case <-h.ctx.Done():
-				// Context cancelled, don't try to advance
+				// Context canceled, don't try to advance
 				return
 			}
 		}()
@@ -1287,7 +1287,6 @@ func (h *Handler) verifyBroadcastForRound(msg *Message, roundNum round.Number) {
 		// Mark this broadcast as processed
 		key := fmt.Sprintf("%d:%s", roundNum, msg.From)
 		h.processedBroadcasts.Store(key, true)
-
 	}
 }
 

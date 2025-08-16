@@ -46,7 +46,7 @@ func Keygen(group curve.Curve, receiver bool, selfID, otherID party.ID, pl *pool
 
 // RefreshReceiver initiates a key-refresh protocol, from the Receiver's perspective.
 //
-// The goal of this protocol is to refresh the shares of the secret key, and other auxilary
+// The goal of this protocol is to refresh the shares of the secret key, and other auxiliary
 // secret data, while preserving the shared public key.
 //
 // This won't change the value of the public key, but it will change the value of the chaining key.

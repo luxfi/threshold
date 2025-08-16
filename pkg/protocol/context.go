@@ -83,5 +83,5 @@ func Protocol(ctx context.Context) string {
 //   log.Info("event", "session", SessionID(ctx), "self", Self(ctx))
 //
 // For metrics, use the luxfi/metric package directly:
-//   import "github.com/luxfi/metric"  
+//   import "github.com/luxfi/metric"
 //   metric.Inc("threshold.rounds.completed")

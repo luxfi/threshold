@@ -9,7 +9,6 @@ import (
 func HandlerLoop(id party.ID, h *protocol.Handler, network *Network) {
 	for {
 		select {
-
 		// outgoing messages
 		case msg, ok := <-h.Listen():
 			if !ok {

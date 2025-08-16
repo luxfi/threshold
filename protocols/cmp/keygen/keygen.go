@@ -58,6 +58,5 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 			VSSSecret: VSSSecret,
 			keyID:     keyID,
 		}, nil
-
 	}
 }

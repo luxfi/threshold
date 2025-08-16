@@ -104,7 +104,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		if err != nil {
 			return r, err
 		}
-		sig = append(sig, zBytes[:]...)
+		sig = append(sig, zBytes...)
 
 		taprootPub := taproot.PublicKey(r.Y.(*curve.Secp256k1Point).XBytes())
 

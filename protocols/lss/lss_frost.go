@@ -49,7 +49,6 @@ func DynamicReshareFROST(
 	newThreshold int,
 	_ *pool.Pool,
 ) (map[party.ID]*keygen.Config, error) {
-
 	if len(oldConfigs) == 0 {
 		return nil, errors.New("lss-frost: no old configurations provided")
 	}

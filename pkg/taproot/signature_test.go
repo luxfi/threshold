@@ -25,5 +25,4 @@ func TestSignatureVerification(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, pk.Verify(sig2, steakHash))
 	}
-
 }

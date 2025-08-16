@@ -146,9 +146,9 @@ func (h *Harness) Run() error {
 		return nil
 
 	case <-h.ctx.Done():
-		// Context cancelled or timed out
-		h.cancel() // Ensure all handlers are cancelled
-		return fmt.Errorf("harness context cancelled: %w", h.ctx.Err())
+		// Context canceled or timed out
+		h.cancel() // Ensure all handlers are canceled
+		return fmt.Errorf("harness context canceled: %w", h.ctx.Err())
 	}
 }
 
@@ -211,7 +211,7 @@ func (h *Harness) Result(id party.ID) (interface{}, error) {
 		return nil, fmt.Errorf("no result for party %s", id)
 	}
 
-	err, _ := h.errors[id]
+	err := h.errors[id]
 	return result, err
 }
 

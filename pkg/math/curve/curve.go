@@ -104,9 +104,9 @@ type Scalar interface {
 // to your concrete type. This interface is not designed to be able to handle
 // different Point types, but we can't encode that in the type system.
 type Point interface {
-	// You're free to implement the binary marshalling however you'd like.
+	// You're free to implement the binary marshaling however you'd like.
 	//
-	// This marshalling should also work with the identity element, ideally,
+	// This marshaling should also work with the identity element, ideally,
 	// but this isn't strictly necessary.
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler

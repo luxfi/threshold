@@ -601,7 +601,7 @@ func (c *CardanoAdapter) serializeMetadataToCBOR(metadata *CardanoMetadata) []by
 		labelBytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(labelBytes, label)
 		h.Write(labelBytes)
-		h.Write([]byte(fmt.Sprintf("%v", value)))
+		fmt.Fprintf(h, "%v", value)
 	}
 	return h.Sum(nil)
 }
@@ -622,8 +622,8 @@ func (c *CardanoAdapter) GenerateCardanoAddress(paymentPubKey, stakePubKey [32]b
 		Network: c.networkID,
 	}
 
-	copy(addr.Payment[:], paymentHash[:])
-	copy(addr.Stake[:], stakeHash[:])
+	copy(addr.Payment[:], paymentHash)
+	copy(addr.Stake[:], stakeHash)
 
 	return addr
 }

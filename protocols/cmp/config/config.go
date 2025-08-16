@@ -90,7 +90,7 @@ func (c *Config) WriteTo(w io.Writer) (total int64, err error) {
 	n, err = types.ThresholdWrapper(c.Threshold).WriteTo(w)
 	total += n
 	if err != nil {
-		return
+		return total, err
 	}
 
 	// write partyIDs
@@ -98,14 +98,14 @@ func (c *Config) WriteTo(w io.Writer) (total int64, err error) {
 	n, err = partyIDs.WriteTo(w)
 	total += n
 	if err != nil {
-		return
+		return total, err
 	}
 
 	// write rid
 	n, err = c.RID.WriteTo(w)
 	total += n
 	if err != nil {
-		return
+		return total, err
 	}
 
 	// write all party data
@@ -114,10 +114,10 @@ func (c *Config) WriteTo(w io.Writer) (total int64, err error) {
 		n, err = c.Public[j].WriteTo(w)
 		total += n
 		if err != nil {
-			return
+			return total, err
 		}
 	}
-	return
+	return total, err
 }
 
 // Domain implements hash.WriterToWithDomain.
@@ -138,38 +138,38 @@ func (p *Public) WriteTo(w io.Writer) (total int64, err error) {
 	// write ECDSA
 	data, err := p.ECDSA.MarshalBinary()
 	if err != nil {
-		return
+		return total, err
 	}
 	n, err := w.Write(data)
 	total = int64(n)
 	if err != nil {
-		return
+		return total, err
 	}
 
 	// write ElGamal
 	data, err = p.ElGamal.MarshalBinary()
 	if err != nil {
-		return
+		return total, err
 	}
 	n, err = w.Write(data)
 	total += int64(n)
 	if err != nil {
-		return
+		return total, err
 	}
 
 	n64, err := p.Paillier.WriteTo(w)
 	total += n64
 	if err != nil {
-		return
+		return total, err
 	}
 
 	n64, err = p.Pedersen.WriteTo(w)
 	total += n64
 	if err != nil {
-		return
+		return total, err
 	}
 
-	return
+	return total, err
 }
 
 // CanSign returns true if the given _sorted_ list of signers is

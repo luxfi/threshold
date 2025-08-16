@@ -25,7 +25,7 @@ type round1 struct {
 	// This means taking the necessary steps to ensure that the shared secret generates
 	// a public key with even y coordinate.
 	//
-	// We also end up returning a different result, to accomodate this fact.
+	// We also end up returning a different result, to accommodate this fact.
 	taproot bool
 	// threshold is the integer t which defines the maximum number of corruptions tolerated for this session.
 	//
@@ -35,7 +35,7 @@ type round1 struct {
 	threshold int
 	// refresh indicates whether or not we're doing a refresh instead of a key-generation.
 	refresh bool
-	// These fields are set to accomodate both key-generation, in which case they'll
+	// These fields are set to accommodate both key-generation, in which case they'll
 	// take on identity values, and refresh, in which case their values are meaningful.
 	// These values should be modifiable.
 

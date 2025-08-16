@@ -39,12 +39,12 @@ const (
 
 // ChainConfig contains chain-specific configuration
 type ChainConfig struct {
-	ChainID        *big.Int
-	Name           string
-	Symbol         string
-	ExplorerURL    string
-	RPCURL         string
-	IsL2           bool
+	ChainID         *big.Int
+	Name            string
+	Symbol          string
+	ExplorerURL     string
+	RPCURL          string
+	IsL2            bool
 	SupportsEIP1559 bool
 	SupportsBlobTx  bool
 }
@@ -195,11 +195,11 @@ func GetChainConfig(chain EVMChain) *ChainConfig {
 			IsL2:        true,
 		},
 	}
-	
+
 	if config, ok := configs[chain]; ok {
 		return config
 	}
-	
+
 	// Default Ethereum config
 	return configs[Ethereum]
 }
@@ -241,7 +241,7 @@ func (e *EVMAdapter) Digest(tx interface{}) ([]byte, error) {
 // digestTransaction computes digest based on transaction type
 func (e *EVMAdapter) digestTransaction(tx *EVMTransaction) ([]byte, error) {
 	h := sha3.NewLegacyKeccak256()
-	
+
 	// Encode based on transaction type
 	var encoded []byte
 	switch tx.Type {
@@ -262,7 +262,7 @@ func (e *EVMAdapter) digestTransaction(tx *EVMTransaction) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported transaction type: %d", tx.Type)
 	}
-	
+
 	h.Write(encoded)
 	return h.Sum(nil), nil
 }
@@ -325,16 +325,16 @@ func (e *EVMAdapter) normalizeLowS(s curve.Scalar) curve.Scalar {
 	orderMod := e.group.Order()
 	order := orderMod.Big()
 	halfOrder := new(big.Int).Div(order, big.NewInt(2))
-	
+
 	sBig := new(big.Int)
 	sBytes, _ := s.MarshalBinary()
 	sBig.SetBytes(sBytes)
-	
+
 	if sBig.Cmp(halfOrder) > 0 {
 		sBig.Sub(order, sBig)
 		s = e.group.NewScalar().SetNat(orderMod.Nat().SetBytes(sBig.Bytes()))
 	}
-	
+
 	return s
 }
 
@@ -386,10 +386,10 @@ func (e *EVMAdapter) ValidateConfig(config *UnifiedConfig) error {
 
 // Transaction types
 const (
-	LegacyTxType      = 0x00
-	AccessListTxType  = 0x01
-	DynamicFeeTxType  = 0x02
-	BlobTxType        = 0x03
+	LegacyTxType     = 0x00
+	AccessListTxType = 0x01
+	DynamicFeeTxType = 0x02
+	BlobTxType       = 0x03
 )
 
 // EVMTransaction represents a generic EVM transaction
@@ -413,34 +413,34 @@ type EVMTransaction struct {
 func (e *EVMAdapter) encodeLegacyTx(tx *EVMTransaction) []byte {
 	// Simplified RLP encoding for legacy transactions
 	var encoded []byte
-	
+
 	// Nonce
 	nonceBytes := make([]byte, 8)
 	for i := 0; i < 8; i++ {
 		nonceBytes[7-i] = byte(tx.Nonce >> (8 * i))
 	}
 	encoded = append(encoded, nonceBytes...)
-	
+
 	// Gas price
 	if tx.GasPrice != nil {
 		priceBytes := tx.GasPrice.Bytes()
 		encoded = append(encoded, priceBytes...)
 	}
-	
+
 	// Gas limit
 	gasBytes := make([]byte, 8)
 	for i := 0; i < 8; i++ {
 		gasBytes[7-i] = byte(tx.GasLimit >> (8 * i))
 	}
 	encoded = append(encoded, gasBytes...)
-	
+
 	// To
 	if tx.To != nil {
 		encoded = append(encoded, tx.To[:]...)
 	} else {
 		encoded = append(encoded, 0x80) // Contract creation
 	}
-	
+
 	// Value
 	if tx.Value != nil {
 		valueBytes := tx.Value.Bytes()
@@ -448,16 +448,16 @@ func (e *EVMAdapter) encodeLegacyTx(tx *EVMTransaction) []byte {
 	} else {
 		encoded = append(encoded, 0x80)
 	}
-	
+
 	// Data
 	encoded = append(encoded, tx.Data...)
-	
+
 	// EIP-155 chain ID
 	if e.config.ChainID != nil {
 		encoded = append(encoded, e.config.ChainID.Bytes()...)
 		encoded = append(encoded, 0x80, 0x80) // r, s placeholders
 	}
-	
+
 	return encoded
 }
 
@@ -486,11 +486,11 @@ func (e *EVMAdapter) encodeBlobTx(tx *EVMTransaction) []byte {
 func (e *EVMAdapter) GenerateEVMAddress(publicKey curve.Point) [20]byte {
 	// Keccak256(pubkey)[12:]
 	pubBytes, _ := publicKey.MarshalBinary()
-	
+
 	h := sha3.NewLegacyKeccak256()
 	h.Write(pubBytes[1:]) // Skip format byte
 	hash := h.Sum(nil)
-	
+
 	var addr [20]byte
 	copy(addr[:], hash[12:])
 	return addr
@@ -500,7 +500,7 @@ func (e *EVMAdapter) GenerateEVMAddress(publicKey curve.Point) [20]byte {
 func (e *EVMAdapter) EstimateGas(tx *EVMTransaction) uint64 {
 	// Base cost
 	baseCost := uint64(21000)
-	
+
 	// Data cost (4 gas per zero byte, 16 gas per non-zero)
 	dataCost := uint64(0)
 	for _, b := range tx.Data {
@@ -510,7 +510,7 @@ func (e *EVMAdapter) EstimateGas(tx *EVMTransaction) uint64 {
 			dataCost += 16
 		}
 	}
-	
+
 	// Access list cost (if present)
 	accessListCost := uint64(0)
 	if len(tx.AccessList) > 0 {
@@ -519,13 +519,13 @@ func (e *EVMAdapter) EstimateGas(tx *EVMTransaction) uint64 {
 			accessListCost += uint64(len(entry.StorageKeys)) * 1900
 		}
 	}
-	
+
 	// L2 specific costs
 	l2Cost := uint64(0)
 	if e.config.IsL2 {
 		// L2s have additional data availability costs
 		l2Cost = uint64(len(tx.Data)) * 16
 	}
-	
+
 	return baseCost + dataCost + accessListCost + l2Cost
 }

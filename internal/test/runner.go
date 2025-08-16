@@ -122,7 +122,6 @@ func (r *ProtocolRunner) Run() error {
 				result interface{}
 				err    error
 			}{id: partyID, result: result, err: err}
-
 		}(id, handler)
 	}
 

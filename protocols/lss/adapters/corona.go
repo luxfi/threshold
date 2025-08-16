@@ -437,13 +437,13 @@ func (r *CoronaAdapter) computeSignatureShare(message []byte, share *CoronaSecre
 		if i < len(offline.Round2Data.MaskedShares) {
 			maskedShare = offline.Round2Data.MaskedShares[i]
 		}
-		
+
 		// Check bounds for share.S
 		secretShare := int64(0)
 		if i < len(share.S) {
 			secretShare = share.S[i]
 		}
-		
+
 		sigShare[i] = (secretShare + h + maskedShare) % r.params.Q
 	}
 
