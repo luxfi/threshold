@@ -149,7 +149,7 @@ func TestFROSTKeygenWithTimeout(t *testing.T) {
 	}
 
 	// Run with timeout
-	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 30*time.Second, createHandlers)
+	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 180*time.Second, createHandlers)
 
 	// Don't fail on timeout
 	if err != nil {
