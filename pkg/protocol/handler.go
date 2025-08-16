@@ -15,7 +15,6 @@ import (
 	"github.com/luxfi/log"
 	"github.com/luxfi/log/level"
 	"github.com/luxfi/threshold/internal/round"
-	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/prometheus/client_golang/prometheus"
 )
