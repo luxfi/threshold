@@ -52,7 +52,7 @@ func runGinkgoTests(protocolName, suite string, timeout time.Duration) error {
 	}
 
 	// Run ginkgo
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // Test runner command
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -161,7 +161,7 @@ func runPropertyTests(protocolName string) error {
 	fmt.Printf("\n=== Property-Based Tests for %s ===\n", protocolName)
 
 	// Run Go's built-in property tests
-	cmd := exec.Command("go", "test",
+	cmd := exec.Command("go", "test", //nolint:gosec // Test runner command
 		fmt.Sprintf("./protocols/%s", protocolName),
 		"-run", "Property",
 		"-v")
@@ -176,7 +176,7 @@ func runFuzzTests(protocolName string) error {
 	fmt.Printf("\n=== Fuzz Tests for %s ===\n", protocolName)
 
 	// Run Go's built-in fuzz tests
-	cmd := exec.Command("go", "test",
+	cmd := exec.Command("go", "test", //nolint:gosec // Test runner command
 		fmt.Sprintf("./protocols/%s", protocolName),
 		"-fuzz", "Fuzz",
 		"-fuzztime", "10s",
@@ -262,14 +262,23 @@ func testBasicSignature(protocolName string) error {
 
 			switch protocolName {
 			case protocolLSS:
-				c := configs[i].(*lss.Config)
-				h, err = protocol.NewMultiHandler(lss.Sign(c, signers, message, pl), nil)
+				if c, ok := configs[i].(*lss.Config); ok {
+					h, err = protocol.NewMultiHandler(lss.Sign(c, signers, message, pl), nil)
+				} else {
+					return
+				}
 			case protocolCMP:
-				c := configs[i].(*cmp.Config)
-				h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
+				if c, ok := configs[i].(*cmp.Config); ok {
+					h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
+				} else {
+					return
+				}
 			case protocolFROST:
-				c := configs[i].(*frost.Config)
-				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
+				if c, ok := configs[i].(*frost.Config); ok {
+					h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
+				} else {
+					return
+				}
 			}
 
 			if err != nil {
@@ -469,7 +478,8 @@ func testConfiguration(protocolName string, n, threshold int) error {
 	return err
 }
 
-func setupTestConfigs(protocolName string, n, threshold int, pl *pool.Pool, network *test.Network, group curve.Curve) ([]interface{}, error) {
+func setupTestConfigs(protocolName string, n, threshold int, pl *pool.Pool,
+	network *test.Network, group curve.Curve) ([]interface{}, error) {
 	partyIDs := test.PartyIDs(n)
 	configs := make([]interface{}, n)
 	var wg sync.WaitGroup
@@ -517,7 +527,8 @@ func setupTestConfigs(protocolName string, n, threshold int, pl *pool.Pool, netw
 	return configs, nil
 }
 
-func performSign(protocolName string, configs []interface{}, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) (interface{}, error) {
+func performSign(protocolName string, configs []interface{}, signers []party.ID,
+	message []byte, pl *pool.Pool, network *test.Network) (interface{}, error) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
 
@@ -534,14 +545,26 @@ func performSign(protocolName string, configs []interface{}, signers []party.ID,
 
 			switch protocolName {
 			case protocolLSS:
-				c := cfg.(*lss.Config)
-				h, err = protocol.NewMultiHandler(lss.Sign(c, signers, message, pl), nil)
+				if c, ok := cfg.(*lss.Config); ok {
+					h, err = protocol.NewMultiHandler(lss.Sign(c, signers, message, pl), nil)
+				} else {
+					errors[i] = fmt.Errorf("invalid lss config type")
+					return
+				}
 			case protocolCMP:
-				c := cfg.(*cmp.Config)
-				h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
+				if c, ok := cfg.(*cmp.Config); ok {
+					h, err = protocol.NewMultiHandler(cmp.Sign(c, signers, message, pl), nil)
+				} else {
+					errors[i] = fmt.Errorf("invalid cmp config type")
+					return
+				}
 			case protocolFROST:
-				c := cfg.(*frost.Config)
-				h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
+				if c, ok := cfg.(*frost.Config); ok {
+					h, err = protocol.NewMultiHandler(frost.Sign(c, signers, message), nil)
+				} else {
+					errors[i] = fmt.Errorf("invalid frost config type")
+					return
+				}
 			}
 
 			if err != nil {
