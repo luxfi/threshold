@@ -271,15 +271,15 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 	group := curve.Secp256k1{}
 
 	// Mark some parties as Byzantine
-	byzantineParties := make(map[party.ID]bool)
+	byzantinePartiesMap := make(map[party.ID]bool)
 	for i := 0; i < byzantineCount; i++ {
-		byzantineParties[partyIDs[i]] = true
+		byzantinePartiesMap[partyIDs[i]] = true
 	}
 
 	// Create Byzantine network wrapper
 	byzantineNetwork := &ByzantineNetwork{
 		Network:          network,
-		ByzantineParties: byzantineParties,
+		ByzantineParties: byzantinePartiesMap,
 	}
 
 	// Run protocol with Byzantine parties
@@ -290,8 +290,8 @@ func runByzantineRound(protocolName string, n, threshold, byzantineCount int) (b
 
 	// Try to sign
 	message := make([]byte, 32)
-	if _, err := rand.Read(message); err != nil {
-		return false, err
+	if _, readErr := rand.Read(message); readErr != nil {
+		return false, readErr
 	}
 
 	err = runSingleSign(protocolName, configs[:threshold+byzantineCount], message)
@@ -329,14 +329,14 @@ func runNetworkFailureRound(protocolName string, n, threshold int, failureRate f
 	wg.Add(n)
 
 	for i, config := range configs {
-		go func(idx int, cfg interface{}) {
+		go func(cfg interface{}) {
 			defer wg.Done()
 
 			err := attemptSignWithConfig(protocolName, cfg, partyIDs, message, pl, unreliableNetwork.Network)
 			if err == nil {
 				successCount++
 			}
-		}(i, config)
+		}(config)
 	}
 
 	wg.Wait()
@@ -373,7 +373,8 @@ func runLargeScaleRound(protocolName string, n, threshold int) error {
 	return runSingleSign(protocolName, configs[:threshold], message)
 }
 
-func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool, network *test.Network, group curve.Curve) ([]interface{}, error) {
+func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool,
+	network *test.Network, group curve.Curve) ([]interface{}, error) {
 	partyIDs := test.PartyIDs(n)
 	configs := make([]interface{}, n)
 	errors := make([]error, n)
@@ -390,11 +391,11 @@ func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool
 			var err error
 
 			switch protocolName {
-			case "lss":
+			case protocolLSS:
 				h, err = protocol.NewMultiHandler(lss.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "cmp":
+			case protocolCMP:
 				h, err = protocol.NewMultiHandler(cmp.Keygen(group, id, partyIDs, threshold, pl), nil)
-			case "frost":
+			case protocolFROST:
 				h, err = protocol.NewMultiHandler(frost.Keygen(group, id, partyIDs, threshold), nil)
 			}
 
@@ -426,24 +427,34 @@ func setupSimulationConfigs(protocolName string, n, threshold int, pl *pool.Pool
 	return configs, nil
 }
 
-func attemptSignWithConfig(protocolName string, config interface{}, partyIDs []party.ID, message []byte, pl *pool.Pool, network *test.Network) error {
+func attemptSignWithConfig(protocolName string, config interface{}, partyIDs []party.ID,
+	message []byte, pl *pool.Pool, network *test.Network) error {
 	var h *protocol.Handler
 	var err error
 	var id party.ID
 
 	switch protocolName {
-	case "lss":
-		c := config.(*lss.Config)
-		id = c.ID
-		h, err = protocol.NewMultiHandler(lss.Sign(c, partyIDs, message, pl), nil)
-	case "cmp":
-		c := config.(*cmp.Config)
-		id = c.ID
-		h, err = protocol.NewMultiHandler(cmp.Sign(c, partyIDs, message, pl), nil)
-	case "frost":
-		c := config.(*frost.Config)
-		id = c.ID
-		h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
+	case protocolLSS:
+		if c, ok := config.(*lss.Config); ok {
+			id = c.ID
+			h, err = protocol.NewMultiHandler(lss.Sign(c, partyIDs, message, pl), nil)
+		} else {
+			return fmt.Errorf("invalid lss config type")
+		}
+	case protocolCMP:
+		if c, ok := config.(*cmp.Config); ok {
+			id = c.ID
+			h, err = protocol.NewMultiHandler(cmp.Sign(c, partyIDs, message, pl), nil)
+		} else {
+			return fmt.Errorf("invalid cmp config type")
+		}
+	case protocolFROST:
+		if c, ok := config.(*frost.Config); ok {
+			id = c.ID
+			h, err = protocol.NewMultiHandler(frost.Sign(c, partyIDs, message), nil)
+		} else {
+			return fmt.Errorf("invalid frost config type")
+		}
 	}
 
 	if err != nil {
