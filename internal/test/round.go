@@ -32,7 +32,7 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 		mu        sync.Mutex
 	)
 
-	if roundType, err = checkAllRoundsSame(rounds); err != nil {
+	if _, err = checkAllRoundsSame(rounds); err != nil {
 		return err, false
 	}
 	// get the second set of messages
@@ -76,7 +76,7 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 	close(out)
 
 	// Check that all rounds are the same type
-	if roundType, err = checkAllRoundsSame(rounds); err != nil {
+	if _, err = checkAllRoundsSame(rounds); err != nil {
 		return err, false
 	}
 	if roundType.String() == reflect.TypeOf(&round.Output{}).String() {
