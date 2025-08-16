@@ -21,7 +21,8 @@ import (
 
 // LSS Protocol implementations
 
-func runLSSKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, threshold int, pl *pool.Pool, network *test.Network) (*lss.Config, error) {
+func runLSSKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID,
+	threshold int, pl *pool.Pool, network *test.Network) (*lss.Config, error) {
 	h, err := protocol.NewMultiHandler(lss.Keygen(group, selfID, partyIDs, threshold, pl), nil)
 	if err != nil {
 		return nil, err
@@ -41,7 +42,10 @@ func runLSSKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, thres
 		if err != nil {
 			return nil, err
 		}
-		return result.(*lss.Config), nil
+		if cfg, ok := result.(*lss.Config); ok {
+			return cfg, nil
+		}
+		return nil, fmt.Errorf("unexpected result type")
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("keygen timeout")
 	}
@@ -68,7 +72,10 @@ func runLSSSign(config *lss.Config, signers []party.ID, message []byte, pl *pool
 		if err != nil {
 			return nil, err
 		}
-		return result.(*ecdsa.Signature), nil
+		if sig, ok := result.(*ecdsa.Signature); ok {
+			return sig, nil
+		}
+		return nil, fmt.Errorf("unexpected result type")
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("signing timeout")
 	}
@@ -96,7 +103,10 @@ func runLSSReshare(config *lss.Config, newThreshold int, newParties []party.ID, 
 		if err != nil {
 			return nil, err
 		}
-		return result.(*lss.Config), nil
+		if cfg, ok := result.(*lss.Config); ok {
+			return cfg, nil
+		}
+		return nil, fmt.Errorf("unexpected result type")
 	case <-time.After(60 * time.Second):
 		return nil, fmt.Errorf("reshare timeout")
 	}
@@ -104,7 +114,8 @@ func runLSSReshare(config *lss.Config, newThreshold int, newParties []party.ID, 
 
 // CMP Protocol implementations
 
-func runCMPKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, threshold int, pl *pool.Pool, network *test.Network) (*cmp.Config, error) {
+func runCMPKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID,
+	threshold int, pl *pool.Pool, network *test.Network) (*cmp.Config, error) {
 	h, err := protocol.NewMultiHandler(cmp.Keygen(group, selfID, partyIDs, threshold, pl), nil)
 	if err != nil {
 		return nil, err
@@ -122,7 +133,10 @@ func runCMPKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, thres
 		if err != nil {
 			return nil, err
 		}
-		return result.(*cmp.Config), nil
+		if cfg, ok := result.(*cmp.Config); ok {
+			return cfg, nil
+		}
+		return nil, fmt.Errorf("unexpected result type")
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("keygen timeout")
 	}
@@ -144,11 +158,15 @@ func runCMPSign(config *cmp.Config, signers []party.ID, message []byte, pl *pool
 	var presignResult *ecdsa.PreSignature
 	select {
 	case <-done:
-		result, err := h.Result()
-		if err != nil {
-			return nil, err
+		result, resErr := h.Result()
+		if resErr != nil {
+			return nil, resErr
 		}
-		presignResult = result.(*ecdsa.PreSignature)
+		if ps, ok := result.(*ecdsa.PreSignature); ok {
+			presignResult = ps
+		} else {
+			return nil, fmt.Errorf("unexpected presign result type")
+		}
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("presign timeout")
 	}
@@ -168,11 +186,14 @@ func runCMPSign(config *cmp.Config, signers []party.ID, message []byte, pl *pool
 
 	select {
 	case <-done:
-		result, err := h.Result()
-		if err != nil {
-			return nil, err
+		result, signErr := h.Result()
+		if signErr != nil {
+			return nil, signErr
 		}
-		return result.(*ecdsa.Signature), nil
+		if sig, ok := result.(*ecdsa.Signature); ok {
+			return sig, nil
+		}
+		return nil, fmt.Errorf("unexpected signing result type")
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("signing timeout")
 	}
@@ -180,7 +201,8 @@ func runCMPSign(config *cmp.Config, signers []party.ID, message []byte, pl *pool
 
 // FROST Protocol implementations
 
-func runFROSTKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, threshold int, pl *pool.Pool, network *test.Network) (*frost.Config, error) {
+func runFROSTKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID,
+	threshold int, pl *pool.Pool, network *test.Network) (*frost.Config, error) {
 	h, err := protocol.NewMultiHandler(frost.Keygen(group, selfID, partyIDs, threshold), nil)
 	if err != nil {
 		return nil, err
@@ -198,13 +220,17 @@ func runFROSTKeygen(group curve.Curve, selfID party.ID, partyIDs []party.ID, thr
 		if err != nil {
 			return nil, err
 		}
-		return result.(*frost.Config), nil
+		if cfg, ok := result.(*frost.Config); ok {
+			return cfg, nil
+		}
+		return nil, fmt.Errorf("unexpected result type")
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("keygen timeout")
 	}
 }
 
-func runFROSTSign(config *frost.Config, signers []party.ID, message []byte, pl *pool.Pool, network *test.Network) (*frost.Signature, error) {
+func runFROSTSign(config *frost.Config, signers []party.ID,
+	message []byte, pl *pool.Pool, network *test.Network) (*frost.Signature, error) {
 	h, err := protocol.NewMultiHandler(frost.Sign(config, signers, message), nil)
 	if err != nil {
 		return nil, err
@@ -222,7 +248,10 @@ func runFROSTSign(config *frost.Config, signers []party.ID, message []byte, pl *
 		if err != nil {
 			return nil, err
 		}
-		return result.(*frost.Signature), nil
+		if sig, ok := result.(*frost.Signature); ok {
+			return sig, nil
+		}
+		return nil, fmt.Errorf("unexpected result type")
 	case <-time.After(30 * time.Second):
 		return nil, fmt.Errorf("signing timeout")
 	}
