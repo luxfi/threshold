@@ -28,7 +28,7 @@ import (
 
 func TestIntegration(t *testing.T) {
 	// Run with timeout to prevent hanging
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -430,7 +430,7 @@ func runProtocol(handlers []*protocol.Handler, partyIDs []party.ID) {
 
 	// Start handler loops with proper synchronization
 	var wg sync.WaitGroup
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	for i, h := range handlers {

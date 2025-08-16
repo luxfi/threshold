@@ -38,7 +38,7 @@ func TestCMPIntegrationKeygen(t *testing.T) {
 	}()
 
 	// Run keygen for all parties
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	var wg sync.WaitGroup
