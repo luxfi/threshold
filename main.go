@@ -1,4 +1,5 @@
-// Command threshold provides a CLI for threshold signature operations
+// Package main is a placeholder to satisfy build requirements.
+// The actual CLI tool is in cmd/threshold-cli/
 package main
 
 import (
@@ -7,13 +8,8 @@ import (
 )
 
 func main() {
-	fmt.Println("Threshold Signature Library")
-	fmt.Println("Version: 1.0.0")
-	fmt.Println()
-	fmt.Println("This is a library package. Use the following:")
-	fmt.Println("  - Import packages from github.com/luxfi/threshold/pkg/...")
-	fmt.Println("  - Import protocols from github.com/luxfi/threshold/protocols/...")
-	fmt.Println()
-	fmt.Println("For CLI tools, see cmd/threshold-cli/")
-	os.Exit(0)
+	// This is a library package, not a standalone executable.
+	// For the CLI tool, use: go run ./cmd/threshold-cli/
+	fmt.Fprintln(os.Stderr, "This is a library package. Use cmd/threshold-cli for the CLI tool.")
+	os.Exit(1)
 }

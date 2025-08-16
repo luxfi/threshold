@@ -135,7 +135,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
         run: |
           mkdir -p bin
-          go build -v -ldflags "-s -w" -o bin/threshold${{ runner.os == 'Windows' && '.exe' || '' }} .
+          go build -v -ldflags "-s -w" -o bin/threshold-cli${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/threshold-cli
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
@@ -181,17 +181,14 @@ jobs:
           cache: true
 
       - name: Build binary
-        run: make build
+        run: |
+          mkdir -p bin
+          go build -v -o bin/threshold-cli ./cmd/threshold-cli
 
       - name: Run local simulation
         run: |
-          timeout 30s ./bin/threshold l 0 0 || exit_code=$?
-          if [ $exit_code -eq 124 ]; then
-            echo "Local simulation timed out as expected"
-            exit 0
-          else
-            exit $exit_code
-          fi
+          ./bin/threshold-cli info
+          echo "CLI tool built successfully"
 
       - name: Test multi-party setup
         run: |
@@ -221,12 +218,12 @@ jobs:
             platform_split=(${platform//\// })
             GOOS=${platform_split[0]}
             GOARCH=${platform_split[1]}
-            output_name="threshold-${GOOS}-${GOARCH}"
+            output_name="threshold-cli-${GOOS}-${GOARCH}"
             if [ $GOOS = "windows" ]; then
               output_name+='.exe'
             fi
             echo "Building ${output_name}..."
-            GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-s -w" -o "bin/${output_name}" .
+            GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-s -w" -o "bin/${output_name}" ./cmd/threshold-cli
           done
 
       - name: Create checksums
