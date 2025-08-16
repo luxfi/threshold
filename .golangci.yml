@@ -2,8 +2,6 @@ run:
   timeout: 5m
   tests: true
   # Cache bust: 2025-08-15
-  skip-dirs:
-    - example
 
 linters:
   enable:
@@ -107,6 +105,8 @@ linters-settings:
       - G502  # Weak crypto (same reason)
 
 issues:
+  exclude-dirs:
+    - example
   exclude-rules:
     - path: _test\.go
       linters:
