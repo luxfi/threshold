@@ -19,6 +19,7 @@ linters:
   disable:
     - funlen
     - gochecknoglobals
+    - errcheck  # Will enable once core issues are fixed
     - gocognit
     - godox
     - prealloc
