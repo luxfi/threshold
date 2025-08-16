@@ -19,10 +19,10 @@ import (
 )
 
 const (
-	protocolLSS   = "lss"
-	protocolCMP   = "cmp"
-	protocolFROST = "frost"
-	operationAll  = "all"
+	protocolLSS     = "lss"
+	protocolCMP     = "cmp"
+	protocolFROST   = "frost"
+	operationAll    = "all"
 	suiteFunctional = "functional"
 	suiteSecurity   = "security"
 	suiteProperty   = "property"
@@ -664,9 +664,18 @@ func runTests(cmd *cobra.Command, args []string) error {
 }
 
 func runSimulation(cmd *cobra.Command, args []string) error {
-	scenario, _ := cmd.Flags().GetString("scenario")
-	rounds, _ := cmd.Flags().GetInt("rounds")
-	failureRate, _ := cmd.Flags().GetFloat64("failure-rate")
+	scenario, scenarioErr := cmd.Flags().GetString("scenario")
+	if scenarioErr != nil {
+		return fmt.Errorf("failed to get scenario flag: %w", scenarioErr)
+	}
+	rounds, roundsErr := cmd.Flags().GetInt("rounds")
+	if roundsErr != nil {
+		return fmt.Errorf("failed to get rounds flag: %w", roundsErr)
+	}
+	failureRate, rateErr := cmd.Flags().GetFloat64("failure-rate")
+	if rateErr != nil {
+		return fmt.Errorf("failed to get failure-rate flag: %w", rateErr)
+	}
 
 	fmt.Printf("Running %s simulation for %s protocol...\n", scenario, protocolName)
 	fmt.Printf("Rounds: %d, Failure rate: %.2f%%\n", rounds, failureRate*100)
@@ -686,7 +695,10 @@ func runSimulation(cmd *cobra.Command, args []string) error {
 }
 
 func runExport(cmd *cobra.Command, args []string) error {
-	format, _ := cmd.Flags().GetString("format")
+	format, formatErr := cmd.Flags().GetString("format")
+	if formatErr != nil {
+		return fmt.Errorf("failed to get format flag: %w", formatErr)
+	}
 
 	// Load config
 	configData, err := os.ReadFile(inputFile)
@@ -711,8 +723,8 @@ func runExport(cmd *cobra.Command, args []string) error {
 		exported, err = exportCMPConfig(&config, format)
 	case protocolFROST:
 		var config frost.Config
-		if err := json.Unmarshal(configData, &config); err != nil {
-			return fmt.Errorf("failed to unmarshal config: %w", err)
+		if unmarshalErr := json.Unmarshal(configData, &config); unmarshalErr != nil {
+			return fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 		}
 		exported, err = exportFROSTConfig(&config, format)
 	default:
@@ -728,7 +740,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 		outputFile = fmt.Sprintf("exported.%s", format)
 	}
 
-	if err := os.WriteFile(outputFile, exported, 0644); err != nil {
+	if err := os.WriteFile(outputFile, exported, 0600); err != nil {
 		return fmt.Errorf("failed to write exported data: %w", err)
 	}
 
@@ -737,7 +749,10 @@ func runExport(cmd *cobra.Command, args []string) error {
 }
 
 func runImport(cmd *cobra.Command, args []string) error {
-	format, _ := cmd.Flags().GetString("format")
+	format, formatErr := cmd.Flags().GetString("format")
+	if formatErr != nil {
+		return fmt.Errorf("failed to get format flag: %w", formatErr)
+	}
 
 	// Read input file
 	data, err := os.ReadFile(inputFile)
