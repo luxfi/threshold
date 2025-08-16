@@ -366,24 +366,24 @@ func generateInitialConfigs(t *testing.T, parties []party.ID, threshold int) map
 	// Real protocol execution would timeout in stress tests
 	configs := make(map[party.ID]*config.Config)
 	group := curve.Secp256k1{}
-	
+
 	// Generate shares and public key shares for all parties
 	publicShares := make(map[party.ID]*config.Public)
-	
+
 	for _, id := range parties {
 		// Generate a random share for each party
 		share := sample.Scalar(rand.Reader, group)
 		publicShare := share.ActOnBase()
-		
+
 		publicShares[id] = &config.Public{
 			ECDSA: publicShare,
 		}
 	}
-	
+
 	// Create configs with all public shares
 	for _, id := range parties {
 		share := sample.Scalar(rand.Reader, group)
-		
+
 		configs[id] = &config.Config{
 			ID:         id,
 			Threshold:  threshold,
@@ -395,37 +395,36 @@ func generateInitialConfigs(t *testing.T, parties []party.ID, threshold int) map
 			Generation: 0,
 		}
 	}
-	
+
 	return configs
 }
 
 func performReshare(t *testing.T, oldConfigs map[party.ID]*config.Config,
 	oldParties, newParties []party.ID, newThreshold int) map[party.ID]*config.Config {
-	
 	// For stress test, create mock reshared configs
 	// Real resharing protocol would timeout in stress tests
 	newConfigs := make(map[party.ID]*config.Config)
-	
+
 	// Get the group from old configs
 	group := oldConfigs[oldParties[0]].Group
-	
+
 	// Generate new shares and public key shares for new parties
 	publicShares := make(map[party.ID]*config.Public)
-	
+
 	for _, id := range newParties {
 		// Generate a random share for each party
 		share := sample.Scalar(rand.Reader, group)
 		publicShare := share.ActOnBase()
-		
+
 		publicShares[id] = &config.Public{
 			ECDSA: publicShare,
 		}
 	}
-	
+
 	// Create new configs with new shares but maintaining consistency
 	for _, id := range newParties {
 		share := sample.Scalar(rand.Reader, group)
-		
+
 		newConfigs[id] = &config.Config{
 			ID:         id,
 			Threshold:  newThreshold,
@@ -437,20 +436,20 @@ func performReshare(t *testing.T, oldConfigs map[party.ID]*config.Config,
 			Generation: 1, // Increment generation
 		}
 	}
-	
+
 	return newConfigs
 }
 
 func testSigning(t *testing.T, configs map[party.ID]*config.Config, signers []party.ID) {
 	// For stress test, we just verify the configs are valid
 	// Real signing protocol would timeout in stress tests
-	
+
 	// Check that we have enough signers for the threshold
 	if len(signers) > 0 && len(configs) > 0 {
 		threshold := configs[signers[0]].Threshold
-		assert.GreaterOrEqual(t, len(signers), threshold, 
+		assert.GreaterOrEqual(t, len(signers), threshold,
 			"Should have at least threshold signers")
-		
+
 		// Verify all configs have consistent public shares
 		for _, id := range signers {
 			cfg := configs[id]
@@ -725,7 +724,7 @@ func TestLSSChainCompatibility(t *testing.T) {
 	// The PublicPoint() method needs proper Lagrange interpolation which
 	// doesn't work correctly with mock configs
 	t.Skip("Skipping chain compatibility test - requires actual protocol execution")
-	
+
 	// Test resharing maintains compatibility across chains
 	chains := []string{"xrpl", "ethereum", "bitcoin", "solana"}
 
@@ -760,13 +759,13 @@ func TestLSSChainCompatibility(t *testing.T) {
 func testSigningWithMessage(t *testing.T, configs map[party.ID]*config.Config, signers []party.ID, message []byte) {
 	// For stress test, we just verify the configs and message are valid
 	// Real signing protocol would timeout in stress tests
-	
+
 	assert.NotEmpty(t, message, "Message should not be empty")
-	
+
 	// Check that we have enough signers for the threshold
 	if len(signers) > 0 && len(configs) > 0 {
 		threshold := configs[signers[0]].Threshold
-		assert.GreaterOrEqual(t, len(signers), threshold, 
+		assert.GreaterOrEqual(t, len(signers), threshold,
 			"Should have at least threshold signers for message signing")
 	}
 }

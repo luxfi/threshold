@@ -120,7 +120,6 @@ func (hash *Hash) WriteAny(data ...interface{}) error {
 		_, _ = hash.h.Write(toBeWritten.Bytes)
 		// )
 		_, _ = hash.h.WriteString(")")
-
 	}
 	return nil
 }

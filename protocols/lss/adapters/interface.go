@@ -122,11 +122,11 @@ type CoronaPreprocessing struct {
 type DilithiumExtensions struct {
 	// NIST security level (2, 3, or 5)
 	SecurityLevel int // Maps to ML-DSA-44, ML-DSA-65, ML-DSA-87
-	
+
 	// Lattice parameters (auto-configured based on security level)
 	K int // Vector dimension
 	L int // Matrix dimension
-	
+
 	// Public seed for deterministic key generation
 	PublicSeed []byte
 }

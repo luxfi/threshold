@@ -64,9 +64,9 @@ func (m *Message) Hash() []byte {
 	return h.Sum()
 }
 
-// marshallableMessage is a copy of message for the purpose of cbor marshalling.
+// marshallableMessage is a copy of message for the purpose of cbor marshaling.
 //
-// This is a workaround to use cbor's default marshalling for Message, all while providing
+// This is a workaround to use cbor's default marshaling for Message, all while providing
 // a MarshalBinary method
 type marshallableMessage struct {
 	SSID                  []byte

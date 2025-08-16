@@ -162,7 +162,6 @@ func (p *Proof) Verify(hash *hash.Hash, public Public) bool {
 		if !lhs.Equal(rhs) {
 			return false
 		}
-
 	}
 
 	return true

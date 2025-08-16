@@ -479,7 +479,7 @@ func createMockShares(t testing.TB, sigType adapters.SignatureType, n, threshold
 		// For testing purposes, use scalar values for all share types
 		// Real Corona shares would be CoronaSecretShare structs
 		scalar := curve.Secp256k1{}.NewScalar()
-		
+
 		shares = append(shares, adapters.Share{
 			ID:    party.ID(fmt.Sprintf("party_%d", i)),
 			Value: scalar,

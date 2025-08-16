@@ -152,7 +152,7 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 	ChiShare := new(saferith.Int).Mul(curve.MakeInt(r.SecretECDSA), KShareInt, -1)
 
 	for _, j := range r.OtherPartyIDs() {
-		//δᵢ += αᵢⱼ + βᵢⱼ
+		// δᵢ += αᵢⱼ + βᵢⱼ
 		DeltaShare.Add(DeltaShare, r.DeltaShareAlpha[j], -1)
 		DeltaShare.Add(DeltaShare, r.DeltaShareBeta[j], -1)
 
