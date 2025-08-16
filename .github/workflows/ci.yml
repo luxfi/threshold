@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.23.0'
+  GO_VERSION: '1.23'
 
 jobs:
   lint:
@@ -48,7 +48,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.23.0']
+        go-version: ['1.23']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,13 +66,19 @@ jobs:
         run: go mod verify
 
       - name: Run tests
+        env:
+          GOTOOLCHAIN: local
         run: go test -v -race -short -timeout 300s ./...
 
       - name: Run build verification
+        env:
+          GOTOOLCHAIN: local
         run: go build -v ./...
 
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
+        env:
+          GOTOOLCHAIN: local
         run: go test -v -race -short -coverprofile=coverage.out -covermode=atomic -timeout 300s ./...
 
       - name: Upload coverage to Codecov
@@ -99,6 +105,8 @@ jobs:
           cache: true
 
       - name: Run benchmarks
+        env:
+          GOTOOLCHAIN: local
         run: go test -bench=. -benchtime=1s -benchmem -timeout=600s -short ./...
 
       - name: Upload benchmark results
@@ -133,6 +141,7 @@ jobs:
         env:
           GOOS: ${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }}
           GOARCH: ${{ matrix.arch }}
+          GOTOOLCHAIN: local
         run: |
           mkdir -p bin
           go build -v -ldflags "-s -w" -o bin/threshold-cli${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/threshold-cli
@@ -181,6 +190,8 @@ jobs:
           cache: true
 
       - name: Build binary
+        env:
+          GOTOOLCHAIN: local
         run: |
           mkdir -p bin
           go build -v -o bin/threshold-cli ./cmd/threshold-cli
