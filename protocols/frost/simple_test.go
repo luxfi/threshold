@@ -95,8 +95,8 @@ func TestFrostRefreshOnly(t *testing.T) {
 	// Create handlers for refresh
 	for i, id := range partyIDs {
 		startFunc := Refresh(configs[i], partyIDs)
-		_, err := harness2.CreateHandler(id, startFunc, sessionID2)
-		require.NoError(t, err)
+		_, refreshErr := harness2.CreateHandler(id, startFunc, sessionID2)
+		require.NoError(t, refreshErr)
 	}
 
 	// Run refresh

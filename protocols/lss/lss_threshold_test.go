@@ -258,6 +258,7 @@ func TestLSSOptimizedKeygen(t *testing.T) {
 
 	// Collect results with timeout
 	successCount := 0
+partyLoop:
 	for i := 0; i < len(activeParties); i++ {
 		select {
 		case err := <-results:
@@ -268,7 +269,7 @@ func TestLSSOptimizedKeygen(t *testing.T) {
 			}
 		case <-ctx.Done():
 			t.Logf("Timeout waiting for party initialization")
-			break
+			break partyLoop
 		}
 	}
 
