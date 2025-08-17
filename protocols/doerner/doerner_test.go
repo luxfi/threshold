@@ -16,6 +16,8 @@ import (
 
 var testGroup = curve.Secp256k1{}
 
+// Unused helper functions kept for future test expansion
+// nolint:unused,deadcode
 func runKeygen(partyIDs party.IDSlice) (*ConfigSender, *ConfigReceiver, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
@@ -47,6 +49,7 @@ func runKeygen(partyIDs party.IDSlice) (*ConfigSender, *ConfigReceiver, error) {
 	return configSender, configReceiver, nil
 }
 
+// nolint:unused,deadcode
 func runRefresh(partyIDs party.IDSlice, configSender *ConfigSender, configReceiver *ConfigReceiver) (*ConfigSender, *ConfigReceiver, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
@@ -78,8 +81,10 @@ func runRefresh(partyIDs party.IDSlice, configSender *ConfigSender, configReceiv
 	return newConfigSender, newConfigReceiver, nil
 }
 
+// nolint:unused,deadcode
 var testHash = []byte("test hash")
 
+// nolint:unused,deadcode
 func runSign(partyIDs party.IDSlice, configSender *ConfigSender, configReceiver *ConfigReceiver) (*ecdsa.Signature, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
@@ -104,6 +109,7 @@ func runSign(partyIDs party.IDSlice, configSender *ConfigSender, configReceiver 
 	return sig, nil
 }
 
+// nolint:unused,deadcode
 func checkKeygenOutput(t *testing.T, configSender *ConfigSender, configReceiver *ConfigReceiver) {
 	require.True(t, configSender.Public.Equal(configReceiver.Public))
 	require.False(t, configSender.Public.IsIdentity())
