@@ -133,6 +133,7 @@ jobs:
         env:
           GOOS: ${{ runner.os == 'Windows' && 'windows' || runner.os == 'macOS' && 'darwin' || 'linux' }}
           GOARCH: ${{ matrix.arch }}
+        shell: bash
         run: |
           mkdir -p bin
           go build -v -ldflags "-s -w" -o bin/threshold-cli${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/threshold-cli
@@ -160,6 +161,12 @@ jobs:
         uses: securego/gosec@master
         with:
           args: -exclude=G104,G115,G304,G401,G501,G502 -fmt=sarif -out=results.sarif ./...
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
 
       - name: Run go mod audit
         run: |
