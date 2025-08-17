@@ -446,7 +446,7 @@ func HighBitsPublic(v Poly, alpha int, Q int) Poly {
 		var rH int
 		if r-rL == Q-1 {
 			rH = 0
-			rL = rL - 1
+			// rL = rL - 1 // This reassignment is not used
 		} else {
 			rH = (r - rL) / alpha
 		}
