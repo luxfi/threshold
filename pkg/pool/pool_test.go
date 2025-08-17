@@ -460,11 +460,11 @@ func TestPool_Search_PanicRecovery(t *testing.T) {
 		p.TearDown() // Close pool mid-operation
 	}()
 
-	count := 0
+	var count int32
 	results := p.Search(3, func() interface{} {
 		time.Sleep(5 * time.Millisecond)
-		count++
-		return count
+		val := atomic.AddInt32(&count, 1)
+		return int(val)
 	})
 
 	// Should still get results (either from pool or serial fallback)
