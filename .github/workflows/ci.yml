@@ -108,7 +108,7 @@ jobs:
         run: |
           # Skip benchmarks that may hang with Go 1.24.5
           go test -bench=. -benchtime=100ms -benchmem -timeout=30s -short -count=1 \
-            $(go list ./... | grep -v -E 'protocols|internal/mta')
+            $(go list ./... | grep -v -E 'protocols|internal/mta|polynomial')
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
