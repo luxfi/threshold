@@ -28,10 +28,6 @@ type DynamicLSS struct {
 	// History of configurations for rollback
 	configHistory map[uint32][]*config.Config
 
-	// Current network state (dealer functionality embedded)
-	currentThreshold int
-	currentParties   []party.ID
-
 	// Pool for goroutine management
 	pool *pool.Pool
 }

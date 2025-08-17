@@ -68,7 +68,7 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 		r.ChainKeys.Store(from, body.CL)
 	} else {
 		// During refresh, chain key should be empty
-		if body.CL == nil || len(body.CL) == 0 {
+		if len(body.CL) == 0 {
 			r.ChainKeys.Store(from, types.EmptyRID())
 		} else {
 			r.ChainKeys.Store(from, body.CL)
@@ -155,7 +155,7 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		for _, j := range r.PartyIDs() {
 			ckValue, _ := r.ChainKeys.Load(j)
 			ck, _ := ckValue.(types.RID)
-			if ck == nil || len(ck) == 0 {
+			if len(ck) == 0 {
 				return nil, fmt.Errorf("invalid chain key from party %s", j)
 			}
 			ChainKey.XOR(ck)

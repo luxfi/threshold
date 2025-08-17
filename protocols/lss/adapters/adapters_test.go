@@ -83,8 +83,8 @@ func testChainAdapter(t *testing.T, chain string, sigType adapters.SignatureType
 	// Test partial signing
 	var partialSigs []adapters.PartialSig
 	for _, share := range shares[:2] { // Use threshold number
-		partial, err := adapter.SignEC(digest, share)
-		require.NoError(t, err)
+		partial, signErr := adapter.SignEC(digest, share)
+		require.NoError(t, signErr)
 		assert.NotNil(t, partial)
 		partialSigs = append(partialSigs, partial)
 	}
@@ -589,8 +589,8 @@ func TestEndToEndThresholdSignature(t *testing.T) {
 			// Each party creates partial signature
 			var partials []adapters.PartialSig
 			for i := 0; i < threshold; i++ {
-				partial, err := adapter.SignEC(digest, shares[i])
-				require.NoError(t, err)
+				partial, signErr := adapter.SignEC(digest, shares[i])
+				require.NoError(t, signErr)
 				partials = append(partials, partial)
 			}
 
