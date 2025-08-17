@@ -28,6 +28,10 @@ func TestConfigCreation(t *testing.T) {
 	assert.Equal(t, id, cfg.ID)
 	assert.Equal(t, threshold, cfg.Threshold)
 	assert.NotNil(t, cfg.ECDSA)
+	assert.NotNil(t, cfg.Group)
+	assert.NotNil(t, cfg.Public)
+	assert.Equal(t, []byte("chainkey"), cfg.ChainKey)
+	assert.Equal(t, []byte("rid"), cfg.RID)
 }
 
 func TestConfigValidation(t *testing.T) {
