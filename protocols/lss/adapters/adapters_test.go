@@ -673,8 +673,8 @@ func TestParallelSigning(t *testing.T) {
 
 	for i := 0; i < 6; i++ {
 		go func(share adapters.Share) {
-			partial, err := adapter.SignEC(digest, share)
-			results <- result{partial, err}
+			partial, signErr := adapter.SignEC(digest, share)
+			results <- result{partial, signErr}
 		}(shares[i])
 	}
 
