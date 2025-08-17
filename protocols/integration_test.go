@@ -145,10 +145,8 @@ var _ = Describe("Protocol Integration", func() {
 			configs := runCMPKeygen(partyIDs, threshold, group, pl)
 			Expect(configs).To(HaveLen(n))
 
-			// Run signing if configs are valid
-			if configs[0] != nil {
-				// CMP config structure is different, skip signing test for now
-			}
+			// CMP config structure is different, skip signing test for now
+			// TODO: Add CMP signing test when structure is stabilized
 		})
 	})
 
@@ -339,6 +337,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 	return configs
 }
 
+// nolint:unused
 func runCMPSign(configs []*cmpconfig.Config, partyIDs []party.ID, message []byte, pl *pool.Pool) []*ecdsa.Signature {
 	n := len(partyIDs)
 	handlers := make([]*protocol.Handler, n)

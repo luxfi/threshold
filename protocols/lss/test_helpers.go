@@ -217,9 +217,7 @@ func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 
 // RunProtocols executes protocol instances and collects results
 func RunProtocols(t *testing.T, protocols map[party.ID]protocol.StartFunc, sessionID []byte) (map[party.ID]interface{}, error) {
-	if sessionID == nil {
-		sessionID = generateRandomBytes(32)
-	}
+	_ = sessionID // sessionID is used for protocol identification
 
 	// For testing, we just return mock configs
 	// In a real implementation, we'd run the full protocol

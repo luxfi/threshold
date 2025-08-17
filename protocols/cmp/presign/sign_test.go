@@ -47,7 +47,7 @@ func init() {
 func TestRound(t *testing.T) {
 	// Test CMP presign protocol rounds
 	// Validates presignature generation that can be used for fast online signing
-	
+
 	// Validate safe arithmetic constants
 	require.NotNil(t, oneNat, "oneNat should be initialized")
 	require.NotNil(t, oneInt, "oneInt should be initialized")

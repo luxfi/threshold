@@ -136,15 +136,13 @@ func TestKeygenQuickTimeout(t *testing.T) {
 
 		// Try to create handlers
 		for _, id := range ids {
-			h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+			_, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
 				lss.Keygen(group, id, ids, threshold, pl), sessionID, cfg)
 			if err != nil {
 				// Error is ok with quick timeout
 				return true
 			}
-			if h != nil {
-				// Handler created successfully
-			}
+			// Handler created successfully (no action needed)
 		}
 
 		// Wait for context to expire
