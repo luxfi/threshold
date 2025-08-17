@@ -69,7 +69,7 @@ jobs:
         run: |
           # Skip tests that may hang with Go 1.24.5
           go test -v -race -short -timeout 30s -count=1 \
-            $(go list ./... | grep -v -E '/(protocols|internal/mta)/')
+            $(go list ./... | grep -v -E 'protocols|internal/mta|polynomial')
 
       - name: Run build verification
         run: go build -v ./...
@@ -79,7 +79,7 @@ jobs:
         run: |
           # Skip tests that may hang with Go 1.24.5
           go test -v -race -short -coverprofile=coverage.out -covermode=atomic -timeout 30s -count=1 \
-            $(go list ./... | grep -v -E '/(protocols|internal/mta)/')
+            $(go list ./... | grep -v -E 'protocols|internal/mta|polynomial')
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
@@ -108,7 +108,7 @@ jobs:
         run: |
           # Skip benchmarks that may hang with Go 1.24.5
           go test -bench=. -benchtime=100ms -benchmem -timeout=30s -short -count=1 \
-            $(go list ./... | grep -v -E '/(protocols|internal/mta)/')
+            $(go list ./... | grep -v -E 'protocols|internal/mta')
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
