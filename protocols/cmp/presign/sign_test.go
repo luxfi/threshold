@@ -4,7 +4,7 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	// "github.com/cronokirby/saferith" // Uncomment when using oneNat, oneInt, minusOneInt
+	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	// Unused variables kept for potential future use
-	// oneNat      = new(saferith.Nat).SetUint64(1)
-	// oneInt      = new(saferith.Int).SetNat(oneNat)
-	// minusOneInt = new(saferith.Int).SetNat(oneNat).Neg(1)
+	// Test constants for safe arithmetic operations
+	oneNat      = new(saferith.Nat).SetUint64(1)
+	oneInt      = new(saferith.Int).SetNat(oneNat)
+	minusOneInt = new(saferith.Int).SetNat(oneNat).Neg(1)
 
 	N           = 4
 	T           = N - 1
@@ -47,6 +47,11 @@ func init() {
 func TestRound(t *testing.T) {
 	// Test CMP presign protocol rounds
 	// Validates presignature generation that can be used for fast online signing
+	
+	// Validate safe arithmetic constants
+	require.NotNil(t, oneNat, "oneNat should be initialized")
+	require.NotNil(t, oneInt, "oneInt should be initialized")
+	require.NotNil(t, minusOneInt, "minusOneInt should be initialized")
 
 	rounds := make([]round.Session, 0, N)
 	for _, c := range configs {
