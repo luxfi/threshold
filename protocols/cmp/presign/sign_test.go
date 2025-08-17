@@ -4,7 +4,7 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/cronokirby/saferith"
+	// "github.com/cronokirby/saferith" // Uncomment when using oneNat, oneInt, minusOneInt
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
