@@ -18,9 +18,10 @@ import (
 )
 
 var (
-	oneNat      = new(saferith.Nat).SetUint64(1)
-	oneInt      = new(saferith.Int).SetNat(oneNat)
-	minusOneInt = new(saferith.Int).SetNat(oneNat).Neg(1)
+	// Unused variables kept for potential future use
+	// oneNat      = new(saferith.Nat).SetUint64(1)
+	// oneInt      = new(saferith.Int).SetNat(oneNat)
+	// minusOneInt = new(saferith.Int).SetNat(oneNat).Neg(1)
 
 	N           = 4
 	T           = N - 1
