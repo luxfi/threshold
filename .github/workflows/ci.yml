@@ -66,20 +66,14 @@ jobs:
         run: go mod verify
 
       - name: Run tests
-        run: |
-          # Skip tests that may hang with Go 1.24.5
-          go test -v -race -short -timeout 30s -count=1 \
-            $(go list ./... | grep -v -E 'protocols|internal/mta|polynomial|pkg/paillier|pkg/pool|pkg/protocol|pkg/zk')
+        run: go test -v -race -short -timeout 60s -count=1 ./...
 
       - name: Run build verification
         run: go build -v ./...
 
       - name: Run tests with coverage
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
-        run: |
-          # Skip tests that may hang with Go 1.24.5
-          go test -v -race -short -coverprofile=coverage.out -covermode=atomic -timeout 30s -count=1 \
-            $(go list ./... | grep -v -E 'protocols|internal/mta|polynomial|pkg/paillier|pkg/pool|pkg/protocol|pkg/zk')
+        run: go test -v -race -short -coverprofile=coverage.out -covermode=atomic -timeout 60s -count=1 ./...
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == env.GO_VERSION
@@ -105,10 +99,7 @@ jobs:
           cache: true
 
       - name: Run benchmarks
-        run: |
-          # Skip benchmarks that may hang with Go 1.24.5
-          go test -bench=. -benchtime=100ms -benchmem -timeout=30s -short -count=1 \
-            $(go list ./... | grep -v -E 'protocols|internal/mta|polynomial|pkg/protocol')
+        run: go test -bench=. -benchtime=100ms -benchmem -timeout=60s -short -count=1 ./...
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
