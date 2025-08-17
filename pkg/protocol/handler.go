@@ -43,8 +43,8 @@ type Handler struct {
 	stopped      atomic.Bool  // tracks if handler is stopped
 
 	// Sharded message storage for zero contention
-	messages        *MessageStore
-	broadcast       *MessageStore
+	messages  *MessageStore
+	broadcast *MessageStore
 
 	// Processed message tracking - prevents race conditions
 	processedBroadcasts sync.Map // "round:from" -> bool
