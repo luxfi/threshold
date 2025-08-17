@@ -165,14 +165,25 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	chainKeyCommitments := &sync.Map{}
 
-	return &round2{
+	nextRound := &round2{
 		round1:               r,
 		fI:                   fI,
-		Phi:                  *phi,
-		ChainKeys:            *chainKeys,
 		ChainKeyDecommitment: decommitment,
-		ChainKeyCommitments:  *chainKeyCommitments,
-	}, nil
+	}
+	// Copy values from the maps instead of copying the maps themselves
+	phi.Range(func(key, value interface{}) bool {
+		nextRound.Phi.Store(key, value)
+		return true
+	})
+	chainKeys.Range(func(key, value interface{}) bool {
+		nextRound.ChainKeys.Store(key, value)
+		return true
+	})
+	chainKeyCommitments.Range(func(key, value interface{}) bool {
+		nextRound.ChainKeyCommitments.Store(key, value)
+		return true
+	})
+	return nextRound, nil
 }
 
 // MessageContent implements round.Round.
