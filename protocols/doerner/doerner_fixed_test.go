@@ -84,11 +84,7 @@ func TestDoernerSimpleInit(t *testing.T) {
 
 		// Test receiver initialization
 		receiverKeygen := Keygen(group, false, ids[1], ids[0], nil)
-		if receiverKeygen == nil {
-			return false
-		}
-
-		return true
+		return receiverKeygen != nil
 	})
 }
 
