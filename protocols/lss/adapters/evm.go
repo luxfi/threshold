@@ -1,5 +1,5 @@
 // Package adapters - Generic EVM blockchain adapter
-// Supports: Ethereum, BSC, Polygon, Avalanche, Arbitrum, Optimism, Base, etc.
+// Supports: Ethereum, BSC, Polygon, Lux, Arbitrum, Optimism, Base, etc.
 package adapters
 
 import (
@@ -18,7 +18,7 @@ const (
 	Ethereum  EVMChain = "ethereum"
 	BSC       EVMChain = "bsc"
 	Polygon   EVMChain = "polygon"
-	Avalanche EVMChain = "avalanche"
+	Lux EVMChain = "lux"
 	Arbitrum  EVMChain = "arbitrum"
 	Optimism  EVMChain = "optimism"
 	Base      EVMChain = "base"
@@ -74,10 +74,10 @@ func GetChainConfig(chain EVMChain) *ChainConfig {
 			ExplorerURL:     "https://polygonscan.com",
 			SupportsEIP1559: true,
 		},
-		Avalanche: {
+		Lux: {
 			ChainID:         big.NewInt(43114),
-			Name:            "Avalanche C-Chain",
-			Symbol:          "AVAX",
+			Name:            "Lux C-Chain",
+			Symbol:          "LUX",
 			ExplorerURL:     "https://snowtrace.io",
 			SupportsEIP1559: true,
 		},
