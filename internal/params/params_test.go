@@ -17,9 +17,10 @@ func TestSecurityParameters(t *testing.T) {
 
 func TestZKModIterations(t *testing.T) {
 	// Verify ZKModIterations is set to expected value
-	assert.Equal(t, 12, ZKModIterations, "ZKModIterations should be 12")
-	// Ensure it's less than StatParam as per the comment
-	assert.Less(t, ZKModIterations, StatParam, "ZKModIterations should be less than StatParam for efficiency")
+	// Note: Increased to 128 for improved security (upstream security fix)
+	assert.Equal(t, 128, ZKModIterations, "ZKModIterations should be 128")
+	// Ensure it's greater than or equal to StatParam for proper security
+	assert.GreaterOrEqual(t, ZKModIterations, StatParam, "ZKModIterations should be >= StatParam for security")
 }
 
 func TestLengthParameters(t *testing.T) {
