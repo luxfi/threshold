@@ -51,7 +51,7 @@ The most comprehensive threshold signature implementation supporting **20+ block
 | **Cardano** | EdDSA/ECDSA/Schnorr | Multi-era, Plutus scripts | ✅ Production |
 
 ### Tier 2 - Ready for Integration
-Cosmos, Polkadot, Avalanche, BSC, NEAR, Aptos, Sui, Tezos, Algorand, Stellar, Hedera, Flow, Kadena, Mina
+Cosmos, Polkadot, Lux, BSC, NEAR, Aptos, Sui, Tezos, Algorand, Stellar, Hedera, Flow, Kadena, Mina
 
 ## 🚀 Quick Start
 

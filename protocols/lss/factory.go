@@ -19,7 +19,7 @@ const (
 	BNBChain  Chain = "bnb"
 	Solana    Chain = "solana"
 	Cardano   Chain = "cardano"
-	Avalanche Chain = "avalanche"
+	Lux Chain = "lux"
 	Polygon   Chain = "polygon"
 	TRON      Chain = "tron"
 	TON       Chain = "ton"
@@ -182,14 +182,14 @@ func GetChainInfo(chain Chain) *ChainInfo {
 			Symbol:        "MATIC",
 			Decimals:      18,
 		},
-		Avalanche: {
-			Name:          "Avalanche C-Chain",
+		Lux: {
+			Name:          "Lux C-Chain",
 			Type:          TypeEVM,
 			SignatureType: adapters.SignatureECDSA,
 			Curve:         "Secp256k1",
 			ChainID:       43114,
 			TestnetID:     43113, // Fuji
-			Symbol:        "AVAX",
+			Symbol:        "LUX",
 			Decimals:      18,
 		},
 		Arbitrum: {
@@ -373,7 +373,7 @@ func (l *LSS) GetConfig() *FactoryConfig {
 func SupportedChains() []Chain {
 	return []Chain{
 		Bitcoin, Ethereum, BNBChain, Solana, Cardano,
-		Avalanche, Polygon, TON, Sui, Aptos,
+		Lux, Polygon, TON, Sui, Aptos,
 		Near, Cosmos, Algorand, Stellar, Hedera,
 		Flow, Tezos, EOS, XRPL, Polkadot,
 		Arbitrum, Optimism, Base, zkSync, Scroll,
