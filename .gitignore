@@ -16,3 +16,8 @@ threshold-cli
 # vendor/
 .idea/**
 .wip/**
+
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+QWEN.md
