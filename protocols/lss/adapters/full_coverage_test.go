@@ -20,7 +20,7 @@ func TestAllChainsSupported(t *testing.T) {
 	// Verify major chains are included
 	expectedChains := []string{
 		"xrpl", "ethereum", "bitcoin", "solana", "cardano",
-		"cosmos", "polkadot", "avalanche", "binance",
+		"cosmos", "polkadot", "lux", "binance",
 		// Note: TON adapter is included in adapters package
 	}
 

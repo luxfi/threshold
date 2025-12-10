@@ -258,7 +258,7 @@ func GetSupportedChains() []string {
 		"ton",
 		"cosmos",
 		"polkadot",
-		"avalanche",
+		"lux",
 		"binance",
 		"cardano",
 		"near",
