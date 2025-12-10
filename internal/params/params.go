@@ -14,7 +14,7 @@ const (
 	// The way it is used in the refresh protocol ensures that the prover cannot guess in advance the secret ρ
 	// used to instantiate the hash function.
 	// Since sampling primes is expensive, we argue that the security can be reduced.
-	ZKModIterations = 12
+	ZKModIterations = 128
 
 	L                 = 1 * SecParam     // = 256
 	LPrime            = 5 * SecParam     // = 1280
