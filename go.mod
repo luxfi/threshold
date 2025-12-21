@@ -1,8 +1,9 @@
 module github.com/luxfi/threshold
 
-go 1.25
+go 1.25.5
 
 require (
+	github.com/cloudflare/circl v1.6.1
 	github.com/cronokirby/saferith v0.33.0
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/fxamacker/cbor/v2 v2.9.0
@@ -22,7 +23,6 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
