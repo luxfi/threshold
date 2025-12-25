@@ -651,12 +651,32 @@ func (h *Handler) tryAdvanceRound() {
 		// expect any incoming messages initially (like LSS round 2)
 		// We need to finalize it immediately to send those messages
 		//
-		// For LSS specifically: round 2 doesn't implement BroadcastRound but does have MessageContent
-		// It needs to be initialized immediately to send its initial P2P messages
+		// Determine if the new round needs immediate initialization
+		// This is needed for:
+		// 1. P2P-only rounds (MessageContent != nil, no BroadcastContent) - to send P2P messages
+		// 2. BroadcastRounds - to send their broadcasts
+		//
+		// Without immediate initialization, BroadcastRounds would deadlock:
+		// handler waits for broadcasts, but broadcasts can only be sent by Finalize
 		needsImmediateInit := false
-		_, isBroadcastRound := nextRound.(round.BroadcastRound)
-		if !isBroadcastRound && nextRound.MessageContent() != nil {
-			// This is a P2P-only round (like LSS round 2)
+		broadcastRound, isBroadcastRound := nextRound.(round.BroadcastRound)
+		h.log.Debug("checking round for immediate init",
+			log.Uint16("round", uint16(nextRound.Number())),
+			log.Bool("isBroadcastRound", isBroadcastRound),
+			log.Bool("hasMessageContent", nextRound.MessageContent() != nil))
+		if isBroadcastRound {
+			bc := broadcastRound.BroadcastContent()
+			h.log.Debug("BroadcastContent check",
+				log.Uint16("round", uint16(nextRound.Number())),
+				log.Bool("hasContent", bc != nil))
+			if bc != nil {
+				// This is a BroadcastRound - it needs to be initialized to SEND its broadcasts
+				needsImmediateInit = true
+				h.log.Debug("round needs immediate initialization (BroadcastRound)",
+					log.Uint16("round", uint16(nextRound.Number())))
+			}
+		} else if nextRound.MessageContent() != nil {
+			// This is a P2P-only round (like LSS keygen round 2)
 			// It needs to be initialized immediately to send messages
 			needsImmediateInit = true
 			h.log.Debug("round needs immediate initialization (P2P-only round)",
@@ -920,24 +940,20 @@ func (h *Handler) metricsUpdater() {
 func (h *Handler) initializeRound(r round.Session) {
 	h.log.Debug("initializing round", log.Uint16("round", uint16(r.Number())))
 
-	// For Doerner protocol: Process any messages that might already be waiting
-	// This happens when parties start on different rounds (receiver on round 1, sender on round 1)
-	// The receiver sends messages immediately, so the sender might have them waiting
+	// Process any messages that might already be waiting
 	h.processQueuedMessages(r.Number())
 
 	// Give a small delay to allow message processing
 	time.Sleep(20 * time.Millisecond)
 
-	// Check if we now have all the messages we need
-	// This is important for Doerner where the Sender's round1S needs messages from Receiver's round1R
-	if r.MessageContent() != nil && !h.hasAllMessages(r) {
-		// We're expecting messages but don't have them yet
-		// Don't finalize yet - wait for tryAdvanceRound to handle it
-		h.log.Debug("round expects messages that haven't arrived yet, deferring initialization",
-			log.Uint16("round", uint16(r.Number())))
-		// Don't mark as finalized - let tryAdvanceRound handle it when messages arrive
-		return
-	}
+	// IMPORTANT: Always call Finalize for initial rounds.
+	// The round's Finalize method handles:
+	// 1. Sending broadcasts/P2P messages
+	// 2. Returning itself if waiting for incoming messages
+	// 3. Returning the next round when ready to advance
+	//
+	// For rounds that need to send messages (round 1 broadcasts, round 2 P2P shares),
+	// we MUST call Finalize to send them. The waiting happens when the round returns itself.
 
 	// Mark this round as being finalized to prevent double finalization
 	// This is especially important for round 1 which is initialized immediately
