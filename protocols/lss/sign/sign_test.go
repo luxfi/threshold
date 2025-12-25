@@ -1,6 +1,7 @@
 package sign_test
 
 import (
+	"crypto/sha256"
 	"testing"
 
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -11,6 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// hash32 returns a 32-byte SHA256 hash of the input (required for signing)
+func hash32(msg string) []byte {
+	h := sha256.Sum256([]byte(msg))
+	return h[:]
+}
 
 func TestSignStart(t *testing.T) {
 	group := curve.Secp256k1{}
@@ -32,7 +39,7 @@ func TestSignStart(t *testing.T) {
 
 	// Use 3 signers so threshold < number of signers
 	signers := []party.ID{"alice", "bob", "charlie"}
-	message := []byte("test message")
+	message := hash32("test message") // Must be 32 bytes
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -73,25 +80,25 @@ func TestSignValidation(t *testing.T) {
 		{
 			name:        "valid signers",
 			signers:     []party.ID{"alice", "bob", "charlie"},
-			message:     []byte("test"),
+			message:     hash32("test"),
 			expectError: false,
 		},
 		{
 			name:        "too few signers",
 			signers:     []party.ID{"alice"},
-			message:     []byte("test"),
+			message:     hash32("test"),
 			expectError: true,
 		},
 		{
-			name:        "empty message",
+			name:        "wrong message length",
 			signers:     []party.ID{"alice", "bob", "charlie"},
-			message:     []byte{},
-			expectError: false, // Empty messages are allowed
+			message:     []byte{}, // Not 32 bytes - should error
+			expectError: true,
 		},
 		{
 			name:        "unknown signer",
 			signers:     []party.ID{"alice", "bob", "unknown"},
-			message:     []byte("test"),
+			message:     hash32("test"),
 			expectError: true,
 		},
 	}
@@ -146,7 +153,7 @@ func TestSignMessage(t *testing.T) {
 
 	// Test signing with more than threshold parties
 	signers := []party.ID{"alice", "bob", "charlie"}
-	message := []byte("important message")
+	message := hash32("important message") // Must be 32 bytes
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -185,7 +192,7 @@ func TestConcurrentSigning(t *testing.T) {
 
 	for i := 0; i < numSessions; i++ {
 		go func(idx int) {
-			message := []byte(string(rune('a' + idx)))
+			message := hash32(string(rune('a' + idx))) // Must be 32 bytes
 			startFunc := sign.Start(cfg, signers, message, pl)
 
 			if startFunc != nil {
