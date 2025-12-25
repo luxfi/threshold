@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -52,11 +53,18 @@ type command struct {
 // We need to keep searching for successful queries of f while *ctr > 0.
 // When we find a successful result, we decrement *ctr.
 func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int) interface{}, ctr *int64, mu *sync.Mutex) {
+	fmt.Printf("[WORKER] Starting search loop, ctr=%d\n", atomic.LoadInt64(ctr))
+	iterations := 0
 	for atomic.LoadInt64(ctr) > 0 {
+		iterations++
+		if iterations == 1 || iterations%1000 == 0 {
+			fmt.Printf("[WORKER] Iteration %d, calling f(0), ctr=%d\n", iterations, atomic.LoadInt64(ctr))
+		}
 		res := f(0)
 		if res == nil {
 			continue
 		}
+		fmt.Printf("[WORKER] Found result at iteration %d\n", iterations)
 		i := atomic.AddInt64(ctr, -1)
 		if i >= 0 {
 			mu.Lock()
@@ -65,6 +73,7 @@ func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int)
 		}
 		ctrChanged <- struct{}{}
 	}
+	fmt.Printf("[WORKER] Search loop done after %d iterations\n", iterations)
 }
 
 // worker starts up a new worker, listening to commands, and producing results.
@@ -177,12 +186,18 @@ func (p *Pool) Search(count int, f func() interface{}) (results []interface{}) {
 		mu:         mu,
 	}
 	// Send command to all workers
+	fmt.Printf("[POOL] Sending %d commands to workers\n", p.workerCount)
 	for i := 0; i < p.workerCount; i++ {
+		fmt.Printf("[POOL] Sending command %d\n", i)
 		p.commands <- cmd
+		fmt.Printf("[POOL] Sent command %d\n", i)
 	}
+	fmt.Printf("[POOL] All commands sent, waiting for %d results\n", count)
 	for atomic.LoadInt64(&ctr) > 0 {
 		<-ctrChanged
+		fmt.Printf("[POOL] Got signal, remaining: %d\n", atomic.LoadInt64(&ctr))
 	}
+	fmt.Printf("[POOL] Done\n")
 
 	return results
 }
