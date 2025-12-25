@@ -3,9 +3,11 @@ package sign
 import (
 	"errors"
 
+	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/party"
 )
 
@@ -47,6 +49,25 @@ func (r *round3) StoreMessage(_ round.Message) error {
 
 // Finalize implements round.Round
 func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
+	// Add our own partial signature (computed in round2.Finalize but we need to include it)
+	// We need to recompute it since we didn't store it
+	lagrangeCoeff := polynomial.Lagrange(r.Group(), r.signers)[r.SelfID()]
+
+	// Recompute our partial sig: s_i = k_i + r * λ_i * x_i * m
+	ourPartialSig := r.Group().NewScalar()
+	ourPartialSig = ourPartialSig.Set(r.rScalar)        // r
+	ourPartialSig = ourPartialSig.Mul(lagrangeCoeff)    // r * λ_i
+	ourPartialSig = ourPartialSig.Mul(r.config.ECDSA)   // r * λ_i * x_i
+
+	// Convert message hash to scalar
+	mScalar := r.Group().NewScalar()
+	mScalar.SetNat(new(saferith.Nat).SetBytes(r.messageHash))
+	ourPartialSig = ourPartialSig.Mul(mScalar) // r * λ_i * x_i * m
+	ourPartialSig = ourPartialSig.Add(r.k)     // k_i + r * λ_i * x_i * m
+
+	// Add our own partial sig
+	r.partialSigs[r.SelfID()] = ourPartialSig
+
 	// Verify we have partial signatures from all signers
 	if len(r.partialSigs) != len(r.signers) {
 		return nil, errors.New("missing partial signatures from some signers")
@@ -77,28 +98,7 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 	return r.ResultRound(sig), nil
 }
 
-// StoreBroadcastMessage implements round.BroadcastRound
-func (r *round3) StoreBroadcastMessage(msg round.Message) error {
-	from := msg.From
-	body, ok := msg.Content.(*broadcast2)
-	if !ok || body == nil {
-		return round.ErrInvalidContent
-	}
-
-	// Verify sender is a signer
-	isSigner := false
-	for _, id := range r.signers {
-		if id == from {
-			isSigner = true
-			break
-		}
-	}
-	if !isSigner {
-		return errors.New("sender not in signers list")
-	}
-
-	// Store partial signature
-	r.partialSigs[from] = body.PartialSig
-
-	return nil
+// StoreBroadcastMessage implements round.BroadcastRound - no-op for round3
+func (r *round3) StoreBroadcastMessage(_ round.Message) error {
+	return nil // Round3 doesn't receive broadcasts - partial sigs passed from round2
 }
