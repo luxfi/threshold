@@ -77,6 +77,15 @@ func (r *round2) StoreMessage(_ round.Message) error {
 
 // Finalize implements round.Round
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
+	// Collect nonces fresh from round1's sync.Map
+	// This is necessary because round2 may have been created before all broadcasts
+	// were received (during initializeRound), so the nonces map may be stale
+	r.round1.receivedNonces.Range(func(key, value interface{}) bool {
+		id := key.(party.ID)
+		r.nonces[id] = value.(curve.Point)
+		return true
+	})
+
 	// Add our own nonce
 	r.nonces[r.SelfID()] = r.K
 
