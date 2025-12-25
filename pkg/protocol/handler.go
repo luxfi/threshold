@@ -55,6 +55,9 @@ type Handler struct {
 	incoming chan *Message
 	priority chan *Message // High-priority messages
 
+	// Output channel protection - must set outClosed BEFORE closing out channel
+	outClosed atomic.Bool
+
 	// Lifecycle management
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -875,6 +878,8 @@ func (h *Handler) Stop() {
 		h.workerGroup.Wait()
 
 		// Close channels safely (out may already be closed by protocol completion)
+		// Set outClosed BEFORE closing to prevent sends on closed channel
+		h.outClosed.Store(true)
 		h.closeOnce.Do(func() {
 			close(h.out)
 		})
@@ -1062,6 +1067,26 @@ func (h *Handler) initializeRound(r round.Session) {
 	}
 }
 
+// safeSend sends a message to the output channel, recovering from panic if the channel is closed.
+// This handles the race condition between checking outClosed and the actual send.
+func (h *Handler) safeSend(msg *Message) (sent bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			h.log.Debug("safeSend recovered from panic - channel closed",
+				log.String("panic", fmt.Sprintf("%v", r)))
+			sent = false
+		}
+	}()
+
+	select {
+	case h.out <- msg:
+		sent = true
+	default:
+		sent = false
+	}
+	return
+}
+
 func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 	h.log.Debug("sendRoundMessage",
 		log.String("from", string(r.SelfID())),
@@ -1097,9 +1122,9 @@ func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 		h.storeMessage(protocolMsg)
 	}
 
-	// Check if handler is stopped before sending
-	if h.stopped.Load() {
-		h.log.Debug("skipping send - handler stopped")
+	// Check if handler is stopped or output channel is closed before sending
+	if h.stopped.Load() || h.outClosed.Load() {
+		h.log.Debug("skipping send - handler stopped or channel closed")
 		return
 	}
 
@@ -1140,18 +1165,16 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 			log.Err(err),
 			log.String("culprits", fmt.Sprintf("%v", culprits)))
 
-		// Send abort message
-		r := h.currentRound.Load().(*roundWrapper).round
-		abortMsg := &Message{
-			SSID:     r.SSID(),
-			From:     r.SelfID(),
-			Protocol: r.ProtocolID(),
-			Data:     []byte(err.Error()),
-		}
-
-		select {
-		case h.out <- abortMsg:
-		default:
+		// Send abort message using safeSend to handle race with channel close
+		if !h.outClosed.Load() {
+			r := h.currentRound.Load().(*roundWrapper).round
+			abortMsg := &Message{
+				SSID:     r.SSID(),
+				From:     r.SelfID(),
+				Protocol: r.ProtocolID(),
+				Data:     []byte(err.Error()),
+			}
+			h.safeSend(abortMsg)
 		}
 
 		h.cancel()
@@ -1159,6 +1182,8 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 		// Close output channel after delay to signal protocol end
 		go func() {
 			time.Sleep(50 * time.Millisecond)
+			// Set outClosed BEFORE closing to prevent sends on closed channel
+			h.outClosed.Store(true)
 			h.closeOnce.Do(func() {
 				close(h.out)
 			})
