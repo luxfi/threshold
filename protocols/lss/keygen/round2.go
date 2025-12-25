@@ -103,6 +103,7 @@ func (r *round2) StoreMessage(msg round.Message) error {
 
 	// Store using sync.Map for thread safety
 	r.shares.Store(from, share)
+
 	return nil
 }
 
