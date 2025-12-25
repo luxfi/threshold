@@ -609,6 +609,26 @@ func (h *Handler) tryAdvanceRound() {
 				h.log.Info("advancing to next round (already initialized)",
 					log.Uint16("from", uint16(r.Number())),
 					log.Uint16("to", uint16(nextRound.Number())))
+
+				// CRITICAL: Check if the new round needs immediate initialization
+				// This was previously missed for BroadcastRounds when taking this path
+				broadcastRound, isBroadcastRound := nextRound.(round.BroadcastRound)
+				if isBroadcastRound {
+					bc := broadcastRound.BroadcastContent()
+					if bc != nil {
+						h.log.Debug("next round needs immediate initialization (BroadcastRound in already-finalized path)",
+							log.Uint16("round", uint16(nextRound.Number())))
+						go h.initializeRound(nextRound)
+						return
+					}
+				} else if nextRound.MessageContent() != nil {
+					h.log.Debug("next round needs immediate initialization (P2P-only in already-finalized path)",
+						log.Uint16("round", uint16(nextRound.Number())))
+					go h.initializeRound(nextRound)
+					return
+				}
+				// If no immediate init needed, process queued messages
+				go h.processQueuedMessages(nextRound.Number())
 			}
 		}
 		return // Already finalized this round
