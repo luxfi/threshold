@@ -22,12 +22,22 @@ func Start(c *config.Config, signers []party.ID, messageHash []byte, pl *pool.Po
 			}
 		}
 
+		// Validate sufficient signers
+		if len(signers) < c.Threshold {
+			return nil, fmt.Errorf("insufficient signers: need at least %d, got %d", c.Threshold, len(signers))
+		}
+
+		// Validate message hash is 32 bytes
+		if len(messageHash) != 32 {
+			return nil, fmt.Errorf("lss: message hash must be 32 bytes")
+		}
+
 		info := round.Info{
 			ProtocolID:       "lss/sign",
 			FinalRoundNumber: 3,
 			SelfID:           c.ID,
 			PartyIDs:         signers,
-			Threshold:        c.Threshold,
+			Threshold:        len(signers) - 1, // Session threshold is n-1 where n is number of participants
 			Group:            c.Group,
 		}
 

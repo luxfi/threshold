@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/polynomial"
@@ -94,47 +93,47 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		return nil, errors.New("missing nonces from some signers")
 	}
 
-	// Compute combined R = sum of all K values
+	// Compute combined R = sum of all K values (nonce commitment)
 	r.R = r.Group().NewPoint()
 	for _, K := range r.nonces {
 		r.R = r.R.Add(K)
 	}
 
-	// Convert R to scalar for signature
-	// Get the X coordinate bytes
+	// Get public key for challenge computation
+	publicKey, err := r.config.PublicPoint()
+	if err != nil {
+		return nil, err
+	}
+
+	// Compute Schnorr challenge: c = H(R || Y || m)
+	// Using curve.FromHash for proper domain separation
 	rBytes, err := r.R.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	// Take first half as X coordinate (assuming compressed point format)
-	halfLen := len(rBytes) / 2
-	if halfLen > 32 {
-		halfLen = 32
-	}
-	xBytes := rBytes[:halfLen]
-
-	rScalar := r.Group().NewScalar()
-	if err := rScalar.UnmarshalBinary(xBytes); err != nil {
-		// If unmarshal fails, set directly from bytes with modular reduction
-		rScalar.SetNat(new(saferith.Nat).SetBytes(xBytes))
+	yBytes, err := publicKey.MarshalBinary()
+	if err != nil {
+		return nil, err
 	}
 
-	// Convert message hash to scalar
-	mScalar := r.Group().NewScalar()
-	mScalar.SetNat(new(saferith.Nat).SetBytes(r.messageHash))
+	// Concatenate R || Y || m for challenge hash
+	challengeInput := make([]byte, 0, len(rBytes)+len(yBytes)+len(r.messageHash))
+	challengeInput = append(challengeInput, rBytes...)
+	challengeInput = append(challengeInput, yBytes...)
+	challengeInput = append(challengeInput, r.messageHash...)
+	challenge := curve.FromHash(r.Group(), challengeInput)
 
 	// Compute Lagrange coefficient for our ID
-	// This is simplified - in practice we need proper Lagrange interpolation
 	lagrangeCoeff := polynomial.Lagrange(r.Group(), r.signers)[r.SelfID()]
 
-	// Compute partial signature: s_i = k_i + r * λ_i * x_i * m
-	// where λ_i is the Lagrange coefficient, x_i is our secret share
+	// Compute partial Schnorr signature: z_i = k_i + c * λ_i * x_i
+	// where c is the challenge, λ_i is the Lagrange coefficient, x_i is our secret share
+	// When aggregated: z = sum(z_i) = sum(k_i) + c * sum(λ_i * x_i) = k + c * x
 	partialSig := r.Group().NewScalar()
-	partialSig = partialSig.Set(rScalar)        // r
-	partialSig = partialSig.Mul(lagrangeCoeff)  // r * λ_i
-	partialSig = partialSig.Mul(r.config.ECDSA) // r * λ_i * x_i
-	partialSig = partialSig.Mul(mScalar)        // r * λ_i * x_i * m
-	partialSig = partialSig.Add(r.k)            // k_i + r * λ_i * x_i * m
+	partialSig = partialSig.Set(challenge)      // c
+	partialSig = partialSig.Mul(lagrangeCoeff)  // c * λ_i
+	partialSig = partialSig.Mul(r.config.ECDSA) // c * λ_i * x_i
+	partialSig = partialSig.Add(r.k)            // k_i + c * λ_i * x_i
 
 	// Marshal partial signature to bytes for broadcast
 	partialSigBytes, err := partialSig.MarshalBinary()
@@ -149,6 +148,9 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		return nil, err
 	}
 
+	// Store our own partial sig so round3 can collect it
+	r.receivedPartialSigs.Store(r.SelfID(), partialSig)
+
 	// Collect received partial sigs from sync.Map
 	partialSigs := make(map[party.ID]curve.Scalar)
 	r.receivedPartialSigs.Range(func(key, value interface{}) bool {
@@ -160,7 +162,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	return &round3{
 		round2:      r,
 		partialSigs: partialSigs,
-		rScalar:     rScalar,
+		challenge:   challenge,
 	}, nil
 }
 
