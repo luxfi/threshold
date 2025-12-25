@@ -49,6 +49,15 @@ func (r *round3) StoreMessage(_ round.Message) error {
 
 // Finalize implements round.Round
 func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
+	// Collect partial sigs fresh from round2's sync.Map
+	// This is necessary because round3 may have been created before all broadcasts
+	// were received (during initializeRound), so the partialSigs map may be stale
+	r.round2.receivedPartialSigs.Range(func(key, value interface{}) bool {
+		id := key.(party.ID)
+		r.partialSigs[id] = value.(curve.Scalar)
+		return true
+	})
+
 	// Add our own partial signature (computed in round2.Finalize but we need to include it)
 	// We need to recompute it since we didn't store it
 	lagrangeCoeff := polynomial.Lagrange(r.Group(), r.signers)[r.SelfID()]
