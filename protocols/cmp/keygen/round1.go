@@ -3,6 +3,8 @@ package keygen
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/internal/types"
@@ -64,9 +66,13 @@ func (r *round1) StoreMessage(round.Message) error { return nil }
 // - commit to message.
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// generate Paillier and Pedersen
+	fmt.Printf("[%s] Round1.Finalize: starting Paillier generation (pool=%v)...\n", r.SelfID(), r.Pool != nil)
+	start := time.Now()
 	PaillierSecret := paillier.NewSecretKey(r.Pool)
+	fmt.Printf("[%s] Round1.Finalize: Paillier done in %v\n", r.SelfID(), time.Since(start))
 	SelfPaillierPublic := PaillierSecret.PublicKey
 	SelfPedersenPublic, PedersenSecret := PaillierSecret.GeneratePedersen()
+	fmt.Printf("[%s] Round1.Finalize: Pedersen done, continuing...\n", r.SelfID())
 
 	ElGamalSecret, ElGamalPublic := sample.ScalarPointPair(rand.Reader, r.Group())
 

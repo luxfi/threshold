@@ -166,6 +166,8 @@ func (h *Harness) runHandlerLoop(id party.ID, handler *protocol.Handler) error {
 				return
 			case msg := <-h.network.Next(id):
 				if msg != nil {
+					fmt.Printf("[HARNESS] %s: RECV msg from %s (round=%d, broadcast=%v)\n",
+						id, msg.From, msg.RoundNumber, msg.Broadcast)
 					handler.Accept(msg)
 				}
 			}
@@ -181,9 +183,12 @@ func (h *Harness) runHandlerLoop(id party.ID, handler *protocol.Handler) error {
 			case msg, ok := <-handler.Listen():
 				if !ok {
 					// Channel closed, handler completed
+					fmt.Printf("[HARNESS] %s: Listen channel closed\n", id)
 					return
 				}
 				if msg != nil {
+					fmt.Printf("[HARNESS] %s: SEND msg to %s (round=%d, broadcast=%v)\n",
+						id, msg.To, msg.RoundNumber, msg.Broadcast)
 					h.network.Send(msg)
 				}
 			}
