@@ -1,10 +1,13 @@
 package sample
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"math/big"
+	"runtime"
 	"sync"
+	"time"
 
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/params"
@@ -71,16 +74,28 @@ var sievePool = sync.Pool{
 }
 
 func tryBlumPrime(rand io.Reader) *saferith.Nat {
+	goroutineID := runtime.NumGoroutine()
+	start := time.Now()
 	initPrimes.Do(func() {
+		fmt.Printf("[PRIME] Initializing primes table...\n")
 		thePrimes = primes(primeBound)
+		fmt.Printf("[PRIME] Primes table initialized with %d primes\n", len(thePrimes))
 	})
+	initTime := time.Since(start)
 
 	bytes := make([]byte, (params.BitsBlumPrime+7)/8)
 
+	readStart := time.Now()
 	_, err := io.ReadFull(rand, bytes)
+	readTime := time.Since(readStart)
+	if readTime > 10*time.Millisecond || initTime > 10*time.Millisecond {
+		fmt.Printf("[PRIME g%d] ReadFull took %v, init took %v\n", goroutineID, readTime, initTime)
+	}
 	if err != nil {
+		fmt.Printf("[PRIME g%d] ReadFull error: %v\n", goroutineID, err)
 		return nil
 	}
+	fmt.Printf("[PRIME g%d] ReadFull done, starting sieve\n", goroutineID)
 	// For both p and (p - 1) / 2 to be prime, it must be the case that p = 3 mod 4
 
 	// Clear low bits to ensure that our number is 3 mod 4
@@ -93,6 +108,7 @@ func tryBlumPrime(rand io.Reader) *saferith.Nat {
 	base := new(big.Int).SetBytes(bytes)
 
 	// sieve checks the candidacy of base, base+1, base+2, etc.
+	sieveStart := time.Now()
 	sievePtr := sievePool.Get().(*[]bool)
 	sieve := *sievePtr
 	defer sievePool.Put(sievePtr)
@@ -105,9 +121,16 @@ func tryBlumPrime(rand io.Reader) *saferith.Nat {
 		sieve[i+1] = false
 		sieve[i+2] = false
 	}
+	fmt.Printf("[PRIME g%d] Sieve init took %v\n", goroutineID, time.Since(sieveStart))
+
 	// sieve out primes
+	sieveOutStart := time.Now()
 	remainder := new(big.Int)
-	for _, prime := range thePrimes {
+	for idx, prime := range thePrimes {
+		// Yield to scheduler periodically to prevent starvation in high-goroutine scenarios
+		if idx%10000 == 0 {
+			runtime.Gosched()
+		}
 		// We want to eliminate all x = 0, 1 mod r, so we figure out where the
 		// next multiple is, relative to base, and eliminate from there.
 		//
@@ -126,16 +149,27 @@ func tryBlumPrime(rand io.Reader) *saferith.Nat {
 			sieve[i+1] = false
 		}
 	}
+	fmt.Printf("[PRIME g%d] Sieve out took %v\n", goroutineID, time.Since(sieveOutStart))
+
 	p := new(big.Int)
 	q := new(big.Int)
+	candidatesChecked := 0
+	primalityStart := time.Now()
 	for delta := 0; delta < len(sieve); delta++ {
 		if !sieve[delta] {
 			continue
+		}
+		candidatesChecked++
+
+		// Yield to scheduler periodically during expensive primality testing
+		if candidatesChecked%100 == 0 {
+			runtime.Gosched()
 		}
 
 		p.SetUint64(uint64(delta))
 		p.Add(p, base)
 		if p.BitLen() > params.BitsBlumPrime {
+			fmt.Printf("[PRIME g%d] BitLen exceeded after %d candidates, %v\n", goroutineID, candidatesChecked, time.Since(primalityStart))
 			return nil
 		}
 		// Since p is odd, this is equivalent to (p - 1) / 2
@@ -150,9 +184,11 @@ func tryBlumPrime(rand io.Reader) *saferith.Nat {
 		if !p.ProbablyPrime(0) {
 			continue
 		}
+		fmt.Printf("[PRIME g%d] Found prime after %d candidates, %v\n", goroutineID, candidatesChecked, time.Since(primalityStart))
 		return new(saferith.Nat).SetBig(p, params.BitsBlumPrime)
 	}
 
+	fmt.Printf("[PRIME g%d] No prime found after %d candidates, %v\n", goroutineID, candidatesChecked, time.Since(primalityStart))
 	return nil
 }
 
