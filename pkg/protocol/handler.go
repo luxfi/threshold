@@ -1327,7 +1327,8 @@ func (h *Handler) verifyNormalForRound(msg *Message, roundNum round.Number) {
 	r := roundObj.(*roundWrapper).round
 
 	// Check if we have required broadcast first
-	if _, ok := r.(round.BroadcastRound); ok {
+	// Only check if BroadcastContent() is non-nil (some rounds embed BroadcastRound but don't use it)
+	if br, ok := r.(round.BroadcastRound); ok && br.BroadcastContent() != nil {
 		broadcasts := h.broadcast.LoadAll(r.Number())
 		if broadcasts[msg.From] == nil {
 			h.log.Debug("waiting for broadcast before normal message",
@@ -1451,7 +1452,8 @@ func (h *Handler) verifyNormal(msg *Message) {
 	r := roundObj.(*roundWrapper).round
 
 	// Check if we have required broadcast first
-	if _, isBroadcast := r.(round.BroadcastRound); isBroadcast {
+	// Only check if BroadcastContent() is non-nil (some rounds embed BroadcastRound but don't use it)
+	if br, isBroadcast := r.(round.BroadcastRound); isBroadcast && br.BroadcastContent() != nil {
 		if broadcast, _ := h.broadcast.Load(msg.RoundNumber, msg.From); broadcast == nil {
 			return // Wait for broadcast first
 		}
@@ -1596,8 +1598,9 @@ func (h *Handler) processQueuedMessages(roundNum round.Number) {
 func (h *Handler) hasAllMessages(r round.Session) bool {
 	number := r.Number()
 
-	// Check broadcasts
-	if _, ok := r.(round.BroadcastRound); ok {
+	// Check broadcasts - but only if BroadcastContent() returns non-nil
+	// Some rounds embed BroadcastRound but don't actually use broadcasts
+	if br, ok := r.(round.BroadcastRound); ok && br.BroadcastContent() != nil {
 		broadcasts := h.broadcast.LoadAll(number)
 		missingBroadcasts := []party.ID{}
 		unprocessedBroadcasts := []party.ID{}
