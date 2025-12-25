@@ -2,6 +2,7 @@ package sign
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
@@ -14,19 +15,34 @@ import (
 type round2 struct {
 	*round1
 
-	// Collected nonces from all signers
+	// Collected nonces from all signers (passed from round1)
 	nonces map[party.ID]curve.Point
 
 	// Combined nonce point R
 	R curve.Point
+
+	// Storage for received partial sigs from other parties
+	receivedPartialSigs sync.Map // map[party.ID]curve.Scalar
 }
 
 // broadcast2 contains the partial signature
 type broadcast2 struct {
 	round.NormalBroadcastContent
 
-	// Partial signature share
-	PartialSig curve.Scalar
+	// Partial signature share - stored as bytes for CBOR compatibility
+	PartialSig []byte
+}
+
+// GetPartialSig unmarshals the PartialSig bytes into a curve.Scalar
+func (b *broadcast2) GetPartialSig(group curve.Curve) (curve.Scalar, error) {
+	if len(b.PartialSig) == 0 {
+		return nil, errors.New("missing partial signature")
+	}
+	scalar := group.NewScalar()
+	if err := scalar.UnmarshalBinary(b.PartialSig); err != nil {
+		return nil, err
+	}
+	return scalar, nil
 }
 
 // Number implements round.Round
@@ -111,16 +127,30 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	partialSig = partialSig.Mul(mScalar)        // r * λ_i * x_i * m
 	partialSig = partialSig.Add(r.k)            // k_i + r * λ_i * x_i * m
 
+	// Marshal partial signature to bytes for broadcast
+	partialSigBytes, err := partialSig.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+
 	// Broadcast partial signature
 	if err := r.BroadcastMessage(out, &broadcast2{
-		PartialSig: partialSig,
+		PartialSig: partialSigBytes,
 	}); err != nil {
 		return nil, err
 	}
 
+	// Collect received partial sigs from sync.Map
+	partialSigs := make(map[party.ID]curve.Scalar)
+	r.receivedPartialSigs.Range(func(key, value interface{}) bool {
+		id := key.(party.ID)
+		partialSigs[id] = value.(curve.Scalar)
+		return true
+	})
+
 	return &round3{
 		round2:      r,
-		partialSigs: make(map[party.ID]curve.Scalar),
+		partialSigs: partialSigs,
 		rScalar:     rScalar,
 	}, nil
 }
@@ -128,14 +158,15 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 // StoreBroadcastMessage implements round.BroadcastRound
 func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 	from := msg.From
-	body, ok := msg.Content.(*broadcast1)
+	body, ok := msg.Content.(*broadcast2)
 	if !ok || body == nil {
 		return round.ErrInvalidContent
 	}
 
-	// Verify K is not identity
-	if body.K == nil || body.K.IsIdentity() {
-		return errors.New("invalid nonce commitment")
+	// Unmarshal partial sig from bytes
+	partialSig, err := body.GetPartialSig(r.Group())
+	if err != nil {
+		return errors.New("invalid partial signature: " + err.Error())
 	}
 
 	// Verify sender is a signer
@@ -150,6 +181,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		return errors.New("sender not in signers list")
 	}
 
-	r.nonces[from] = body.K
+	// Store using sync.Map for thread safety
+	r.receivedPartialSigs.Store(from, partialSig)
 	return nil
 }
