@@ -50,6 +50,13 @@ type Handler struct {
 	processedBroadcasts sync.Map // "round:from" -> bool
 	processedMessages   sync.Map // "round:from" -> bool
 
+	// Verification in progress tracking - prevents concurrent verification of same message
+	verifyingBroadcasts sync.Map // "round:from" -> bool
+	verifyingMessages   sync.Map // "round:from" -> bool
+
+	// Retry tracking - prevents goroutine accumulation from multiple retries
+	pendingRetries sync.Map // round.Number -> bool
+
 	// High-performance channels
 	out      chan *Message
 	incoming chan *Message
@@ -630,8 +637,56 @@ func (h *Handler) tryAdvanceRound() {
 					go h.initializeRound(nextRound)
 					return
 				}
-				// If no immediate init needed, process queued messages
-				go h.processQueuedMessages(nextRound.Number())
+				// CRITICAL FIX: For "pure finalize" rounds (no BroadcastContent AND no MessageContent),
+				// we still need to call initializeRound so that Finalize is called to complete the protocol.
+				// Example: LSS sign round3 has no content but its Finalize returns the signature result.
+				h.log.Debug("next round is pure-finalize round (no content), initializing",
+					log.Uint16("round", uint16(nextRound.Number())))
+				go h.initializeRound(nextRound)
+			}
+		} else {
+			// Round is finalized but next round not stored yet - another goroutine is still
+			// running initializeRound/finalizeRound. Retry after a short delay to allow it to complete.
+			// But first check if the protocol has completed (in which case there's no next round).
+			select {
+			case <-h.done:
+				// Protocol completed, no retry needed
+				h.log.Debug("round finalized, protocol completed, no retry needed",
+					log.Uint16("round", uint16(r.Number())))
+				return
+			case <-h.ctx.Done():
+				// Context canceled, no retry needed
+				return
+			default:
+				// Check if a retry is already pending for this round to prevent goroutine accumulation
+				if _, alreadyPending := h.pendingRetries.LoadOrStore(r.Number(), true); alreadyPending {
+					// Another goroutine is already handling the retry, don't spawn another
+					return
+				}
+
+				// Protocol still running, schedule retry
+				h.log.Debug("round finalized but next round not yet stored, scheduling retry",
+					log.Uint16("round", uint16(r.Number())),
+					log.Uint16("expected_next", uint16(nextRoundNum)))
+				go func() {
+					defer h.pendingRetries.Delete(r.Number())
+					select {
+					case <-time.After(10 * time.Millisecond):
+						// Check again if protocol is done before retrying
+						select {
+						case <-h.done:
+							return
+						case <-h.ctx.Done():
+							return
+						default:
+							h.tryAdvanceRound()
+						}
+					case <-h.done:
+						return
+					case <-h.ctx.Done():
+						return
+					}
+				}()
 			}
 		}
 		return // Already finalized this round
@@ -718,6 +773,9 @@ func (h *Handler) tryAdvanceRound() {
 
 // Accept accepts a message with non-blocking queue management
 func (h *Handler) Accept(msg *Message) {
+	if msg == nil {
+		return
+	}
 	if h.metrics != nil {
 		h.metrics.queuedMessages.Inc()
 	}
@@ -847,6 +905,21 @@ func (h *Handler) WaitForResult() (interface{}, error) {
 			}
 
 		case <-h.ctx.Done():
+			// When context is done, first check if we have a result
+			// This handles the race where protocol completes and cancels context
+			// but context Done fires before ticker case gets the result
+			if result := h.result.Load(); result != nil {
+				duration := time.Since(h.protocolStartTime)
+				h.log.Info("protocol completed successfully (caught on context done)", log.Duration("duration", duration))
+
+				if h.metrics != nil {
+					h.metrics.protocolsCompleted.Inc()
+					h.metrics.protocolDuration.Observe(duration.Seconds())
+				}
+
+				return result, nil
+			}
+
 			h.log.Error("protocol canceled")
 
 			if h.metrics != nil {
@@ -963,30 +1036,116 @@ func (h *Handler) metricsUpdater() {
 // Helper methods for perfect protocol execution...
 
 func (h *Handler) initializeRound(r round.Session) {
+	if r == nil {
+		h.log.Debug("initializeRound called with nil round, ignoring")
+		return
+	}
 	h.log.Debug("initializing round", log.Uint16("round", uint16(r.Number())))
 
-	// Process any messages that might already be waiting
+	// Process any messages that might already be waiting BEFORE claiming finalized lock
 	h.processQueuedMessages(r.Number())
 
-	// Give a small delay to allow message processing
-	time.Sleep(20 * time.Millisecond)
+	// Check if this round needs to wait for incoming messages before Finalize.
+	// There are three cases where we must wait:
+	//
+	// 1. FINAL round - aggregates data from all parties (e.g., SigmaShares in sign round 5)
+	//    The final round's Finalize computes the final result using data from all parties.
+	//
+	// 2. Round with MessageContent (P2P messages) - StoreMessage populates state that Finalize uses
+	//    Example: Sign round 3 - StoreMessage sets DeltaShareAlpha[from], Finalize reads DeltaShareAlpha[j]
+	//    If we call Finalize before StoreMessage, we get nil pointer panics.
+	//
+	// 3. Round with BroadcastContent (broadcast messages) - StoreBroadcastMessage populates state
+	//    Example: FROST round 2 - StoreBroadcastMessage sets ChainKeyCommitments, Finalize checks count
+	//    If we call Finalize before StoreBroadcastMessage, we get "missing chain key commitments" errors.
+	//
+	// Note: Round 1 only SENDS broadcasts via Finalize, it doesn't RECEIVE broadcasts.
+	// Rounds 2+ that have BroadcastContent DO receive broadcasts from the previous round.
+	// So we only wait for broadcasts if r.Number() > 1.
+	isFinalRound := r.Number() == r.FinalRoundNumber()
+	hasIncomingP2P := r.MessageContent() != nil
+	hasIncomingBroadcast := false
+	if r.Number() > 1 {
+		if br, ok := r.(round.BroadcastRound); ok && br.BroadcastContent() != nil {
+			hasIncomingBroadcast = true
+		}
+	}
 
-	// IMPORTANT: Always call Finalize for initial rounds.
+	// Determine if we should wait for messages before calling Finalize.
+	//
+	// Key insight: Some rounds (like LSS round 2) use a "send-first" pattern where
+	// Finalize sends P2P messages first, then returns self to wait for replies.
+	// Other rounds (like CMP/FROST) receive messages from the previous round's Finalize
+	// and expect that data to be available when their Finalize is called.
+	//
+	// We can distinguish these cases by checking if ANY messages have arrived:
+	// - If messages have arrived: they're "in flight" from previous round → wait for all
+	// - If no messages yet: this might be a "send-first" round → call Finalize
+	shouldWait := false
+
+	if hasIncomingP2P {
+		// For P2P-only rounds (like LSS round 2), we should ALWAYS call Finalize first.
+		// The round's Finalize handles the "send-first, wait-for-replies" pattern:
+		// - First Finalize: sends shares, stores own share, returns self
+		// - Second Finalize: checks if all shares received, returns next round or self
+		//
+		// We previously waited if some P2P messages had arrived, but this caused a deadlock:
+		// - Party A waits for all shares before Finalize
+		// - But party A has shares that others need
+		// - Everyone waits, no one sends
+		//
+		// Now we always call Finalize for P2P rounds, and let the round logic decide.
+		// The round will return itself if it's not ready to advance.
+		h.log.Debug("P2P round - will call Finalize to send shares",
+			log.Uint16("round", uint16(r.Number())))
+	}
+
+	if hasIncomingBroadcast {
+		hasAnyBroadcast := false
+		roundPrefix := fmt.Sprintf("%d:", r.Number())
+		h.processedBroadcasts.Range(func(key, _ interface{}) bool {
+			// Only check broadcasts for THIS round, not previous rounds
+			if keyStr, ok := key.(string); ok && len(keyStr) >= len(roundPrefix) && keyStr[:len(roundPrefix)] == roundPrefix {
+				hasAnyBroadcast = true
+				return false // stop iteration
+			}
+			return true // continue checking other keys
+		})
+		if hasAnyBroadcast && !h.hasAllMessages(r) {
+			// Some broadcasts for THIS round arrived - wait for all before Finalize
+			shouldWait = true
+		}
+	}
+
+	// Final round always waits for all messages
+	if isFinalRound && !h.hasAllMessages(r) {
+		shouldWait = true
+	}
+
+	if shouldWait {
+		h.log.Debug("round waiting for all messages",
+			log.Uint16("round", uint16(r.Number())),
+			log.Bool("isFinal", isFinalRound),
+			log.Bool("hasP2P", hasIncomingP2P),
+			log.Bool("hasBroadcast", hasIncomingBroadcast))
+		return
+	}
+
+	// Now we're ready to finalize - claim the lock
+	if finalized, loaded := h.finalized.LoadOrStore(r.Number(), true); loaded && finalized.(bool) {
+		h.log.Debug("round already being finalized, skipping",
+			log.Uint16("round", uint16(r.Number())))
+		return
+	}
+
+	// IMPORTANT: Call Finalize for rounds that:
+	// 1. Need to send broadcasts/P2P messages
+	// 2. Have all required incoming messages
+	//
 	// The round's Finalize method handles:
 	// 1. Sending broadcasts/P2P messages
 	// 2. Returning itself if waiting for incoming messages
 	// 3. Returning the next round when ready to advance
-	//
-	// For rounds that need to send messages (round 1 broadcasts, round 2 P2P shares),
-	// we MUST call Finalize to send them. The waiting happens when the round returns itself.
-
-	// Mark this round as being finalized to prevent double finalization
-	// This is especially important for round 1 which is initialized immediately
-	if finalized, loaded := h.finalized.LoadOrStore(r.Number(), true); loaded && finalized.(bool) {
-		h.log.Debug("round already being initialized/finalized, skipping",
-			log.Uint16("round", uint16(r.Number())))
-		return
-	}
 
 	out := make(chan *round.Message, r.N()+1)
 
@@ -1024,6 +1183,35 @@ func (h *Handler) initializeRound(r round.Session) {
 
 	// Store next round and advance if appropriate
 	if nextRound != nil {
+		// Check for protocol completion first
+		if output, ok := nextRound.(*round.Output); ok {
+			h.result.Store(output.Result)
+			h.log.Info("protocol completed in initialization",
+				log.String("self", string(r.SelfID())),
+				log.Uint16("final_round", uint16(r.Number())))
+			// Close done channel to signal completion to workers
+			h.closeDoneOnce.Do(func() {
+				close(h.done)
+			})
+			// Cancel context immediately to stop all workers
+			// This must happen before WaitForResult returns
+			h.cancel()
+			// Close output channel asynchronously to allow final message delivery
+			go func() {
+				time.Sleep(10 * time.Millisecond)
+				h.closeOnce.Do(func() {
+					close(h.out)
+				})
+			}()
+			return
+		}
+
+		// Check for protocol abort
+		if abort, ok := nextRound.(*round.Abort); ok {
+			h.handleError(abort.Err, abort.Culprits...)
+			return
+		}
+
 		if nextRound.Number() > r.Number() {
 			// Store the next round for later use but DON'T advance to it yet
 			// We need to wait for all round 1 messages to be processed first
@@ -1201,7 +1389,7 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 		return nextRoundObj.(*roundWrapper).round
 	}
 
-	// If not, we need to finalize this round
+	// We need to finalize this round
 	out := make(chan *round.Message, r.N()+1)
 
 	// Use goroutine like initializeRound does to allow async message generation
@@ -1299,6 +1487,19 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 }
 
 func (h *Handler) verifyBroadcastForRound(msg *Message, roundNum round.Number) {
+	// Prevent concurrent verification of the same message
+	// This is critical because ZK proof verification is expensive
+	key := fmt.Sprintf("%d:%s", roundNum, msg.From)
+	if _, loaded := h.verifyingBroadcasts.LoadOrStore(key, true); loaded {
+		return // Already being verified by another goroutine
+	}
+	defer h.verifyingBroadcasts.Delete(key)
+
+	// Check if already processed (double-check after acquiring the verification lock)
+	if _, processed := h.processedBroadcasts.Load(key); processed {
+		return
+	}
+
 	// Verify a broadcast message for a specific round
 	roundObj, ok := h.rounds.Load(roundNum)
 	if !ok {
@@ -1343,6 +1544,18 @@ func (h *Handler) verifyBroadcastForRound(msg *Message, roundNum round.Number) {
 }
 
 func (h *Handler) verifyNormalForRound(msg *Message, roundNum round.Number) {
+	// Prevent concurrent verification of the same message
+	key := fmt.Sprintf("%d:%s", roundNum, msg.From)
+	if _, loaded := h.verifyingMessages.LoadOrStore(key, true); loaded {
+		return // Already being verified by another goroutine
+	}
+	defer h.verifyingMessages.Delete(key)
+
+	// Check if already processed (double-check after acquiring the verification lock)
+	if _, processed := h.processedMessages.Load(key); processed {
+		return
+	}
+
 	// Verify a normal message for a specific round
 	roundObj, ok := h.rounds.Load(roundNum)
 	if !ok {
@@ -1353,11 +1566,15 @@ func (h *Handler) verifyNormalForRound(msg *Message, roundNum round.Number) {
 
 	// Check if we have required broadcast first
 	// Only check if BroadcastContent() is non-nil (some rounds embed BroadcastRound but don't use it)
+	// CRITICAL: We must check processedBroadcasts (set after StoreBroadcastMessage succeeds),
+	// not just if the broadcast message is queued. StoreBroadcastMessage populates round state
+	// (e.g., r.K[from]) that VerifyMessage depends on.
 	if br, ok := r.(round.BroadcastRound); ok && br.BroadcastContent() != nil {
-		broadcasts := h.broadcast.LoadAll(r.Number())
-		if broadcasts[msg.From] == nil {
-			h.log.Debug("waiting for broadcast before normal message",
-				log.String("from", string(msg.From)))
+		key := fmt.Sprintf("%d:%s", r.Number(), msg.From)
+		if _, processed := h.processedBroadcasts.Load(key); !processed {
+			h.log.Debug("waiting for broadcast to be processed before normal message",
+				log.String("from", string(msg.From)),
+				log.Uint16("round", uint16(r.Number())))
 			return
 		}
 	}
@@ -1478,9 +1695,16 @@ func (h *Handler) verifyNormal(msg *Message) {
 
 	// Check if we have required broadcast first
 	// Only check if BroadcastContent() is non-nil (some rounds embed BroadcastRound but don't use it)
+	// CRITICAL: We must check processedBroadcasts (set after StoreBroadcastMessage succeeds),
+	// not just if the broadcast message is queued. StoreBroadcastMessage populates round state
+	// (e.g., r.K[from]) that VerifyMessage depends on.
 	if br, isBroadcast := r.(round.BroadcastRound); isBroadcast && br.BroadcastContent() != nil {
-		if broadcast, _ := h.broadcast.Load(msg.RoundNumber, msg.From); broadcast == nil {
-			return // Wait for broadcast first
+		key := fmt.Sprintf("%d:%s", msg.RoundNumber, msg.From)
+		if _, processed := h.processedBroadcasts.Load(key); !processed {
+			h.log.Debug("waiting for broadcast to be processed before normal message",
+				log.String("from", string(msg.From)),
+				log.Uint16("round", uint16(msg.RoundNumber)))
+			return // Wait for broadcast to be processed first
 		}
 	}
 
