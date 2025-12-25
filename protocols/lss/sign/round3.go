@@ -3,23 +3,61 @@ package sign
 import (
 	"errors"
 
-	"github.com/cronokirby/saferith"
 	"github.com/luxfi/threshold/internal/round"
-	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
-	"github.com/luxfi/threshold/pkg/math/polynomial"
 	"github.com/luxfi/threshold/pkg/party"
 )
 
-// round3 combines partial signatures
+// round3 combines partial signatures and verifies the final Schnorr signature
 type round3 struct {
 	*round2
 
 	// Collected partial signatures
 	partialSigs map[party.ID]curve.Scalar
 
-	// r value from R point
-	rScalar curve.Scalar
+	// Schnorr challenge c = H(R || Y || m)
+	challenge curve.Scalar
+}
+
+// SchnorrSignature represents a threshold Schnorr signature
+type SchnorrSignature struct {
+	R curve.Point  // Combined nonce point
+	Z curve.Scalar // Combined signature scalar
+}
+
+// Verify verifies a Schnorr signature: z*G == R + c*Y
+func (sig *SchnorrSignature) Verify(publicKey curve.Point, messageHash []byte) bool {
+	if sig.R == nil || sig.Z == nil || publicKey == nil {
+		return false
+	}
+
+	group := sig.R.Curve()
+
+	// Recompute challenge: c = H(R || Y || m)
+	rBytes, err := sig.R.MarshalBinary()
+	if err != nil {
+		return false
+	}
+	yBytes, err := publicKey.MarshalBinary()
+	if err != nil {
+		return false
+	}
+
+	challengeInput := make([]byte, 0, len(rBytes)+len(yBytes)+len(messageHash))
+	challengeInput = append(challengeInput, rBytes...)
+	challengeInput = append(challengeInput, yBytes...)
+	challengeInput = append(challengeInput, messageHash...)
+	challenge := curve.FromHash(group, challengeInput)
+
+	// Verify: z*G == R + c*Y
+	// Left side: z*G
+	left := sig.Z.ActOnBase()
+
+	// Right side: R + c*Y
+	cY := challenge.Act(publicKey)
+	right := sig.R.Add(cY)
+
+	return left.Equal(right)
 }
 
 // Number implements round.Round
@@ -58,43 +96,25 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 		return true
 	})
 
-	// Add our own partial signature (computed in round2.Finalize but we need to include it)
-	// We need to recompute it since we didn't store it
-	lagrangeCoeff := polynomial.Lagrange(r.Group(), r.signers)[r.SelfID()]
-
-	// Recompute our partial sig: s_i = k_i + r * λ_i * x_i * m
-	ourPartialSig := r.Group().NewScalar()
-	ourPartialSig = ourPartialSig.Set(r.rScalar)        // r
-	ourPartialSig = ourPartialSig.Mul(lagrangeCoeff)    // r * λ_i
-	ourPartialSig = ourPartialSig.Mul(r.config.ECDSA)   // r * λ_i * x_i
-
-	// Convert message hash to scalar
-	mScalar := r.Group().NewScalar()
-	mScalar.SetNat(new(saferith.Nat).SetBytes(r.messageHash))
-	ourPartialSig = ourPartialSig.Mul(mScalar) // r * λ_i * x_i * m
-	ourPartialSig = ourPartialSig.Add(r.k)     // k_i + r * λ_i * x_i * m
-
-	// Add our own partial sig
-	r.partialSigs[r.SelfID()] = ourPartialSig
-
 	// Verify we have partial signatures from all signers
+	// Our own partial sig is already stored in round2.receivedPartialSigs
 	if len(r.partialSigs) != len(r.signers) {
 		return nil, errors.New("missing partial signatures from some signers")
 	}
 
-	// Combine partial signatures: s = sum(s_i)
-	s := r.Group().NewScalar()
+	// Combine partial signatures: z = sum(z_i)
+	z := r.Group().NewScalar()
 	for _, partialSig := range r.partialSigs {
-		s = s.Add(partialSig)
+		z = z.Add(partialSig)
 	}
 
-	// Create final ECDSA signature
-	sig := &ecdsa.Signature{
+	// Create final Schnorr signature
+	sig := &SchnorrSignature{
 		R: r.R,
-		S: s,
+		Z: z,
 	}
 
-	// Optionally verify the signature against the public key
+	// Verify the signature against the public key
 	publicKey, err := r.config.PublicPoint()
 	if err != nil {
 		return nil, err
