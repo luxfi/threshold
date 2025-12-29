@@ -1,6 +1,6 @@
 module github.com/luxfi/threshold
 
-go 1.25.5
+go 1.26
 
 require (
 	// External dependencies
