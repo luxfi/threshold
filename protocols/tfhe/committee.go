@@ -1,3 +1,22 @@
+// UNSAFE: This implementation is NOT a real threshold scheme.
+//   - Every party stores the full master key (tfhe.go ~line 374: UnderlyingKey: masterSK)
+//   - PartialDecrypt returns an HMAC tag, not a partial decryption
+//   - CombineShares ignores partials and runs single-party decryption
+//
+// DO NOT USE in production. Refused security review by Red 2026-04-28.
+//
+// Real threshold FHE requires:
+//  1. Shamir-split master secret key (each party gets a SHARE, not the full key)
+//  2. PartialDecrypt produces a partial decryption (lattice noise + share contribution)
+//  3. CombineShares Lagrange-interpolates partials to recover the cleartext
+//
+// Migration path: route through luxfi/lattice threshold protocol primitives
+// (which DO implement real Shamir share generation + partial-decrypt + combine).
+// See lps/LP-137-TFHE-REAL-THRESHOLD-SPEC.md.
+//
+// Test opt-in: set LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 to bypass the
+// fail-loud panics at every entry point. Production must crash if reached.
+//
 // Committee surface for the threshold-FHE policy gate.
 //
 // This file defines the narrow "committee API" used by per-node policy
@@ -245,6 +264,10 @@ func NewPartialDecrypter() *PartialDecrypter { return &PartialDecrypter{} }
 
 // PartialDecrypt computes the party's share for the given ciphertext.
 //
+// UNSAFE: this returns an HMAC tag bound to (party, session, ciphertext) —
+// it is NOT a partial decryption. The downstream combine ignores Partial and
+// runs single-party decrypt. Panics unless LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
+//
 // Partial is HMAC-SHA256(key, "LUX/FHE/THRESHOLD/PARTIAL/v1" || sessionID
 // || ciphertextID) — a deterministic, per-party byte sequence that
 // fingerprints the (party, session, ciphertext) tuple. MAC is
@@ -258,6 +281,7 @@ func (p *PartialDecrypter) PartialDecrypt(
 	ct FHECiphertext,
 	sessionID [32]byte,
 ) (FHEThresholdShare, error) {
+	guardUnsafe()
 	partial := computePartial(key, sessionID, ct.ID)
 	mac := computeMAC(key, key.PartyID, sessionID, ct.ID, partial)
 	return FHEThresholdShare{
