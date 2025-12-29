@@ -1101,20 +1101,29 @@ func (h *Handler) initializeRound(r round.Session) {
 	}
 
 	if hasIncomingBroadcast {
-		hasAnyBroadcast := false
-		roundPrefix := fmt.Sprintf("%d:", r.Number())
-		h.processedBroadcasts.Range(func(key, _ interface{}) bool {
-			// Only check broadcasts for THIS round, not previous rounds
-			if keyStr, ok := key.(string); ok && len(keyStr) >= len(roundPrefix) && keyStr[:len(roundPrefix)] == roundPrefix {
-				hasAnyBroadcast = true
-				return false // stop iteration
-			}
-			return true // continue checking other keys
-		})
-		if hasAnyBroadcast && !h.hasAllMessages(r) {
-			// Some broadcasts for THIS round arrived - wait for all before Finalize
+		// For broadcast rounds, we must ALWAYS call Finalize first to send our own broadcast.
+		// Only wait if we've already sent our broadcast (check if it's stored).
+		// CRITICAL FIX: If we wait before sending our own broadcast, we deadlock:
+		// - Party A waits for B and C's broadcasts
+		// - Party B waits for A and C's broadcasts
+		// - No one sends, everyone waits
+		selfBroadcastKey := fmt.Sprintf("%d:%s", r.Number(), r.SelfID())
+		broadcasts := h.broadcast.LoadAll(r.Number())
+		hasSentOwnBroadcast := broadcasts[r.SelfID()] != nil
+
+		if hasSentOwnBroadcast && !h.hasAllMessages(r) {
+			// We've sent our broadcast, now wait for others
 			shouldWait = true
+			h.log.Debug("broadcast round: sent own broadcast, waiting for others",
+				log.Uint16("round", uint16(r.Number())),
+				log.String("self", string(r.SelfID())))
+		} else if !hasSentOwnBroadcast {
+			// Haven't sent our broadcast yet - MUST call Finalize first
+			h.log.Debug("broadcast round: need to send own broadcast first",
+				log.Uint16("round", uint16(r.Number())),
+				log.String("self", string(r.SelfID())))
 		}
+		_ = selfBroadcastKey // suppress unused warning
 	}
 
 	// Final round always waits for all messages
@@ -1855,13 +1864,15 @@ func (h *Handler) hasAllMessages(r round.Session) bool {
 		unprocessedBroadcasts := []party.ID{}
 
 		for _, id := range r.PartyIDs() {
+			// Skip self - we send our own broadcast, we don't wait for it
+			// CRITICAL: This must be checked BEFORE the nil check to prevent livelock
+			// where a party waits for its own broadcast that hasn't been sent yet.
+			if id == r.SelfID() {
+				continue
+			}
 			if broadcasts[id] == nil {
 				missingBroadcasts = append(missingBroadcasts, id)
 			} else {
-				// Skip checking our own broadcast - we don't process it
-				if id == r.SelfID() {
-					continue
-				}
 				// Check if this broadcast has been processed by StoreBroadcastMessage
 				key := fmt.Sprintf("%d:%s", number, id)
 				if _, processed := h.processedBroadcasts.Load(key); !processed {
