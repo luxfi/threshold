@@ -57,7 +57,7 @@ Cosmos, Polkadot, Lux, BSC, NEAR, Aptos, Sui, Tezos, Algorand, Stellar, Hedera, 
 
 ### Installation
 ```bash
-go get github.com/luxfi/threshold@v1.0.1
+go get github.com/luxfi/threshold@v1.1.11
 ```
 
 ### Basic Usage
