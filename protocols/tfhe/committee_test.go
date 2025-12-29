@@ -4,8 +4,12 @@
 package tfhe
 
 import (
+	"bytes"
 	"context"
 	"testing"
+
+	"github.com/luxfi/fhe"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 func makeKey(id uint32) KeyShare {
@@ -163,5 +167,116 @@ func TestNewFHECiphertext_DeterministicID(t *testing.T) {
 	c := NewFHECiphertext([]byte("hello!"))
 	if a.ID == c.ID {
 		t.Fatal("different bytes must produce different IDs")
+	}
+}
+
+// buildLatticeFixture generates a real threshold-FHE protocol, encrypts a
+// uint64, and returns the protocol along with the ciphertext bytes. Used
+// by TestCommittee_DispatchByteEqual to drive both the aggregator path
+// and the direct CombineShares path against the same ciphertext.
+func buildLatticeFixture(t *testing.T, value uint64) (*Protocol, *fhe.BitCiphertext, []byte) {
+	t.Helper()
+	params, err := fhe.NewParametersFromLiteral(fhe.PN10QP27)
+	if err != nil {
+		t.Fatalf("params: %v", err)
+	}
+	parties := []party.ID{"party1", "party2", "party3"}
+	kg, err := NewKeyGenerator(2, 3, params, nil)
+	if err != nil {
+		t.Fatalf("keygen: %v", err)
+	}
+	pubKey, shares, err := kg.GenerateKeys(context.Background(), parties)
+	if err != nil {
+		t.Fatalf("generate keys: %v", err)
+	}
+	cfg := &Config{
+		Threshold:      2,
+		TotalParties:   3,
+		PartyID:        parties[0],
+		Generation:     1,
+		FHEParams:      params,
+		PublicKey:      pubKey,
+		SecretKeyShare: shares[parties[0]],
+	}
+	p, err := NewProtocol(cfg, nil)
+	if err != nil {
+		t.Fatalf("protocol: %v", err)
+	}
+	bc := p.GetEncryptor().EncryptUint64(value, fhe.FheUint8)
+	raw, err := bc.MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal ciphertext: %v", err)
+	}
+	return p, bc, raw
+}
+
+// TestCommittee_DispatchByteEqual proves that when a Protocol is wired
+// into ShareAggregator, the bytes returned by ShareAggregator.Aggregate
+// are byte-identical to the bytes returned by Protocol.CombineShares
+// invoked directly on the same ciphertext + share set. There is one and
+// only one combine routine: the aggregator dispatches, it does not
+// duplicate.
+func TestCommittee_DispatchByteEqual(t *testing.T) {
+	proto, bc, raw := buildLatticeFixture(t, 0xA5)
+	ct := NewFHECiphertext(raw)
+	var sess [32]byte
+	copy(sess[:], "session-dispatch")
+
+	shares, keys := collect(t, 3, sess, ct)
+
+	// Path A: dispatch through ShareAggregator.
+	aggA := &ShareAggregator{PartyKeys: keys, Protocol: proto}
+	resA, ptA, err := aggA.Aggregate(context.Background(), ct, shares[:2], 2, sess)
+	if err != nil {
+		t.Fatalf("aggregator dispatch: %v", err)
+	}
+	if resA.Status != StatusOK {
+		t.Fatalf("aggregator status = %s", resA.Status)
+	}
+
+	// Path B: invoke Protocol.CombineShares directly on the same shares.
+	proto.ClearShares()
+	ctHash := computeCiphertextHash(bc)
+	for i, s := range shares[:2] {
+		ds := &DecryptionShare{
+			PartyID:        party.ID([]byte{'p', byte('0' + s.PartyID)}),
+			Index:          i,
+			Generation:     proto.config.Generation,
+			CiphertextHash: ctHash,
+			PartialResult:  append([]byte(nil), s.Partial...),
+		}
+		if err := proto.AddDecryptionShare(ds); err != nil {
+			t.Fatalf("add share %d: %v", i, err)
+		}
+	}
+	ptB, err := proto.CombineShares(context.Background(), bc)
+	if err != nil {
+		t.Fatalf("direct combine: %v", err)
+	}
+
+	if !bytes.Equal(ptA, ptB) {
+		t.Fatalf("byte mismatch: aggregator=%x direct=%x", ptA, ptB)
+	}
+}
+
+// TestCommittee_DispatchEnvelopePath confirms that when no Protocol is
+// wired, the aggregator returns the verdict envelope unchanged — the
+// FChain policy-1-bit-verdict path that the policy gate consumes.
+func TestCommittee_DispatchEnvelopePath(t *testing.T) {
+	ct := NewFHECiphertext([]byte("verdict-allow"))
+	var sess [32]byte
+	copy(sess[:], "envelope")
+	shares, keys := collect(t, 3, sess, ct)
+
+	a := &ShareAggregator{PartyKeys: keys}
+	res, plaintext, err := a.Aggregate(context.Background(), ct, shares[:2], 2, sess)
+	if err != nil {
+		t.Fatalf("aggregate: %v", err)
+	}
+	if res.Status != StatusOK {
+		t.Fatalf("status = %s", res.Status)
+	}
+	if !bytes.Equal(plaintext, ct.Bytes) {
+		t.Fatalf("envelope plaintext mismatch: got %x want %x", plaintext, ct.Bytes)
 	}
 }
