@@ -155,9 +155,9 @@ func TestLSSSignMultipleSubsets(t *testing.T) {
 
 	// Test different signer subsets
 	subsets := [][]party.ID{
-		partyIDs[:threshold],                         // First 3
-		partyIDs[len(partyIDs)-threshold:],           // Last 3
-		{partyIDs[0], partyIDs[2], partyIDs[4]},      // Every other
+		partyIDs[:threshold],                    // First 3
+		partyIDs[len(partyIDs)-threshold:],      // Last 3
+		{partyIDs[0], partyIDs[2], partyIDs[4]}, // Every other
 	}
 
 	for i, signers := range subsets {
