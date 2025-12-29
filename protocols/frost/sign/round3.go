@@ -96,8 +96,43 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		z.Add(z_l)
 	}
 
-	// The format of our signature depends on using taproot, naturally
-	if r.taproot {
+	// The format of our signature depends on the signature scheme
+	if r.sr25519 {
+		// sr25519 signature: R (32 bytes) || s (32 bytes), with high bit of s set
+		// R is the ristretto255 canonical encoding of the group commitment
+		RBytes, err := r.R.MarshalBinary()
+		if err != nil {
+			return r, fmt.Errorf("failed to marshal R: %w", err)
+		}
+		// z is the response scalar; for ristretto255 MarshalBinary returns big-endian,
+		// but go-schnorrkel expects little-endian encoding. Convert.
+		zBE, err := z.MarshalBinary()
+		if err != nil {
+			return r, fmt.Errorf("failed to marshal z: %w", err)
+		}
+		zLE := make([]byte, 32)
+		for i := 0; i < 32; i++ {
+			zLE[i] = zBE[31-i]
+		}
+
+		var sigBytes [64]byte
+		copy(sigBytes[:32], RBytes)
+		copy(sigBytes[32:], zLE)
+		// Set the schnorrkel marker bit (high bit of byte 63)
+		sigBytes[63] |= 128
+
+		sig := SR25519Signature{
+			Data:           sigBytes,
+			SigningContext: r.signingContext,
+		}
+
+		// Verify using the Merlin transcript path
+		if !sig.Verify(r.Y, r.M) {
+			return r.AbortRound(fmt.Errorf("sr25519 signature verification failed")), nil
+		}
+
+		return r.ResultRound(sig), nil
+	} else if r.taproot {
 		sig := taproot.Signature(make([]byte, 0, taproot.SignatureLen))
 		sig = append(sig, r.R.(*curve.Secp256k1Point).XBytes()...)
 		zBytes, err := z.MarshalBinary()
