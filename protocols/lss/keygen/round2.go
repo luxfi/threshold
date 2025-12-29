@@ -1,6 +1,7 @@
 package keygen
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 
@@ -83,7 +84,10 @@ func (r *round2) VerifyMessage(msg round.Message) error {
 	}
 
 	sharePoint := share.ActOnBase()
-	if !sharePoint.Equal(expectedCommitment) {
+	// Use MarshalBinary for comparison to avoid race in dcrd/secp256k1 ToAffine
+	spBytes, _ := sharePoint.MarshalBinary()
+	ecBytes, _ := expectedCommitment.MarshalBinary()
+	if !bytes.Equal(spBytes, ecBytes) {
 		return errors.New("share doesn't match commitment")
 	}
 
