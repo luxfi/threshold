@@ -79,7 +79,7 @@ func Protocol(ctx context.Context) string {
 }
 
 // Note: For logging, use the luxfi/log package directly:
-//   import "github.com/luxfi/log"
+//   import "github.com/luxfi/logger/log"
 //   log.Info("event", "session", SessionID(ctx), "self", Self(ctx))
 //
 // For metrics, use the luxfi/metric package directly:

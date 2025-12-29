@@ -154,12 +154,12 @@ func (r *refreshRound2) Finalize(out chan<- *round.Message) (round.Session, erro
 
 // Helper functions
 
-func generateRefreshPolynomial(n, q int) []int {
+func generateRefreshPolynomial(n int, q uint64) []int {
 	poly := make([]int, n)
 	for i := 0; i < n; i++ {
 		var buf [8]byte
 		rand.Read(buf[:])
-		poly[i] = int(binary.LittleEndian.Uint64(buf[:]) % uint64(q))
+		poly[i] = int(binary.LittleEndian.Uint64(buf[:]) % q)
 	}
 	// First coefficient should be 0 for refresh (maintains same secret)
 	poly[0] = 0
@@ -191,10 +191,10 @@ func verifyPolynomialCommitment(poly []int, decommit hash.Decommitment, hasher h
 	return hasher.Decommit(polyHash, decommit, nil)
 }
 
-func evaluateRefreshPolynomial(coeffs []int, x int, modulus int) []int {
+func evaluateRefreshPolynomial(coeffs []int, x int, modulus uint64) []int {
 	result := make([]int, len(coeffs))
 	for i, coeff := range coeffs {
-		result[i] = (coeff * x) % modulus
+		result[i] = int((uint64(coeff) * uint64(x)) % modulus)
 	}
 	return result
 }
