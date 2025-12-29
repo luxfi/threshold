@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	"github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -44,7 +43,7 @@ func BenchmarkHandler(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				ctx := context.Background()
-				logger := log.NewTestLogger(level.Info)
+				logger := log.NewTestLogger(log.InfoLevel)
 				sessionID := []byte("test-session")
 				cfg := protocol.DefaultConfig()
 				cfg.ProtocolTimeout = 30 * time.Second // Shorter timeout for tests
@@ -97,7 +96,7 @@ func BenchmarkConcurrentMessages(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				ctx := context.Background()
-				logger := log.NewTestLogger(level.Info)
+				logger := log.NewTestLogger(log.InfoLevel)
 				sessionID := []byte("test-session")
 				cfg := protocol.DefaultConfig()
 				cfg.ProtocolTimeout = 30 * time.Second // Shorter timeout for tests
@@ -252,7 +251,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				ctx := context.Background()
-				logger := log.NewTestLogger(level.Info)
+				logger := log.NewTestLogger(log.InfoLevel)
 				sessionID := []byte("test-session")
 				cfg := protocol.DefaultConfig()
 				cfg.ProtocolTimeout = 30 * time.Second // Shorter timeout for tests
@@ -292,7 +291,7 @@ func TestHandlerPerformance(t *testing.T) {
 	defer pl.TearDown()
 
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	sessionID := []byte("test-session")
 	cfg := protocol.DefaultConfig()
 

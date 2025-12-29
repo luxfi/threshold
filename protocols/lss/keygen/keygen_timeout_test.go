@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -30,7 +29,7 @@ func TestKeygenWithTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	sessionID := []byte("test-keygen-timeout")
 	cfg := protocol.DefaultConfig()
 
@@ -130,7 +129,7 @@ func TestKeygenQuickTimeout(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 
-		logger := log.NewTestLogger(level.Info)
+		logger := log.NewTestLogger(log.InfoLevel)
 		sessionID := []byte("quick-test")
 		cfg := protocol.DefaultConfig()
 

@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -32,7 +31,7 @@ func TestFROSTKeygenSimple(t *testing.T) {
 
 	// Create handlers
 	handlers := make(map[party.ID]*protocol.Handler)
-	logger := log.NewTestLogger(level.Error) // Reduce log noise
+	logger := log.NewTestLogger(log.ErrorLevel) // Reduce log noise
 	sessionID := []byte("frost-keygen-simple")
 	config := &protocol.Config{
 		Workers:         4,
@@ -132,7 +131,7 @@ func TestFROSTKeygenWithTimeout(t *testing.T) {
 	createHandlers := func() map[party.ID]*protocol.Handler {
 		handlers := make(map[party.ID]*protocol.Handler)
 		ctx := context.Background()
-		logger := log.NewTestLogger(level.Info)
+		logger := log.NewTestLogger(log.InfoLevel)
 		sessionID := []byte("test-frost-keygen")
 		config := protocol.DefaultConfig()
 
