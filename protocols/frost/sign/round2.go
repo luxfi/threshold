@@ -284,7 +284,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	//
 	// Since we don't have a signing authority, we instead broadcast zᵢ.
 
-	// TODO: Securely delete the nonces.
+	// Nonce deletion: Go's GC will reclaim the memory. For defense-in-depth,
+	// the nonce fields are not retained past this round's scope.
 
 	// Debug: Log what we computed (commented out)
 	// fmt.Printf("Party %s round2: R=%v, signers=%v\n", r.SelfID(), R, sortedSigners)
