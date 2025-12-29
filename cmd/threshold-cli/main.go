@@ -836,7 +836,7 @@ func getCurve(curveType string) (curve.Curve, error) {
 	case "p256":
 		return nil, fmt.Errorf("p256 not yet supported")
 	case "ed25519":
-		return nil, fmt.Errorf("ed25519 not yet supported")
+		return curve.Ed25519{}, nil
 	default:
 		return nil, fmt.Errorf("unknown curve: %s", curveType)
 	}

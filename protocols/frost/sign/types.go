@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/gtank/merlin"
+	r255 "github.com/gtank/ristretto255"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/sample"
@@ -125,4 +127,60 @@ func (sig Signature) Verify(public curve.Point, m []byte) bool {
 	actual := sig.z.ActOnBase()
 
 	return expected.Equal(actual)
+}
+
+// SR25519Signature holds an sr25519 (Schnorrkel) compatible signature.
+//
+// The signature is 64 bytes: R (32 bytes) || s (32 bytes), with the high bit
+// of byte 63 set to distinguish sr25519 from Ed25519.
+type SR25519Signature struct {
+	// Data is the raw 64-byte signature.
+	Data [64]byte
+	// SigningContext is the application-level signing context (e.g. "substrate").
+	SigningContext []byte
+}
+
+// Verify checks an sr25519 signature using the Merlin transcript protocol.
+//
+// The verification equation is: s*G == R + c*Y
+// where c = scalar(transcript.extract_bytes("sign:c", 64)).
+func (sig SR25519Signature) Verify(public curve.Point, m []byte) bool {
+	// Decode R from the first 32 bytes
+	R := r255.NewElement()
+	if err := R.Decode(sig.Data[:32]); err != nil {
+		return false
+	}
+
+	// Decode s from the last 32 bytes (strip the schnorrkel marker bit)
+	sBytes := make([]byte, 32)
+	copy(sBytes, sig.Data[32:])
+	sBytes[31] &= 127 // clear the schnorrkel marker bit
+	s := r255.NewScalar()
+	if err := s.Decode(sBytes); err != nil {
+		return false
+	}
+
+	// Reconstruct the Merlin transcript to get the same challenge
+	groupKeyBytes, _ := public.MarshalBinary()
+
+	t := merlin.NewTranscript("SigningContext")
+	t.AppendMessage([]byte(""), sig.SigningContext)
+	t.AppendMessage([]byte("sign-bytes"), m)
+	t.AppendMessage([]byte("proto-name"), []byte("Schnorr-sig"))
+	t.AppendMessage([]byte("sign:pk"), groupKeyBytes)
+	t.AppendMessage([]byte("sign:R"), sig.Data[:32])
+	challengeBytes := t.ExtractBytes([]byte("sign:c"), 64)
+	k := r255.NewScalar().FromUniformBytes(challengeBytes)
+
+	// Verify: s*G == R + k*Y
+	// Equivalent: R' = s*G - k*Y, then R' == R
+	// Extract the ristretto255 element from the public key via marshal/unmarshal
+	yElement := r255.NewElement()
+	if err := yElement.Decode(groupKeyBytes); err != nil {
+		return false
+	}
+	negY := r255.NewElement().Negate(yElement)
+	Rp := r255.NewElement().VarTimeDoubleScalarBaseMult(k, negY, s)
+
+	return Rp.Equal(R) == 1
 }
