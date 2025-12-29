@@ -20,21 +20,21 @@ func TestRound1IsBroadcastRound(t *testing.T) {
 			"c": {ECDSA: curve.Secp256k1{}.NewScalar().ActOnBase()},
 		},
 	}
-	
+
 	signers := []party.ID{"a", "b", "c"}
 	startFunc := Start(cfg, signers, make([]byte, 32), nil)
 	session, err := startFunc([]byte("test"))
 	if err != nil {
 		t.Fatalf("Failed to start: %v", err)
 	}
-	
+
 	// Check if round 1 is a BroadcastRound
 	br, isBR := session.(round.BroadcastRound)
 	t.Logf("Round 1 implements BroadcastRound: %v", isBR)
 	if !isBR {
 		t.Fatal("Round 1 should implement BroadcastRound")
 	}
-	
+
 	bc := br.BroadcastContent()
 	t.Logf("BroadcastContent type: %T", bc)
 	if bc == nil {
@@ -51,12 +51,12 @@ func TestRound2IsBroadcastRound(t *testing.T) {
 			Threshold: 2,
 		},
 	}
-	
+
 	r2 := &round2{
 		round1: r1,
 		nonces: make(map[party.ID]curve.Point),
 	}
-	
+
 	// Check if round 2 is a BroadcastRound
 	var session round.Session = r2
 	br, isBR := session.(round.BroadcastRound)
@@ -64,7 +64,7 @@ func TestRound2IsBroadcastRound(t *testing.T) {
 	if !isBR {
 		t.Fatal("Round 2 should implement BroadcastRound")
 	}
-	
+
 	bc := br.BroadcastContent()
 	t.Logf("BroadcastContent type: %T", bc)
 	if bc == nil {
