@@ -32,10 +32,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/luxfi/crypto/bls"
 	"github.com/luxfi/ringtail/threshold"
 	"github.com/luxfi/threshold/pkg/party"
 	blsThreshold "github.com/luxfi/threshold/protocols/bls"
+	"github.com/zeebo/blake3"
 )
 
 var (
@@ -136,7 +138,7 @@ func (s *Signature) HasBLS() bool {
 }
 
 // Bytes serializes the Quasar signature.
-// Format: [1-byte flags][BLS sig][optional Ringtail sig]
+// Format: [1-byte flags][BLS sig][4-byte Ringtail len][CBOR-encoded Ringtail sig]
 func (s *Signature) Bytes() ([]byte, error) {
 	if s == nil || s.BLS == nil {
 		return nil, ErrNotInitialized
@@ -153,7 +155,21 @@ func (s *Signature) Bytes() ([]byte, error) {
 	result[0] = flags
 	copy(result[1:], blsBytes)
 
-	// TODO: Append Ringtail serialization when present
+	if s.Ringtail != nil {
+		ringtailBytes, err := cbor.Marshal(s.Ringtail)
+		if err != nil {
+			return nil, fmt.Errorf("quasar: failed to serialize ringtail signature: %w", err)
+		}
+		// Append length-prefixed Ringtail bytes
+		lenBuf := make([]byte, 4)
+		lenBuf[0] = byte(len(ringtailBytes) >> 24)
+		lenBuf[1] = byte(len(ringtailBytes) >> 16)
+		lenBuf[2] = byte(len(ringtailBytes) >> 8)
+		lenBuf[3] = byte(len(ringtailBytes))
+		result = append(result, lenBuf...)
+		result = append(result, ringtailBytes...)
+	}
+
 	return result, nil
 }
 
@@ -451,13 +467,8 @@ func (d *TrustedDealer) GenerateShares(ctx context.Context, partyIDs []party.ID)
 	return configs, groupKey, nil
 }
 
-// hashMessage computes a binding hash of the message.
+// hashMessage computes a binding hash of the message using BLAKE3.
 func hashMessage(message []byte) []byte {
-	// Use XOR-based hash as placeholder
-	// Production should use zeebo/blake3
-	h := make([]byte, 32)
-	for i, b := range message {
-		h[i%32] ^= b
-	}
-	return h
+	h := blake3.Sum256(message)
+	return h[:]
 }
