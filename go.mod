@@ -3,7 +3,6 @@ module github.com/luxfi/threshold
 go 1.25.5
 
 require (
-
 	// External dependencies
 	github.com/cloudflare/circl v1.6.2 // BLS12-381 curve operations
 	github.com/fxamacker/cbor/v2 v2.9.0
@@ -65,7 +64,3 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// FHE requires local GPU binding (luxfi/gpu module path doesn't match git repo)
-// Threshold doesn't directly use GPU ops but needs fhe to build
-replace github.com/luxfi/gpu => /Users/z/work/luxcpp/gpu
