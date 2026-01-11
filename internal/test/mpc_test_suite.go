@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/log"
-	"github.com/luxfi/log/level"
+	"github.com/luxfi/logger/log"
+	"github.com/luxfi/logger/level"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"

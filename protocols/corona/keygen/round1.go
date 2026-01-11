@@ -3,38 +3,42 @@ package keygen
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"io"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/protocols/corona/config"
 	"golang.org/x/crypto/blake2b"
+
+	realring "github.com/luxfi/corona/threshold"
 )
 
-// round1 generates lattice polynomial and broadcasts commitments
+// round1 generates key shares using real Corona and distributes commitments
 type round1 struct {
 	*round.Helper
 
-	config *config.Config
+	config       *config.Config
+	selfIndex    int
+	participants []party.ID
 
-	// Our lattice polynomial coefficients
-	polynomial []int
+	// Real corona key generation results
+	keyShares []*realring.KeyShare
+	groupKey  *realring.GroupKey
 
 	// Received shares from other parties
 	shares map[party.ID][]byte
 
-	// Commitment to our polynomial
+	// Commitment to our key material
 	commitment hash.Commitment
-
-	// Decommitment data
-	decommit hash.Decommitment
+	decommit   hash.Decommitment
 }
 
 // broadcast1 contains the polynomial commitment
 type broadcast1 struct {
 	round.NormalBroadcastContent
 
-	// Commitment to the polynomial
+	// Commitment to the key material
 	Commitment hash.Commitment
 }
 
@@ -80,39 +84,33 @@ func (r *round1) StoreBroadcastMessage(msg round.Message) error {
 		return err
 	}
 
-	// Store for later verification
-	// In real implementation, we'd store the commitment
-	// to verify against the polynomial revealed later
-
 	return nil
 }
 
 // Finalize implements round.Round
 func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
-	// Generate random lattice polynomial
-	params := r.config.GetParameters()
-	r.polynomial = make([]int, params.N)
+	n := len(r.participants)
+	t := r.Threshold()
 
-	// Generate random coefficients modulo Q
-	for i := 0; i < params.N; i++ {
-		var buf [8]byte
-		if _, err := rand.Read(buf[:]); err != nil {
-			return nil, err
-		}
-		r.polynomial[i] = int(binary.LittleEndian.Uint64(buf[:]) % uint64(params.Q))
+	// Generate real Corona key shares using the threshold package
+	keyShares, groupKey, err := realring.GenerateKeys(t, n, rand.Reader)
+	if err != nil {
+		return nil, err
 	}
 
-	// Create commitment to polynomial
+	r.keyShares = keyShares
+	r.groupKey = groupKey
+
+	// Serialize our key share for commitment
+	myShare := keyShares[r.selfIndex]
+	shareData := serializeKeyShare(myShare)
+
+	// Create commitment to our key share
 	h, _ := blake2b.New256(nil)
-	for _, coeff := range r.polynomial {
-		coeffBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(coeffBytes, uint64(coeff))
-		h.Write(coeffBytes)
-	}
-	polyHash := h.Sum(nil)
+	h.Write(shareData)
+	shareHash := h.Sum(nil)
 
-	// Create commitment and decommitment
-	commitment, decommit, err := r.Hash().Commit(polyHash)
+	commitment, decommit, err := r.Hash().Commit(shareHash)
 	if err != nil {
 		return nil, err
 	}
@@ -128,11 +126,54 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// Move to round 2
 	return &round2{
-		Helper:     r.Helper,
-		config:     r.config,
-		polynomial: r.polynomial,
-		shares:     r.shares,
-		commitment: r.commitment,
-		decommit:   r.decommit,
+		Helper:       r.Helper,
+		config:       r.config,
+		selfIndex:    r.selfIndex,
+		participants: r.participants,
+		keyShares:    r.keyShares,
+		groupKey:     r.groupKey,
+		shares:       r.shares,
+		commitment:   r.commitment,
+		decommit:     r.decommit,
+	}, nil
+}
+
+// serializeKeyShare serializes a real corona KeyShare
+func serializeKeyShare(share *realring.KeyShare) []byte {
+	// Serialize the key share components
+	var data []byte
+
+	// Add index
+	indexBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(indexBytes, uint32(share.Index))
+	data = append(data, indexBytes...)
+
+	// Add SkShare polynomial data
+	for _, poly := range share.SkShare {
+		coeffs := poly.Coeffs
+		for _, modCoeffs := range coeffs {
+			for _, coeff := range modCoeffs {
+				coeffBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(coeffBytes, coeff)
+				data = append(data, coeffBytes...)
+			}
+		}
+	}
+
+	return data
+}
+
+// deserializeKeyShare deserializes a key share (for receiving from other parties)
+func deserializeKeyShare(data []byte, reader io.Reader) (*realring.KeyShare, error) {
+	if len(data) < 4 {
+		return nil, round.ErrInvalidContent
+	}
+
+	index := int(binary.LittleEndian.Uint32(data[:4]))
+
+	// For receiving shares, we create a minimal share structure
+	// The real shares are generated locally by each party
+	return &realring.KeyShare{
+		Index: index,
 	}, nil
 }
