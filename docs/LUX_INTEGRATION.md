@@ -85,7 +85,7 @@ type Config struct {
 
 ```go
 import (
-    "github.com/luxfi/node/utils/logging"
+    "github.com/luxfi/log"
     "github.com/luxfi/threshold/pkg/protocol"
     "github.com/prometheus/client_golang/prometheus"
 )
