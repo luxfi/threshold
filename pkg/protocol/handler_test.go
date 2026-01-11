@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/luxfi/log"
+	"github.com/luxfi/logger/log"
 	"github.com/luxfi/log/level"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"

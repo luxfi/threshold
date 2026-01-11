@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/luxfi/log"
+	"github.com/luxfi/logger/log"
 	"github.com/luxfi/log/level"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
