@@ -5,21 +5,25 @@ import (
 	"errors"
 
 	"github.com/luxfi/threshold/internal/round"
-	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/protocols/ringtail/config"
-	"golang.org/x/crypto/blake2b"
+
+	realring "github.com/luxfi/ringtail/threshold"
 )
 
-// round3 combines shares to create the final threshold key
+// round3 finalizes key generation and outputs the config with real ringtail shares
 type round3 struct {
 	*round.Helper
 
-	config        *config.Config
-	polynomial    []int
-	shares        map[party.ID][]byte
-	polynomials   map[party.ID][]int
-	decommitments map[party.ID]hash.Decommitment
+	config       *config.Config
+	selfIndex    int
+	participants []party.ID
+
+	// Real ringtail key generation results
+	keyShares []*realring.KeyShare
+	groupKey  *realring.GroupKey
+
+	shares map[party.ID][]byte
 }
 
 // Number implements round.Round
@@ -49,55 +53,99 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 		return nil, errors.New("insufficient shares received")
 	}
 
-	// Combine shares to create private key share
-	params := r.config.GetParameters()
-	privateShare := make([]byte, params.N*8)
+	// Get our real ringtail key share
+	myKeyShare := r.keyShares[r.selfIndex]
+	if myKeyShare == nil {
+		return nil, errors.New("missing own key share")
+	}
 
-	// Simple combination - real implementation would use proper lattice operations
-	for _, share := range r.shares {
-		for i := 0; i < len(share); i++ {
-			privateShare[i] ^= share[i]
+	// Serialize private share for storage
+	privateShare := serializeSkShare(myKeyShare)
+
+	// Serialize public key (group key)
+	publicKey := serializeGroupKey(r.groupKey)
+
+	// Create verification shares for each participant
+	verificationShares := make(map[party.ID][]byte)
+	for i, partyID := range r.participants {
+		if i < len(r.keyShares) && r.keyShares[i] != nil {
+			verificationShares[partyID] = computeVerificationShare(r.keyShares[i])
 		}
 	}
 
-	// Generate public key from combined polynomials
-	h, _ := blake2b.New256(nil)
-	for _, poly := range r.polynomials {
-		for _, coeff := range poly {
-			coeffBytes := make([]byte, 8)
-			binary.LittleEndian.PutUint64(coeffBytes, uint64(coeff))
-			h.Write(coeffBytes)
-		}
-	}
-	publicKey := h.Sum(nil)
-
-	// Create the final configuration
+	// Create the final configuration with real ringtail data
 	finalConfig := &config.Config{
-		ID:           r.SelfID(),
-		Threshold:    r.Threshold(),
-		Level:        r.config.Level,
-		PublicKey:    publicKey,
-		PrivateShare: privateShare,
-		Participants: r.PartyIDs(),
+		ID:                 r.SelfID(),
+		Threshold:          r.Threshold(),
+		Level:              r.config.Level,
+		SecurityLevel:      r.config.SecurityLevel,
+		PublicKey:          publicKey,
+		PrivateShare:       privateShare,
+		VerificationShares: verificationShares,
+		Participants:       r.PartyIDs(),
+		Ring:               r.config.Ring,
+		RingXi:             r.config.RingXi,
+		RingNu:             r.config.RingNu,
 	}
 
-	// Return the result
+	// Return the result with real ringtail objects
 	return r.ResultRound(&KeygenOutput{
-		Config: finalConfig,
+		Config:   finalConfig,
+		KeyShare: myKeyShare,
+		GroupKey: r.groupKey,
 	}), nil
 }
 
-// KeygenOutput represents the result of key generation
-type KeygenOutput struct {
-	Config *config.Config
+// serializeSkShare serializes the secret key share polynomials
+func serializeSkShare(share *realring.KeyShare) []byte {
+	if share == nil || len(share.SkShare) == 0 {
+		return nil
+	}
+
+	var data []byte
+
+	// Add number of polynomials
+	numPolys := make([]byte, 4)
+	binary.LittleEndian.PutUint32(numPolys, uint32(len(share.SkShare)))
+	data = append(data, numPolys...)
+
+	// Serialize each polynomial's coefficients
+	for _, poly := range share.SkShare {
+		if poly.Coeffs == nil {
+			continue
+		}
+		for _, modCoeffs := range poly.Coeffs {
+			// Add number of coefficients
+			numCoeffs := make([]byte, 4)
+			binary.LittleEndian.PutUint32(numCoeffs, uint32(len(modCoeffs)))
+			data = append(data, numCoeffs...)
+
+			for _, coeff := range modCoeffs {
+				coeffBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(coeffBytes, coeff)
+				data = append(data, coeffBytes...)
+			}
+		}
+	}
+
+	return data
 }
 
-// PublicKey returns the generated public key
-func (o *KeygenOutput) PublicKey() []byte {
-	return o.Config.PublicKey
-}
+// computeVerificationShare creates a verification hash for a key share
+func computeVerificationShare(share *realring.KeyShare) []byte {
+	// Use the Lambda (Lagrange coefficient) as verification material
+	if share.Lambda.Coeffs == nil {
+		return nil
+	}
 
-// PrivateShare returns this party's private key share
-func (o *KeygenOutput) PrivateShare() []byte {
-	return o.Config.PrivateShare
+	var data []byte
+	for _, modCoeffs := range share.Lambda.Coeffs {
+		for _, coeff := range modCoeffs {
+			coeffBytes := make([]byte, 8)
+			binary.LittleEndian.PutUint64(coeffBytes, coeff)
+			data = append(data, coeffBytes...)
+		}
+	}
+
+	return data
 }
