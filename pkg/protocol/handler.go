@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/luxfi/logger/level"
-	"github.com/luxfi/logger/log"
+	"github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,7 +27,7 @@ type MultiHandler = Handler
 // NewMultiHandler creates a handler with default config (temporary compatibility)
 func NewMultiHandler(create StartFunc, sessionID []byte) (*Handler, error) {
 	// Create a test logger for compatibility
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	config := DefaultConfig()
 	return NewHandler(context.Background(), logger, nil, create, sessionID, config)
 }
@@ -197,7 +196,7 @@ func NewHandler(
 		config = DefaultConfig()
 	}
 
-	if logger == nil {
+	if logger.IsZero() {
 		return nil, errors.New("logger is required")
 	}
 

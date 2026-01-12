@@ -9,8 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
@@ -96,9 +95,9 @@ func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []
 	for _, id := range partyIDs {
 		startFunc := createStartFunc(id, partyIDs, s.threshold, s.group, s.pool)
 
-		logger := log.NewTestLogger(level.Error)
+		logger := log.NewTestLogger(log.ErrorLevel)
 		if s.verbose {
-			logger = log.NewTestLogger(level.Info)
+			logger = log.NewTestLogger(log.InfoLevel)
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

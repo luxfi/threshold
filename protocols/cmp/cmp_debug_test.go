@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -53,7 +52,7 @@ func TestCMPDebugKeygen(t *testing.T) {
 		go func(id party.ID) {
 			defer wg.Done()
 
-			logger := log.NewTestLogger(level.Debug)
+			logger := log.NewTestLogger(log.DebugLevel)
 			sessionID := []byte("debug-keygen")
 			protocolConfig := protocol.DefaultConfig()
 

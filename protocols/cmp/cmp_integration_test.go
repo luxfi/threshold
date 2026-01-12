@@ -6,8 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -52,7 +51,7 @@ func TestCMPIntegrationKeygen(t *testing.T) {
 		go func(id party.ID) {
 			defer wg.Done()
 
-			logger := log.NewTestLogger(level.Info)
+			logger := log.NewTestLogger(log.InfoLevel)
 			sessionID := []byte("keygen-test")
 			protocolConfig := protocol.DefaultConfig()
 

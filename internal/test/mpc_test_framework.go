@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
@@ -110,9 +109,9 @@ func (env *MPCTestEnvironment) CreateHandler(
 	startFunc protocol.StartFunc,
 	sessionID []byte,
 ) *protocol.Handler {
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	if !env.Config.Verbose {
-		logger = log.NewTestLogger(level.Error)
+		logger = log.NewTestLogger(log.ErrorLevel)
 	}
 
 	config := protocol.DefaultConfig()
