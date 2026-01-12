@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	"github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -159,7 +158,7 @@ func (m *mockContent) RoundNumber() round.Number {
 // Test basic handler creation
 func TestNewHandler(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -207,7 +206,7 @@ func TestNewHandler_NilLogger(t *testing.T) {
 // Test handler with create error
 func TestNewHandler_CreateError(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -222,7 +221,7 @@ func TestNewHandler_CreateError(t *testing.T) {
 // Test message acceptance
 func TestHandler_Accept(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -263,7 +262,7 @@ func TestHandler_Accept(t *testing.T) {
 // Test CanAccept validation
 func TestHandler_CanAccept(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -370,7 +369,7 @@ func TestHandler_CanAccept(t *testing.T) {
 // Test protocol completion
 func TestHandler_ProtocolCompletion(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -403,7 +402,7 @@ func TestHandler_ProtocolCompletion(t *testing.T) {
 // Test protocol abort
 func TestHandler_ProtocolAbort(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -436,7 +435,7 @@ func TestHandler_ProtocolAbort(t *testing.T) {
 // Test concurrent message processing
 func TestHandler_ConcurrentMessages(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -503,7 +502,7 @@ func TestHandler_ConcurrentMessages(t *testing.T) {
 // Test WaitForResult timeout
 func TestHandler_WaitForResultTimeout(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -572,7 +571,7 @@ func TestMessageStore(t *testing.T) {
 // Test broadcast message handling
 func TestHandler_BroadcastMessages(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	broadcastContent := &mockContent{
@@ -628,7 +627,7 @@ func TestHandler_BroadcastMessages(t *testing.T) {
 // Test metrics creation
 func TestHandler_Metrics(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 	registry := prometheus.NewRegistry()
 
@@ -676,7 +675,7 @@ func TestHandler_Metrics(t *testing.T) {
 // Test Stop cleanup
 func TestHandler_Stop(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -733,7 +732,7 @@ func TestNewMultiHandler(t *testing.T) {
 // Test error handling
 func TestHandler_ErrorHandling(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -795,7 +794,7 @@ func TestHandler_ErrorHandling(t *testing.T) {
 // Test abort message handling
 func TestHandler_AbortMessage(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -841,7 +840,7 @@ func TestHandler_AbortMessage(t *testing.T) {
 // Test Listen channel
 func TestHandler_Listen(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -880,7 +879,7 @@ func TestHandler_Listen(t *testing.T) {
 // Test finalize method for compatibility
 func TestHandler_Finalize(t *testing.T) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Debug)
+	logger := log.NewTestLogger(log.DebugLevel)
 	sessionID := []byte("test-session")
 
 	mockR := &mockRound{
@@ -940,7 +939,7 @@ func TestHandler_Finalize(t *testing.T) {
 // Benchmark message processing
 func BenchmarkHandler_Accept(b *testing.B) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Error)
+	logger := log.NewTestLogger(log.ErrorLevel)
 	sessionID := []byte("bench-session")
 
 	create := func(ssid []byte) (round.Session, error) {
@@ -992,7 +991,7 @@ func BenchmarkHandler_Accept(b *testing.B) {
 // Benchmark concurrent message processing
 func BenchmarkHandler_ConcurrentAccept(b *testing.B) {
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Error)
+	logger := log.NewTestLogger(log.ErrorLevel)
 	sessionID := []byte("bench-session")
 
 	create := func(ssid []byte) (round.Session, error) {

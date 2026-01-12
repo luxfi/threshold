@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/prometheus/client_golang/prometheus"
@@ -57,9 +56,9 @@ func NewAsyncRunner(t testing.TB, config *TestConfig, network NetworkInterface) 
 
 	var logger log.Logger
 	if config.EnableLogging {
-		logger = log.NewTestLogger(level.Info)
+		logger = log.NewTestLogger(log.InfoLevel)
 	} else {
-		logger = log.NewTestLogger(level.Error)
+		logger = log.NewTestLogger(log.ErrorLevel)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.TestTimeout)

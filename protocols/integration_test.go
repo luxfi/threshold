@@ -12,8 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -272,7 +271,7 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 	configs := make([]*lssconfig.Config, n)
 
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	counter := atomic.AddUint64(&sessionCounter, 1)
 	sessionID := []byte(fmt.Sprintf("lss-keygen-session-%d-%d", time.Now().UnixNano(), counter))
 	config := protocol.DefaultConfig()
@@ -306,7 +305,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 	configs := make([]*cmpconfig.Config, n)
 
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	counter := atomic.AddUint64(&sessionCounter, 1)
 	sessionID := []byte(fmt.Sprintf("cmp-keygen-session-%d-%d", time.Now().UnixNano(), counter))
 	config := protocol.DefaultConfig()
@@ -355,7 +354,7 @@ func runCMPSign(configs []*cmpconfig.Config, partyIDs []party.ID, message []byte
 	signatures := make([]*ecdsa.Signature, n)
 
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	sessionID := []byte("test-sign-session")
 	config := protocol.DefaultConfig()
 
@@ -406,7 +405,7 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 	configs := make([]*frost.Config, n)
 
 	ctx := context.Background()
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	counter := atomic.AddUint64(&sessionCounter, 1)
 	sessionID := []byte(fmt.Sprintf("frost-keygen-session-%d-%d", time.Now().UnixNano(), counter))
 	config := protocol.DefaultConfig()
