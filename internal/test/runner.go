@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,9 +35,9 @@ func NewRunner(t testing.TB, config *TestConfig) *ProtocolRunner {
 
 	var logger log.Logger
 	if config.EnableLogging {
-		logger = log.NewTestLogger(level.Info)
+		logger = log.NewTestLogger(log.InfoLevel)
 	} else {
-		logger = log.NewTestLogger(level.Error) // Use Error level to suppress most logs
+		logger = log.NewTestLogger(log.ErrorLevel) // Use Error level to suppress most logs
 	}
 
 	return &ProtocolRunner{

@@ -4,8 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +23,7 @@ var (
 
 var _ = BeforeSuite(func() {
 	ctx = context.Background()
-	logger = log.NewTestLogger(level.Info)
+	logger = log.NewTestLogger(log.InfoLevel)
 	DeferCleanup(func() {
 		// Cleanup after all tests
 	})
