@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
@@ -39,7 +38,7 @@ func NewProtocolTestSuite(t testing.TB, parties []party.ID) *ProtocolTestSuite {
 		handlers: make(map[party.ID]*protocol.Handler),
 		results:  make(map[party.ID]interface{}),
 		errors:   make(map[party.ID]error),
-		logger:   log.NewTestLogger(level.Info),
+		logger:   log.NewTestLogger(log.InfoLevel),
 	}
 }
 
