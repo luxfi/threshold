@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,7 +38,7 @@ func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
 		ctx:      ctx,
 		cancel:   cancel,
 		network:  NewNetwork(partyIDs),
-		logger:   log.NewTestLogger(level.Info),
+		logger:   log.NewTestLogger(log.InfoLevel),
 		registry: prometheus.NewRegistry(),
 		handlers: make(map[party.ID]*protocol.Handler),
 		results:  make(map[party.ID]interface{}),

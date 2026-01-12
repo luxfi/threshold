@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -32,7 +31,7 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 	createHandlers := func() map[party.ID]*protocol.Handler {
 		handlers := make(map[party.ID]*protocol.Handler)
 		ctx := context.Background()
-		logger := log.NewTestLogger(level.Info)
+		logger := log.NewTestLogger(log.InfoLevel)
 		sessionID := []byte("test-lss-keygen")
 		cfg := protocol.DefaultConfig()
 
@@ -118,7 +117,7 @@ func TestLSSSignWithTimeout(t *testing.T) {
 	createHandlers := func() map[party.ID]*protocol.Handler {
 		handlers := make(map[party.ID]*protocol.Handler)
 		ctx := context.Background()
-		logger := log.NewTestLogger(level.Info)
+		logger := log.NewTestLogger(log.InfoLevel)
 		sessionID := []byte("test-lss-sign")
 		cfg := protocol.DefaultConfig()
 

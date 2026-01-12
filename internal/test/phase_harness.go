@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/logger/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +28,7 @@ func NewPhaseHarness(t testing.TB, ids []party.ID) *PhaseHarness {
 		t:      t,
 		ids:    ids,
 		net:    NewNetwork(ids),
-		logger: log.NewTestLogger(level.Info),
+		logger: log.NewTestLogger(log.InfoLevel),
 	}
 }
 

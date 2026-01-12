@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luxfi/logger/log"
-	"github.com/luxfi/log/level"
+	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -31,7 +30,7 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	sessionID := []byte("test-lss-keygen-specific")
 	config := protocol.DefaultConfig()
 
@@ -135,7 +134,7 @@ func TestLSSKeygenRoundProgression(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	logger := log.NewTestLogger(level.Info)
+	logger := log.NewTestLogger(log.InfoLevel)
 	sessionID := []byte("test-round-progression")
 	config := protocol.DefaultConfig()
 
