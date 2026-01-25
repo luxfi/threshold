@@ -8,6 +8,28 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 )
 
+// mockThresholdProvider is a local mock implementation for testing
+type mockThresholdProvider struct {
+	seed []byte
+}
+
+func (m *mockThresholdProvider) RequestRandomness(ctx context.Context, numBytes int) ([]byte, error) {
+	// Return deterministic randomness based on seed
+	result := make([]byte, numBytes)
+	for i := 0; i < numBytes; i++ {
+		if i < len(m.seed) {
+			result[i] = m.seed[i]
+		} else {
+			result[i] = byte(i)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockThresholdProvider) IsAvailable(ctx context.Context) bool {
+	return true
+}
+
 func TestKeyGeneration(t *testing.T) {
 	threshold := 2
 	totalParties := 3
@@ -141,8 +163,8 @@ func TestThresholdRNGLocal(t *testing.T) {
 		t.Fatalf("NewProtocol failed: %v", err)
 	}
 
-	// Set up local threshold provider
-	localProvider := fhe.NewLocalThresholdProvider(threshold, totalParties, []byte("test-seed"))
+	// Set up local threshold provider (using mock for testing)
+	localProvider := &mockThresholdProvider{seed: []byte("test-seed")}
 	proto.SetThresholdRNG(localProvider)
 
 	// Verify threshold network is available
@@ -153,23 +175,27 @@ func TestThresholdRNGLocal(t *testing.T) {
 }
 
 func TestCalculateThreshold(t *testing.T) {
+	// CalculateThreshold(n) returns floor(n/2) + 1 for honest majority
 	tests := []struct {
-		percent    int
 		numParties int
 		expected   int
 	}{
-		{69, 5, 4},  // 69% of 5 = 3.45, ceil = 4
-		{50, 4, 2},  // 50% of 4 = 2
-		{75, 8, 6},  // 75% of 8 = 6
-		{100, 3, 3}, // 100% of 3 = 3
-		{0, 5, 1},   // 0% should return at least 1
+		{1, 1},  // floor(1/2) + 1 = 0 + 1 = 1
+		{2, 2},  // floor(2/2) + 1 = 1 + 1 = 2
+		{3, 2},  // floor(3/2) + 1 = 1 + 1 = 2
+		{4, 3},  // floor(4/2) + 1 = 2 + 1 = 3
+		{5, 3},  // floor(5/2) + 1 = 2 + 1 = 3
+		{6, 4},  // floor(6/2) + 1 = 3 + 1 = 4
+		{7, 4},  // floor(7/2) + 1 = 3 + 1 = 4
+		{10, 6}, // floor(10/2) + 1 = 5 + 1 = 6
+		{0, 0},  // edge case: n <= 0 returns 0
 	}
 
 	for _, tc := range tests {
-		result := CalculateThreshold(tc.percent, tc.numParties)
+		result := CalculateThreshold(tc.numParties)
 		if result != tc.expected {
-			t.Errorf("CalculateThreshold(%d, %d) = %d, expected %d",
-				tc.percent, tc.numParties, result, tc.expected)
+			t.Errorf("CalculateThreshold(%d) = %d, expected %d",
+				tc.numParties, result, tc.expected)
 		}
 	}
 }
