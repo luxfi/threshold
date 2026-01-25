@@ -9,7 +9,7 @@ require (
 	// Lux crypto stack - this is the HIGH-LEVEL orchestration layer
 	// that consumes primitives from these packages (LP-5703, LP-5704)
 	github.com/luxfi/crypto v1.17.28 // ECDSA, EdDSA, BLS curves
-	github.com/luxfi/fhe v1.3.0 // FHE primitives for TFHE protocol
+	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
 	github.com/luxfi/lattice/v7 v7.0.0 // Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/luxfi/corona v0.2.0 // Post-quantum threshold signatures (uses lattice/v7)
 	github.com/prometheus/client_golang v1.23.2
