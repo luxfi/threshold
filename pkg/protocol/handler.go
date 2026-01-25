@@ -196,7 +196,7 @@ func NewHandler(
 		config = DefaultConfig()
 	}
 
-	if logger.IsZero() {
+	if logger == nil || logger.IsZero() {
 		return nil, errors.New("logger is required")
 	}
 
