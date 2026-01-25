@@ -1,6 +1,7 @@
 package sign
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/luxfi/threshold/pkg/hash"
@@ -37,6 +38,64 @@ type Signature struct {
 	R curve.Point
 	// z is the response scalar.
 	z curve.Scalar
+}
+
+// NewSignature creates a new Signature from a commitment point R and response scalar z.
+func NewSignature(R curve.Point, z curve.Scalar) *Signature {
+	return &Signature{R: R, z: z}
+}
+
+// MarshalBinary serializes the signature to bytes in format: R (33 bytes) || z (32 bytes).
+func (sig *Signature) MarshalBinary() ([]byte, error) {
+	rBytes, err := sig.R.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal R: %w", err)
+	}
+	zBytes, err := sig.z.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal z: %w", err)
+	}
+	result := make([]byte, len(rBytes)+len(zBytes))
+	copy(result[:len(rBytes)], rBytes)
+	copy(result[len(rBytes):], zBytes)
+	return result, nil
+}
+
+// UnmarshalBinary deserializes a signature from bytes.
+// For x-only format (64 bytes): R_x (32 bytes) || z (32 bytes) - used by BIP-340 and precompiles.
+// For compressed format (65 bytes): R (33 bytes) || z (32 bytes).
+func (sig *Signature) UnmarshalBinary(group curve.Curve, data []byte) error {
+	switch len(data) {
+	case 64:
+		// X-only format: R_x (32) || z (32)
+		// Use LiftX for secp256k1 to recover the point from x-coordinate
+		if secp, ok := group.(curve.Secp256k1); ok {
+			R, err := secp.LiftX(data[:32])
+			if err != nil {
+				return fmt.Errorf("failed to lift x-coordinate for R: %w", err)
+			}
+			sig.R = R
+		} else {
+			return fmt.Errorf("x-only format only supported for secp256k1, got %s", group.Name())
+		}
+		sig.z = group.NewScalar()
+		if err := sig.z.UnmarshalBinary(data[32:64]); err != nil {
+			return fmt.Errorf("failed to unmarshal z: %w", err)
+		}
+	case 65:
+		// Compressed format: R (33) || z (32)
+		sig.R = group.NewPoint()
+		if err := sig.R.UnmarshalBinary(data[:33]); err != nil {
+			return fmt.Errorf("failed to unmarshal R: %w", err)
+		}
+		sig.z = group.NewScalar()
+		if err := sig.z.UnmarshalBinary(data[33:65]); err != nil {
+			return fmt.Errorf("failed to unmarshal z: %w", err)
+		}
+	default:
+		return fmt.Errorf("invalid signature length: expected 64 or 65, got %d", len(data))
+	}
+	return nil
 }
 
 // Verify checks if a signature equation actually holds.
