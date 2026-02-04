@@ -34,8 +34,8 @@ import (
 
 	"github.com/luxfi/crypto/bls"
 	"github.com/luxfi/ringtail/threshold"
-	blsThreshold "github.com/luxfi/threshold/protocols/bls"
 	"github.com/luxfi/threshold/pkg/party"
+	blsThreshold "github.com/luxfi/threshold/protocols/bls"
 )
 
 var (
