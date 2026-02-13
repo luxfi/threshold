@@ -24,7 +24,7 @@ require (
 	github.com/cronokirby/saferith v0.33.0
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
 	github.com/luxfi/log v1.4.1
-	github.com/onsi/ginkgo/v2 v2.27.3
+	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.38.3
 )
 
