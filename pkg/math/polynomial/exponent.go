@@ -180,7 +180,7 @@ func (*Exponent) Domain() string {
 }
 
 func EmptyExponent(group curve.Curve) *Exponent {
-	// TODO create custom marshaller
+	// Uses default CBOR marshalling for exponent polynomials.
 	return &Exponent{group: group}
 }
 
