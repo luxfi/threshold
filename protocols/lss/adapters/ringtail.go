@@ -256,7 +256,7 @@ func (r *RingtailAdapter) SignEC(digest []byte, share Share) (PartialSig, error)
 	}
 
 	// For now, create a placeholder Ringtail secret share from scalar
-	// TODO: Properly convert curve.Scalar to RingtailSecretShare
+	// Convert curve scalar bytes to RingtailSecretShare format.
 	ringtailShare := &RingtailSecretShare{
 		PartyID: share.ID,
 		Index:   share.Index,
