@@ -72,10 +72,14 @@ func (s *SuiAdapter) hashWithIntent(data []byte) []byte {
 func (s *SuiAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 	// This would integrate with FROST protocol for Ed25519
 	// For testing, provide a placeholder R value
+	z, err := coerceScalar(s.group, share.Value)
+	if err != nil {
+		return nil, fmt.Errorf("sui: %w", err)
+	}
 	return &EdDSAPartialSig{
 		PartyID: share.ID,
 		R:       s.group.NewBasePoint(), // Placeholder for testing
-		Z:       share.Value,
+		Z:       z,
 	}, nil
 }
 
@@ -87,11 +91,19 @@ func (s *SuiAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 
 	var r curve.Point
 	z := s.group.NewScalar()
+	expectedCurve := s.group.Name()
 
-	for _, part := range parts {
+	for i, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
+		}
+
+		if eddsaPart.Z == nil {
+			return nil, fmt.Errorf("sui: ed25519 partial[%d] has nil scalar Z", i)
+		}
+		if got := eddsaPart.Z.Curve().Name(); got != expectedCurve {
+			return nil, fmt.Errorf("sui: ed25519 partial[%d] scalar Z on wrong curve (got %s, want %s)", i, got, expectedCurve)
 		}
 
 		if r == nil && eddsaPart.R != nil {
