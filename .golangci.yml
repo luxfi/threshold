@@ -2,6 +2,10 @@ run:
   timeout: 5m
   tests: true
   # Cache bust: 2025-08-15
+  # Pin lint target to Go 1.24 so the analyser (built against Go 1.24 in
+  # golangci-lint v1.64.x) does not bail out on go.mod's 1.26.1 directive.
+  # Remove once golangci-lint ships a Go 1.26 binary and we can migrate to v2.
+  go: "1.24"
 
 linters:
   enable:

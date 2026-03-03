@@ -1,0 +1,7 @@
+--- PASS: TestLensAdapter_BuildActivationTranscript_NewFields
+--- PASS: TestLensAdapter_InvalidInputs
+--- PASS: TestLensAdapter_NewCommitteeSigns
+--- PASS: TestLensAdapter_PairwiseMaterialRegenerated
+--- PASS: TestLensAdapter_PreservesLineage
+--- PASS: TestLensAdapter_RollbackRestoresGeneration
+--- PASS: TestLensAdapter_SetAndThresholdRotation

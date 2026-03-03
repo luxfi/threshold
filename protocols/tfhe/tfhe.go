@@ -1,3 +1,22 @@
+// UNSAFE: This implementation is NOT a real threshold scheme.
+//   - Every party stores the full master key (line ~374: UnderlyingKey: masterSK)
+//   - PartialDecrypt returns an HMAC tag, not a partial decryption
+//   - CombineShares ignores partials and runs single-party decryption
+//
+// DO NOT USE in production. Refused security review by Red 2026-04-28.
+//
+// Real threshold FHE requires:
+//  1. Shamir-split master secret key (each party gets a SHARE, not the full key)
+//  2. PartialDecrypt produces a partial decryption (lattice noise + share contribution)
+//  3. CombineShares Lagrange-interpolates partials to recover the cleartext
+//
+// Migration path: route through luxfi/lattice threshold protocol primitives
+// (which DO implement real Shamir share generation + partial-decrypt + combine).
+// See lps/LP-137-TFHE-REAL-THRESHOLD-SPEC.md.
+//
+// Test opt-in: set LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 to bypass the
+// fail-loud panics at every entry point. Production must crash if reached.
+//
 // Package tfhe provides the HIGH-LEVEL orchestration layer for Threshold FHE.
 //
 // This package wraps github.com/luxfi/fhe's threshold functionality and
@@ -12,11 +31,12 @@
 // This package is for multi-party threshold operations only.
 //
 // References:
+//   - LP-137: TFHE Real Threshold Spec (lps/LP-137-TFHE-REAL-THRESHOLD-SPEC.md)
 //   - LP-5703: Threshold Cryptography (lux/threshold)
 //   - LP-5702: Fully Homomorphic Encryption (lux/fhe)
 //   - LP-5704: Composable Cryptographic Architecture
 //
-// Copyright (c) 2024-2025 Lux Industries Inc.
+// Copyright (c) 2024-2026 Lux Industries Inc.
 // SPDX-License-Identifier: BSD-3-Clause
 package tfhe
 
@@ -24,12 +44,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/luxfi/fhe"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 )
+
+// unsafeTFHEEnvVar gates the fake-threshold implementation. Tests must set
+// LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 to opt in. Production paths panic.
+const unsafeTFHEEnvVar = "LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY"
+
+// unsafePanicMsg is the standard refusal message emitted at every entry point
+// of the fake-threshold implementation when the opt-in env var is unset.
+const unsafePanicMsg = "tfhe: UNSAFE fake-threshold implementation reached without " +
+	unsafeTFHEEnvVar + "=1. " +
+	"Every party stores the full master key; PartialDecrypt returns an HMAC tag; " +
+	"CombineShares runs single-party decrypt. " +
+	"DO NOT USE in production. See lps/LP-137-TFHE-REAL-THRESHOLD-SPEC.md."
+
+// guardUnsafe panics unless the test opt-in env var is set. Called from every
+// entry point of the fake-threshold implementation.
+func guardUnsafe() {
+	if os.Getenv(unsafeTFHEEnvVar) != "1" {
+		panic(unsafePanicMsg)
+	}
+}
 
 var (
 	// ErrInsufficientShares is returned when fewer than threshold shares are provided.
@@ -131,7 +172,11 @@ type Protocol struct {
 }
 
 // NewProtocol creates a new threshold FHE protocol instance.
+//
+// UNSAFE: panics in production unless LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
+// See package doc for migration to real threshold FHE.
 func NewProtocol(config *Config, pl *pool.Pool) (*Protocol, error) {
+	guardUnsafe()
 	if config == nil {
 		return nil, ErrNotInitialized
 	}
@@ -229,7 +274,12 @@ func (p *Protocol) CanDecrypt() bool {
 
 // CombineShares combines collected shares to produce the final decryption.
 // Requires at least threshold shares to be collected.
+//
+// UNSAFE: this is NOT a real combine. Partial shares are IGNORED; the routine
+// runs single-party decrypt against the full master key copy stored on every
+// party. Panics unless LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
 func (p *Protocol) CombineShares(ctx context.Context, ct *fhe.BitCiphertext) ([]byte, error) {
+	guardUnsafe()
 	p.sharesMu.Lock()
 	defer p.sharesMu.Unlock()
 
@@ -353,7 +403,11 @@ func NewKeyGenerator(threshold, totalParties int, params fhe.Parameters, pl *poo
 
 // GenerateKeys generates threshold FHE keys using a trusted dealer.
 // Returns the collective public key and secret key shares for each party.
+//
+// UNSAFE: every party gets the FULL master key — this is master-key replication,
+// NOT Shamir secret sharing. Panics unless LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
 func (kg *KeyGenerator) GenerateKeys(ctx context.Context, parties []party.ID) (*fhe.PublicKey, map[party.ID]*SecretKeyShare, error) {
+	guardUnsafe()
 	if len(parties) != kg.totalParties {
 		return nil, nil, fmt.Errorf("expected %d parties, got %d", kg.totalParties, len(parties))
 	}
