@@ -107,14 +107,16 @@ func testChainAdapter(t *testing.T, chain string, sigType adapters.SignatureType
 func TestXRPLSpecificFeatures(t *testing.T) {
 	t.Run("STX_SMT_Prefixes", func(t *testing.T) {
 		// Test single-signing prefix
-		xrplSingle := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+		xrplSingle, err := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+		require.NoError(t, err)
 		txBlob := []byte("test transaction")
 
 		digestSingle, err := xrplSingle.Digest(txBlob)
 		require.NoError(t, err)
 
 		// Test multi-signing prefix
-		xrplMulti := adapters.NewXRPLAdapter(adapters.SignatureECDSA, true)
+		xrplMulti, err := adapters.NewXRPLAdapter(adapters.SignatureECDSA, true)
+		require.NoError(t, err)
 		digestMulti, err := xrplMulti.Digest(txBlob)
 		require.NoError(t, err)
 
@@ -123,7 +125,8 @@ func TestXRPLSpecificFeatures(t *testing.T) {
 	})
 
 	t.Run("Ed25519_Prefix", func(t *testing.T) {
-		xrpl := adapters.NewXRPLAdapter(adapters.SignatureEdDSA, false)
+		xrpl, err := adapters.NewXRPLAdapter(adapters.SignatureEdDSA, false)
+		require.NoError(t, err)
 
 		// Create mock public key (using Secp256k1 as Ed25519 not available)
 		pubKey := curve.Secp256k1{}.NewBasePoint()
@@ -136,7 +139,8 @@ func TestXRPLSpecificFeatures(t *testing.T) {
 	})
 
 	t.Run("Low_S_Normalization", func(t *testing.T) {
-		xrpl := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+		xrpl, err := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+		require.NoError(t, err)
 
 		// Create high S value
 		group := curve.Secp256k1{}
@@ -280,7 +284,7 @@ func TestSolanaFeatures(t *testing.T) {
 		// Solana only supports Ed25519
 		config := &adapters.UnifiedConfig{
 			SignatureScheme: adapters.SignatureEdDSA,
-			Group:           curve.Secp256k1{}, // Using Secp256k1 as Edwards25519 not available
+			Group:           curve.Ed25519{},
 		}
 
 		err := sol.ValidateConfig(config)
@@ -415,13 +419,21 @@ func TestRingtailPQAdapter(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkAdapters(b *testing.B) {
+	xrplECDSA, err := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+	if err != nil {
+		b.Fatal(err)
+	}
+	xrplEdDSA, err := adapters.NewXRPLAdapter(adapters.SignatureEdDSA, false)
+	if err != nil {
+		b.Fatal(err)
+	}
 	benchmarks := []struct {
 		name    string
 		adapter adapters.SignerAdapter
 		sigType adapters.SignatureType
 	}{
-		{"XRPL_ECDSA", adapters.NewXRPLAdapter(adapters.SignatureECDSA, false), adapters.SignatureECDSA},
-		{"XRPL_EdDSA", adapters.NewXRPLAdapter(adapters.SignatureEdDSA, false), adapters.SignatureEdDSA},
+		{"XRPL_ECDSA", xrplECDSA, adapters.SignatureECDSA},
+		{"XRPL_EdDSA", xrplEdDSA, adapters.SignatureEdDSA},
 		{"Ethereum", adapters.NewEthereumAdapter(), adapters.SignatureECDSA},
 		{"Bitcoin_ECDSA", adapters.NewBitcoinAdapter(adapters.SignatureECDSA), adapters.SignatureECDSA},
 		{"Bitcoin_Schnorr", adapters.NewBitcoinAdapter(adapters.SignatureSchnorr), adapters.SignatureSchnorr},
@@ -544,10 +556,9 @@ func TestCrossChainCompatibility(t *testing.T) {
 	ed25519Chains := []string{"xrpl", "solana"}
 
 	config.SignatureScheme = adapters.SignatureEdDSA
-	// Using Secp256k1 as Edwards25519 not available
-	config.Group = curve.Secp256k1{}
-	config.SecretShare = curve.Secp256k1{}.NewScalar()
-	config.PublicKey = curve.Secp256k1{}.NewBasePoint()
+	config.Group = curve.Ed25519{}
+	config.SecretShare = curve.Ed25519{}.NewScalar()
+	config.PublicKey = curve.Ed25519{}.NewBasePoint()
 
 	for _, chain := range ed25519Chains {
 		adapter := factory.NewAdapter(chain, adapters.SignatureEdDSA)
@@ -612,10 +623,11 @@ func TestEndToEndThresholdSignature(t *testing.T) {
 // TestAdapterErrorHandling tests error cases
 func TestAdapterErrorHandling(t *testing.T) {
 	t.Run("InvalidDigestInput", func(t *testing.T) {
-		adapter := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+		adapter, err := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+		require.NoError(t, err)
 
 		// Invalid input type
-		_, err := adapter.Digest(123)
+		_, err = adapter.Digest(123)
 		assert.Error(t, err)
 	})
 
@@ -656,7 +668,8 @@ func TestAdapterErrorHandling(t *testing.T) {
 
 // TestParallelSigning tests concurrent signing operations
 func TestParallelSigning(t *testing.T) {
-	adapter := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+	adapter, err := adapters.NewXRPLAdapter(adapters.SignatureECDSA, false)
+	require.NoError(t, err)
 	shares := createMockShares(t, adapters.SignatureECDSA, 10, 6)
 
 	message := []byte("parallel test message")

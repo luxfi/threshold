@@ -1,5 +1,9 @@
 # Threshold Signatures - Universal Multi-Chain Implementation
 
+> Lux is not merely adding post-quantum signatures to a chain; it defines a hybrid finality architecture for DAG-native consensus, with protocol-agnostic threshold lifecycle, post-quantum threshold sealing, and cross-chain propagation of Horizon finality.
+
+See [LP-105 §Claims and evidence](https://github.com/luxfi/lps/blob/main/LP-105-lux-stack-lexicon.md#claims-and-evidence) for the canonical claims/evidence table and the ten architectural commitments — single source of truth.
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24.5-blue.svg)](https://go.dev)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](PRODUCTION_READY.md)

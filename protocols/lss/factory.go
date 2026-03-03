@@ -321,7 +321,7 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 		case Solana:
 			return adapters.NewSolanaAdapter(), nil
 		case Cardano:
-			return adapters.NewCardanoAdapter(info.SignatureType, 0x01, adapters.EraBabbage), nil
+			return adapters.NewCardanoAdapter(info.SignatureType, 0x01, adapters.EraBabbage)
 		case TON:
 			return adapters.NewTONAdapter(0), nil
 		case Sui:
@@ -337,7 +337,7 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 		// Custom implementations
 		switch chain {
 		case XRPL:
-			return adapters.NewXRPLAdapter(info.SignatureType, false), nil
+			return adapters.NewXRPLAdapter(info.SignatureType, false)
 		default:
 			return nil, fmt.Errorf("unsupported custom chain: %s", chain)
 		}

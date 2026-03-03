@@ -32,8 +32,10 @@ const (
 	EraConway  // Upcoming with governance
 )
 
-// NewCardanoAdapter creates a new Cardano adapter
-func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *CardanoAdapter {
+// NewCardanoAdapter creates a new Cardano adapter. Returns an error if
+// sigType is not one of EdDSA / ECDSA / Schnorr (Cardano's three valid
+// signature schemes for Babbage+ eras).
+func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) (*CardanoAdapter, error) {
 	var group curve.Curve
 	switch sigType {
 	case SignatureEdDSA:
@@ -43,7 +45,7 @@ func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *C
 	case SignatureSchnorr:
 		group = curve.Secp256k1{}
 	default:
-		panic("unsupported signature type for Cardano")
+		return nil, fmt.Errorf("cardano: unsupported signature type %v (want SignatureEdDSA, SignatureECDSA, or SignatureSchnorr)", sigType)
 	}
 
 	return &CardanoAdapter{
@@ -51,7 +53,7 @@ func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *C
 		sigType:   sigType,
 		networkID: networkID,
 		era:       era,
-	}
+	}, nil
 }
 
 // Digest computes Cardano transaction digest
@@ -95,10 +97,14 @@ func (c *CardanoAdapter) SignEC(digest []byte, share Share) (PartialSig, error) 
 	case SignatureEdDSA:
 		// Native Cardano signature (Ed25519)
 		// For testing, provide a placeholder R value
+		z, err := coerceScalar(c.group, share.Value)
+		if err != nil {
+			return nil, fmt.Errorf("cardano: %w", err)
+		}
 		return &EdDSAPartialSig{
 			PartyID: share.ID,
 			R:       c.group.NewBasePoint(), // Placeholder for testing
-			Z:       share.Value,
+			Z:       z,
 		}, nil
 	case SignatureECDSA:
 		// For cross-chain compatibility
@@ -143,11 +149,19 @@ func (c *CardanoAdapter) aggregateEd25519(parts []PartialSig) (FullSig, error) {
 
 	var r curve.Point
 	z := c.group.NewScalar()
+	expectedCurve := c.group.Name()
 
-	for _, part := range parts {
+	for i, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
+		}
+
+		if eddsaPart.Z == nil {
+			return nil, fmt.Errorf("cardano: ed25519 partial[%d] has nil scalar Z", i)
+		}
+		if got := eddsaPart.Z.Curve().Name(); got != expectedCurve {
+			return nil, fmt.Errorf("cardano: ed25519 partial[%d] scalar Z on wrong curve (got %s, want %s)", i, got, expectedCurve)
 		}
 
 		if r == nil && eddsaPart.R != nil {

@@ -1,0 +1,7 @@
+--- PASS: TestPulsarAdapter_BuildActivationTranscript_NewFields
+--- PASS: TestPulsarAdapter_InvalidInputs
+--- PASS: TestPulsarAdapter_NewCommitteeSigns
+--- PASS: TestPulsarAdapter_PairwiseMaterialRegenerated
+--- PASS: TestPulsarAdapter_PreservesLineage
+--- PASS: TestPulsarAdapter_RollbackRestoresGeneration
+--- PASS: TestPulsarAdapter_SetAndThresholdRotation
