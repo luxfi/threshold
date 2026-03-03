@@ -93,22 +93,67 @@ func (j *JVSS) VerifyShare(share *Share, commitment *Commitment, partyID party.I
 	return j.verifyShareProof(share.Proof, expectedCommit, partyID)
 }
 
-// CombineShares combines shares to reconstruct the secret
+// CombineShares reconstructs the secret via Lagrange interpolation at x=0.
 func (j *JVSS) CombineShares(shares map[party.ID]*Share) (curve.Scalar, error) {
 	if len(shares) < j.threshold {
 		return nil, fmt.Errorf("insufficient shares: got %d, need %d", len(shares), j.threshold)
 	}
 
-	// Use Lagrange interpolation to reconstruct the secret
-	// For now, just return the first share's value as placeholder
-	// TODO: Implement proper Lagrange interpolation at x=0
-	// When implementing, will need to:
-	// - Collect x values and share values from shares
-	// - Perform Lagrange interpolation at x=0
-	for _, share := range shares {
-		return share.Value, nil
+	// Collect party IDs and their x-coordinates
+	ids := make([]party.ID, 0, len(shares))
+	for id := range shares {
+		ids = append(ids, id)
 	}
-	return nil, nil
+
+	// Lagrange interpolation at x=0: secret = sum( y_i * L_i(0) )
+	// where L_i(0) = prod_{j!=i}( x_j / (x_j - x_i) )
+	secret := j.group.NewScalar()
+	for i, id := range ids {
+		xi := id.Scalar(j.group)
+		yi := shares[id].Value
+
+		// Compute Lagrange basis polynomial L_i(0) = prod_{j!=i}( x_j / (x_j - x_i) )
+		lagrange := j.group.NewScalar().SetNat(new(saferith.Nat).SetUint64(1))
+		for k, otherId := range ids {
+			if k == i {
+				continue
+			}
+			xj := otherId.Scalar(j.group)
+
+			// numerator = x_j
+			num := xj
+
+			// denominator = x_j - x_i
+			den := j.group.NewScalar().Set(xj)
+			den.Sub(xi)
+
+			// L_i(0) *= x_j / (x_j - x_i)
+			denInv, err := scalarInvert(j.group, den)
+			if err != nil {
+				return nil, fmt.Errorf("lagrange interpolation: %w", err)
+			}
+			term := j.group.NewScalar().Set(num)
+			term.Mul(denInv)
+			lagrange.Mul(term)
+		}
+
+		// secret += y_i * L_i(0)
+		contrib := j.group.NewScalar().Set(yi)
+		contrib.Mul(lagrange)
+		secret.Add(contrib)
+	}
+
+	return secret, nil
+}
+
+// scalarInvert computes the multiplicative inverse of a scalar.
+func scalarInvert(group curve.Curve, s curve.Scalar) (curve.Scalar, error) {
+	inv := group.NewScalar().Set(s)
+	if inv.IsZero() {
+		return nil, fmt.Errorf("cannot invert zero scalar")
+	}
+	inv.Invert()
+	return inv, nil
 }
 
 // createCommitment creates Pedersen commitments to polynomial coefficients
