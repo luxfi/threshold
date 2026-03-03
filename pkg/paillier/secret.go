@@ -64,7 +64,7 @@ func KeyGen(pl *pool.Pool) (pk *PublicKey, sk *SecretKey) {
 
 // NewSecretKey generates primes p and q suitable for the scheme, and returns the initialized SecretKey.
 func NewSecretKey(pl *pool.Pool) *SecretKey {
-	// TODO maybe we could take the reader as argument?
+	// Uses crypto/rand.Reader for key generation.
 	return NewSecretKeyFromPrimes(sample.Paillier(rand.Reader, pl))
 }
 
