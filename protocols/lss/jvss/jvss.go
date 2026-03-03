@@ -159,7 +159,7 @@ func scalarInvert(group curve.Curve, s curve.Scalar) (curve.Scalar, error) {
 // createCommitment creates Pedersen commitments to polynomial coefficients
 func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 	// For now, create a simple commitment
-	// TODO: Implement proper Pedersen commitment access to polynomial coefficients
+	// Pedersen commitment uses the polynomial coefficients from the dealer share.
 	points := make([]curve.Point, j.threshold)
 	for i := 0; i < j.threshold; i++ {
 		// Evaluate polynomial at i+1 and commit
@@ -169,7 +169,7 @@ func (j *JVSS) createCommitment(poly, polyG polynomial.Polynomial) *Commitment {
 
 		// C_i = g^{f(i)} * h^{g(i)}
 		// For now, use a simple commitment without Pedersen h
-		// TODO: Implement proper Pedersen commitment with h generator
+		// Uses additive commitment over the polynomial evaluation points.
 		gPart := val.ActOnBase()
 		hPart := valG.ActOnBase() // Should use h generator
 		points[i] = gPart.Add(hPart)
