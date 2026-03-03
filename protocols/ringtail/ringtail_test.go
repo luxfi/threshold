@@ -92,7 +92,7 @@ func TestSign(t *testing.T) {
 	signers := []party.ID{"a", "b"}
 	message := []byte("test message")
 
-	signFunc := ringtail.Sign(cfg, signers, message, nil)
+	signFunc := ringtail.SignWithConfig(cfg, signers, message, nil)
 	require.NotNil(t, signFunc, "Sign should return a function")
 
 	sessionID := []byte("test-sign-session")
@@ -137,7 +137,7 @@ func TestSignWithTimeout(t *testing.T) {
 		for _, id := range signers {
 			cfg := configs[id]
 			sessionID := []byte("test-ringtail-sign")
-			startFunc := ringtail.Sign(cfg, signers, message, pl)
+			startFunc := ringtail.SignWithConfig(cfg, signers, message, pl)
 
 			session, err := startFunc(sessionID)
 			if err != nil {
@@ -235,7 +235,7 @@ func TestTimeout(t *testing.T) {
 		signers := []party.ID{"a", "b"}
 		message := []byte("test message")
 
-		signFunc := ringtail.Sign(cfg, signers, message, nil)
+		signFunc := ringtail.SignWithConfig(cfg, signers, message, nil)
 		sessionID := []byte("timeout-test")
 
 		_, _ = signFunc(sessionID)
@@ -276,7 +276,7 @@ func TestConfigValidation(t *testing.T) {
 
 				params := cfg.GetParameters()
 				assert.Greater(t, params.N, 0)
-				assert.Greater(t, params.Q, 0)
+				assert.Greater(t, params.Q, uint64(0))
 				assert.Greater(t, params.Sigma, 0.0)
 			}
 		})
@@ -297,7 +297,7 @@ func TestSecurityLevels(t *testing.T) {
 
 		params := cfg.GetParameters()
 		assert.Greater(t, params.N, 0)
-		assert.Greater(t, params.Q, 0)
+		assert.Greater(t, params.Q, uint64(0))
 		assert.Greater(t, params.Sigma, 0.0)
 
 		switch level {

@@ -1,0 +1,83 @@
+name: Fresh-Clone CI
+
+# Additive workflow: validates the repo can be cloned cold into a clean
+# Ubuntu container and produce green test artifacts. Complements ci.yml
+# (which uses the cached / persistent runner state). Required for the
+# Mar-3 PQ Consensus Architecture Freeze (LP-105 §"Production
+# implementation"). Do not delete; do not merge with ci.yml — the value
+# is precisely that the runner has nothing cached.
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.25.7'
+
+jobs:
+  fresh-clone-test:
+    name: Fresh clone go test
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+    steps:
+      - name: Install build deps
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential \
+            > /dev/null
+
+      - name: Install Go ${{ env.GO_VERSION }}
+        run: |
+          curl -fsSL https://go.dev/dl/go${{ env.GO_VERSION }}.linux-amd64.tar.gz \
+            | tar -C /usr/local -xz
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Fresh clone
+        run: |
+          git clone --depth 1 \
+            "https://github.com/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          git fetch --depth 1 origin "${GITHUB_SHA}"
+          git checkout "${GITHUB_SHA}"
+
+      - name: Show environment
+        working-directory: repo
+        run: |
+          go version
+          go env GOROOT GOPATH GOMODCACHE
+          git rev-parse HEAD
+
+      - name: go mod download
+        working-directory: repo
+        run: go mod download
+
+      - name: go test (count=1, no cache)
+        id: gotest
+        working-directory: repo
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout 300s ./... 2>&1 | tee ../go-test.log
+          echo "log=$GITHUB_WORKSPACE/go-test.log" >> "$GITHUB_OUTPUT"
+
+      - name: Tag artifact set
+        id: tag
+        run: |
+          # Find the highest reachable freeze tag (v0.1.0 series).
+          cd repo
+          freeze_tag="$(git tag --sort=-v:refname | head -n1)"
+          echo "tag=${freeze_tag:-untagged}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test log
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-clone-test-log-${{ steps.tag.outputs.sha }}-${{ steps.tag.outputs.tag }}
+          path: go-test.log
+          if-no-files-found: error
+          retention-days: 90

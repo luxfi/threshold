@@ -10,7 +10,7 @@ require (
 	// that consumes primitives from these packages (LP-5703, LP-5704)
 	github.com/luxfi/crypto v1.17.43 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
-	github.com/luxfi/lattice/v7 v7.0.0 // Lattice ops for Ringtail (post-quantum) + GPU acceleration
+	github.com/luxfi/lattice/v7 v7.0.1 // Lattice ops for Ringtail (post-quantum) + GPU acceleration
 	github.com/luxfi/ringtail v0.2.0 // Post-quantum threshold signatures (uses lattice/v7)
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
@@ -48,7 +48,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
-	github.com/montanaflynn/stats v0.8.2 // indirect
+	github.com/montanaflynn/stats v0.9.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -68,4 +68,18 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+require (
+	github.com/luxfi/lens v0.1.0-rc1-pq-consensus-freeze
+	github.com/luxfi/pulsar v0.1.0-rc1-pq-consensus-freeze
+)
+
+// Local-dev replace directives. Tagged versions above pin the
+// March 3, 2026 PQ Consensus Architecture Freeze. See
+// ~/work/lux/consensus/CROSS-REPO-VERSION-PIN.md for the canonical commit
+// SHA → tag mapping.
+replace (
+	github.com/luxfi/lens => ../lens // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
+	github.com/luxfi/pulsar => ../pulsar // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
 )

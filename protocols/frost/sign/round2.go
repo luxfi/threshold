@@ -3,6 +3,7 @@ package sign
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/cronokirby/saferith"
 	"github.com/gtank/merlin"
@@ -35,7 +36,8 @@ type round2 struct {
 	// D[i] = Dᵢ will contain all of the commitments created by each party, ourself included.
 	D map[party.ID]curve.Point
 	// E[i] = Eᵢ will contain all of the commitments created by each party, ourself included.
-	E map[party.ID]curve.Point
+	E    map[party.ID]curve.Point
+	deMu *sync.Mutex
 }
 
 type broadcast2 struct {
@@ -70,12 +72,6 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		return fmt.Errorf("nonce commitment is the identity point")
 	}
 
-	// Only skip if we already have BOTH; otherwise we could drop one
-	if r.D[msg.From] != nil && r.E[msg.From] != nil {
-		// Already have both values for this party, skip
-		return nil
-	}
-
 	// Deep copy points to avoid aliasing issues - use marshal/unmarshal for clean copy
 	dBytes, err := body.D_i.MarshalBinary()
 	if err != nil {
@@ -95,8 +91,15 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 		return fmt.Errorf("failed to unmarshal E_i: %w", err)
 	}
 
+	r.deMu.Lock()
+	// Only skip if we already have BOTH; otherwise we could drop one
+	if r.D[msg.From] != nil && r.E[msg.From] != nil {
+		r.deMu.Unlock()
+		return nil
+	}
 	r.D[msg.From] = dCopy
 	r.E[msg.From] = eCopy
+	r.deMu.Unlock()
 	return nil
 }
 
@@ -111,6 +114,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Check if we have all D and E values from ALL signers
 	// This is critical - we MUST have D,E from every signer before proceeding
 	signers := r.PartyIDs()
+
+	r.deMu.Lock()
 	missingCount := 0
 	for _, l := range signers {
 		if r.D[l] == nil || r.E[l] == nil {
@@ -118,17 +123,33 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		}
 		// Also verify they're not identity points (shouldn't happen but double-check)
 		if r.D[l] != nil && r.D[l].IsIdentity() {
+			r.deMu.Unlock()
 			return r, fmt.Errorf("party %s has identity point for D", l)
 		}
 		if r.E[l] != nil && r.E[l].IsIdentity() {
+			r.deMu.Unlock()
 			return r, fmt.Errorf("party %s has identity point for E", l)
 		}
 	}
 
 	if missingCount > 0 {
+		r.deMu.Unlock()
 		// Not ready yet, return self to continue waiting for broadcasts
 		return r, nil
 	}
+
+	// Snapshot D and E under the lock, then release.
+	// After this point no new StoreBroadcastMessage calls will arrive
+	// for this round (protocol guarantees), so the copies are final.
+	D := make(map[party.ID]curve.Point, len(r.D))
+	E := make(map[party.ID]curve.Point, len(r.E))
+	for k, v := range r.D {
+		D[k] = v
+	}
+	for k, v := range r.E {
+		E[k] = v
+	}
+	r.deMu.Unlock()
 
 	// This essentially follows parts of Figure 3.
 
@@ -165,13 +186,13 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 			Bytes:     []byte(l),
 		})
 		// Write canonical encoding of D[l]
-		dBytes, _ := r.D[l].MarshalBinary()
+		dBytes, _ := D[l].MarshalBinary()
 		_ = rhoPreHash.WriteAny(&hash.BytesWithDomain{
 			TheDomain: "D",
 			Bytes:     dBytes,
 		})
 		// Write canonical encoding of E[l]
-		eBytes, _ := r.E[l].MarshalBinary()
+		eBytes, _ := E[l].MarshalBinary()
 		_ = rhoPreHash.WriteAny(&hash.BytesWithDomain{
 			TheDomain: "E",
 			Bytes:     eBytes,
@@ -190,8 +211,8 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	RShares := make(map[party.ID]curve.Point)
 	// Use sorted order to ensure consistent R computation
 	for _, l := range sortedSigners {
-		RShares[l] = rho[l].Act(r.E[l])
-		RShares[l] = RShares[l].Add(r.D[l])
+		RShares[l] = rho[l].Act(E[l])
+		RShares[l] = RShares[l].Add(D[l])
 		R = R.Add(RShares[l])
 	}
 	var c curve.Scalar
@@ -302,6 +323,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		RShares: RShares,
 		c:       c,
 		z:       map[party.ID]curve.Scalar{r.SelfID(): zI},
+		zMu:     &sync.Mutex{},
 		Lambda:  Lambdas,
 	}, nil
 }

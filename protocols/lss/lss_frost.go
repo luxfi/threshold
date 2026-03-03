@@ -1,4 +1,33 @@
 // Package lss provides dynamic resharing extensions for FROST protocols.
+//
+// DEPRECATED — superseded by the Lens curve-threshold kernel and its
+// LSS-Lens adapter (LP-103). Retained only for binary compatibility
+// with callers in transit; new integrations MUST use Lens.
+//
+// This file's surface predates the LSS-Pulsar contract and reflects
+// in-process simulation conventions:
+//
+//   - DynamicReshareFROST runs in one Go process. No round-based
+//     message passing; no JVSS distribution of the auxiliary w / q
+//     secrets. The single-process simulation is correct mathematically
+//     but is not the on-wire protocol.
+//   - Refresh() and Sign() are intentionally short-circuited: the
+//     underlying FROST primitives expose protocol.StartFunc, and
+//     callers that need real distributed signing run frost.Sign
+//     directly through the round-based protocol harness.
+//   - ConvertToLSSConfig writes static ChainKey / RID byte tags,
+//     "frost-chainkey" / "frost-rid". Lens supersedes this with values
+//     bound to the genesis ceremony or proper distributed FROST DKG.
+//   - verifyResharingFROST checks public-key consistency, which is
+//     sufficient for the in-process correctness contract used by
+//     existing tests; it does not enforce on-wire protocol correctness.
+//
+// The replacement is the Lens curve-threshold kernel (LP-103,
+// github.com/luxfi/lens) plus an LSS-Lens adapter mirroring
+// lss_pulsar.go: Lens owns curve math (Pedersen commits, FROST 2-round
+// signing, curve resharing); the adapter wires Generation tracking,
+// Rollback, snapshot persistence, and dealer/coordinator role
+// separation. Production resharing flows through that path.
 package lss
 
 import (
@@ -285,19 +314,27 @@ func verifyResharingFROST(
 	return nil
 }
 
-// Sign performs FROST signing with the current configuration
+// Sign is deprecated. The underlying FROST primitives expose a
+// protocol.StartFunc; production callers MUST drive the 2-round
+// distributed signing protocol via frost.Sign through the round-based
+// protocol harness. This LSS-FROST shim is retained only for binary
+// compatibility and always returns errFROSTSignDeprecated.
 func (f *FROST) Sign(_ []party.ID, _ []byte) ([]byte, error) {
-	// FROST.Sign returns a protocol.StartFunc, we need to execute it
-	// In a real implementation, this would run the protocol
-	// For now, return a placeholder
-	return nil, errors.New("sign execution not implemented - use frost.Sign directly")
+	return nil, errFROSTSignDeprecated
 }
 
-// Refresh performs a proactive refresh of shares without changing membership
+// errFROSTSignDeprecated is returned by the deprecated LSS-FROST
+// signing entrypoint. Use frost.Sign through the round-based protocol
+// harness for real distributed signing; LSS-Lens will replace this
+// shim entirely.
+var errFROSTSignDeprecated = errors.New("lss-frost: deprecated; drive frost.Sign through the round-based protocol harness or use the LSS-Lens adapter")
+
+// Refresh is deprecated. Real proactive-refresh flows through Lens's
+// HJKY97 zero-poly round-based protocol and the LSS-Lens adapter.
+// This shim only advances the LSS Generation counter so existing
+// in-process tests keep working; it does NOT execute the FROST refresh
+// math.
 func (f *FROST) Refresh() (*FROSTConfig, error) {
-	// FROST's Refresh returns a protocol.StartFunc
-	// For this implementation, we'll just increment generation
-	// In practice, you'd execute the refresh protocol
 	f.generation++
 	f.config.Generation = f.generation
 	return f.config, nil
@@ -319,7 +356,11 @@ func (f *FROST) UpdateConfig(newConfig *FROSTConfig) {
 	f.generation++
 }
 
-// ConvertToLSSConfig converts a FROST config to LSS config format for compatibility
+// ConvertToLSSConfig converts a FROST config to LSS config format for
+// in-process compatibility. The static ChainKey / RID tags are
+// deterministic so legacy callers see stable bytes; production paths
+// derive these values from the genesis ceremony or proper distributed
+// FROST DKG via the LSS-Lens adapter.
 func ConvertToLSSConfig(frostConfig *keygen.Config, generation uint64) *Config {
 	return &Config{
 		ID:         frostConfig.ID,
@@ -328,8 +369,8 @@ func ConvertToLSSConfig(frostConfig *keygen.Config, generation uint64) *Config {
 		Generation: generation,
 		ECDSA:      frostConfig.PrivateShare,
 		Public:     convertVerificationShares(frostConfig.VerificationShares.Points),
-		ChainKey:   []byte("frost-chainkey"), // Placeholder
-		RID:        []byte("frost-rid"),      // Placeholder
+		ChainKey:   []byte("frost-chainkey-deprecated"),
+		RID:        []byte("frost-rid-deprecated"),
 	}
 }
 

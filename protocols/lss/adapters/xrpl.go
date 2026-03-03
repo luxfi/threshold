@@ -2,11 +2,14 @@
 package adapters
 
 import (
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+
+	"golang.org/x/crypto/ripemd160" //nolint:staticcheck // XRPL spec mandates RIPEMD-160
 
 	"github.com/luxfi/threshold/pkg/math/curve"
 )
@@ -32,8 +35,10 @@ type XRPLAdapter struct {
 	group     curve.Curve
 }
 
-// NewXRPLAdapter creates a new XRPL adapter
-func NewXRPLAdapter(sigType SignatureType, multiSign bool) *XRPLAdapter {
+// NewXRPLAdapter creates a new XRPL adapter. Returns an error if sigType is
+// not one of the XRPL-supported signature schemes (secp256k1 ECDSA or
+// Ed25519). Callers can recover instead of crashing the process.
+func NewXRPLAdapter(sigType SignatureType, multiSign bool) (*XRPLAdapter, error) {
 	var group curve.Curve
 	switch sigType {
 	case SignatureECDSA:
@@ -41,14 +46,14 @@ func NewXRPLAdapter(sigType SignatureType, multiSign bool) *XRPLAdapter {
 	case SignatureEdDSA:
 		group = curve.Ed25519{}
 	default:
-		panic("unsupported signature type for XRPL")
+		return nil, fmt.Errorf("xrpl: unsupported signature type %v (want SignatureECDSA or SignatureEdDSA)", sigType)
 	}
 
 	return &XRPLAdapter{
 		sigType:   sigType,
 		multiSign: multiSign,
 		group:     group,
-	}
+	}, nil
 }
 
 // Digest computes XRPL transaction digest with appropriate prefix
@@ -105,10 +110,14 @@ func (x *XRPLAdapter) signEd25519(digest []byte, share Share) (PartialSig, error
 	// This would integrate with FROST protocol
 	// Return partial signature share
 	// For testing, provide a placeholder R value
+	z, err := coerceScalar(x.group, share.Value)
+	if err != nil {
+		return nil, fmt.Errorf("xrpl: %w", err)
+	}
 	return &EdDSAPartialSig{
 		PartyID: share.ID,
 		R:       x.group.NewBasePoint(), // Placeholder for testing
-		Z:       share.Value,
+		Z:       z,
 	}, nil
 }
 
@@ -171,14 +180,25 @@ func (x *XRPLAdapter) aggregateEd25519(parts []PartialSig) (FullSig, error) {
 	// Aggregate R and z values from partial signatures
 	var r curve.Point
 	z := x.group.NewScalar()
+	expectedCurve := x.group.Name()
 
-	for _, part := range parts {
+	for i, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
 		}
 
+		if eddsaPart.Z == nil {
+			return nil, fmt.Errorf("xrpl: ed25519 partial[%d] has nil scalar Z", i)
+		}
+		if got := eddsaPart.Z.Curve().Name(); got != expectedCurve {
+			return nil, fmt.Errorf("xrpl: ed25519 partial[%d] scalar Z on wrong curve (got %s, want %s)", i, got, expectedCurve)
+		}
+
 		if r == nil && eddsaPart.R != nil {
+			if got := eddsaPart.R.Curve().Name(); got != expectedCurve {
+				return nil, fmt.Errorf("xrpl: ed25519 partial[%d] point R on wrong curve (got %s, want %s)", i, got, expectedCurve)
+			}
 			r = eddsaPart.R
 		}
 
@@ -371,12 +391,93 @@ func (x *XRPLAdapter) GetSignerListEntry(config *UnifiedConfig, weight uint16) m
 	}
 }
 
-// deriveXRPLAddress derives XRPL address from public key
+// deriveXRPLAddress derives an XRPL classic address from a public key.
+//
+// Per https://xrpl.org/accounts.html#address-encoding the encoding is:
+//
+//  1. Serialize the public key (33-byte secp256k1 compressed, or
+//     0xED || 32-byte Ed25519).
+//  2. AccountID = RIPEMD-160(SHA-256(pubkey)).
+//  3. Prepend the Account Address type byte 0x00.
+//  4. Append a 4-byte checksum: first 4 bytes of SHA-256(SHA-256(payload)).
+//  5. Base58-encode using the XRPL dictionary
+//     "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz".
+//
+// On serialization failure this returns the empty string so callers in
+// SignerListSet building can skip the entry instead of producing
+// nonsense.
 func (x *XRPLAdapter) deriveXRPLAddress(pubKey curve.Point) string {
-	// This would implement full XRPL address derivation
-	// RIPEMD160(SHA256(publicKey)) with Base58Check encoding
-	// For now, return placeholder
-	return "rXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+	keyBytes, err := pubKey.MarshalBinary()
+	if err != nil || len(keyBytes) == 0 {
+		return ""
+	}
+
+	// XRPL Ed25519 keys carry a 0xED prefix on the wire. Some libraries
+	// strip it; we always (re-)prepend so the AccountID is computed over
+	// the canonical 33-byte form.
+	if x.sigType == SignatureEdDSA && (len(keyBytes) != 33 || keyBytes[0] != Ed25519Prefix) {
+		prefixed := make([]byte, 0, 33)
+		prefixed = append(prefixed, Ed25519Prefix)
+		prefixed = append(prefixed, keyBytes...)
+		keyBytes = prefixed
+	}
+	return classicAddressFromPubkey(keyBytes)
+}
+
+// xrplBase58Alphabet is the XRPL-specific Base58 dictionary. The order
+// differs from Bitcoin's alphabet — XRPL begins with 'r', not '1'.
+const xrplBase58Alphabet = "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz"
+
+// classicAddressFromPubkey computes the XRPL classic address ("r..."
+// form) for a serialized public key. Pure function; no curve dependency.
+func classicAddressFromPubkey(pubkey []byte) string {
+	// Step 1: AccountID = RIPEMD-160(SHA-256(pubkey)).
+	sha := sha256.Sum256(pubkey)
+	rip := ripemd160.New()
+	rip.Write(sha[:])
+	accountID := rip.Sum(nil) // 20 bytes
+
+	// Step 2: payload = 0x00 || AccountID, then 4-byte SHA-256d checksum.
+	payload := make([]byte, 0, 1+20+4)
+	payload = append(payload, 0x00)
+	payload = append(payload, accountID...)
+	c1 := sha256.Sum256(payload)
+	c2 := sha256.Sum256(c1[:])
+	payload = append(payload, c2[:4]...)
+
+	return xrplBase58Encode(payload)
+}
+
+// xrplBase58Encode encodes input using the XRPL Base58 alphabet.
+// Leading zero bytes are encoded as the alphabet's zero character ('r').
+func xrplBase58Encode(input []byte) string {
+	if len(input) == 0 {
+		return ""
+	}
+	// Count leading zeros to preserve them as the alphabet's index-0 char.
+	zeros := 0
+	for zeros < len(input) && input[zeros] == 0 {
+		zeros++
+	}
+
+	// Convert the rest via repeated base-58 division.
+	num := new(big.Int).SetBytes(input)
+	base := big.NewInt(58)
+	mod := new(big.Int)
+	out := make([]byte, 0, len(input)*138/100+1)
+	for num.Sign() > 0 {
+		num.DivMod(num, base, mod)
+		out = append(out, xrplBase58Alphabet[mod.Int64()])
+	}
+	// Prepend the alphabet's zero char for each leading zero byte.
+	for i := 0; i < zeros; i++ {
+		out = append(out, xrplBase58Alphabet[0])
+	}
+	// Reverse — we built it least-significant-first.
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return string(out)
 }
 
 // XRPLTransaction represents a simplified XRPL transaction
