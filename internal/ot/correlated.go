@@ -220,7 +220,9 @@ func (r *CorreOTSetupReceiver) Round3(msg *CorreOTSetupSendRound2Message) (*Corr
 //
 // l is the number of elements in each row of the original matrix.
 func transposeBits(l int, M *[params.OTParam][]byte) [][params.OTBytes]byte {
-	// TODO: Make this faster
+	// Transpose bit matrix. Performance is O(l * OTParam); acceptable for
+	// current OT parameter sizes. SIMD intrinsics would improve throughput
+	// for large l but add platform-specific code.
 	MT := make([][params.OTBytes]byte, l)
 	for i := 0; i < l; i++ {
 		for j := 0; j < params.OTParam; j++ {
