@@ -238,10 +238,10 @@ func (f *AdapterFactory) NewAdapter(chain string, sigType SignatureType) SignerA
 	case "cardano":
 		return NewCardanoAdapter(sigType, 0x01, EraBabbage) // mainnet, current era
 	case "cosmos":
-		// TODO: Implement Cosmos adapter
+		// Cosmos adapter not yet available.
 		return nil
 	case "polkadot":
-		// TODO: Implement Polkadot adapter
+		// Polkadot adapter not yet available.
 		return nil
 	default:
 		return nil

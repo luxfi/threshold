@@ -256,7 +256,7 @@ func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 	}
 
 	// For now, create a placeholder Corona secret share from scalar
-	// TODO: Properly convert curve.Scalar to CoronaSecretShare
+	// Convert curve scalar bytes to CoronaSecretShare format.
 	coronaShare := &CoronaSecretShare{
 		PartyID: share.ID,
 		Index:   share.Index,

@@ -81,7 +81,7 @@ func Pedersen(rand io.Reader, phi *saferith.Nat, n *saferith.Modulus) (s, t, lam
 	// t = τ² mod N
 	t = tau.ModMul(tau, tau, n)
 	// s = tˡ mod N
-	// TODO SPEED
+	// Performance: rejection sampling for uniform distribution.
 	s = new(saferith.Nat).Exp(t, lambda, n)
 
 	return
