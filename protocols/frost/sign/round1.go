@@ -28,6 +28,14 @@ type round1 struct {
 	// and we need to make sure to generate our challenge in the correct way. Naturally,
 	// we also return a taproot.Signature instead a generic signature.
 	taproot bool
+	// sr25519 indicates whether we produce sr25519 (Schnorrkel) compatible signatures.
+	//
+	// If so, the challenge is computed via Merlin transcripts matching the Substrate/Polkadot
+	// sr25519 scheme. The result is an sr25519 Signature (R || s, 64 bytes).
+	sr25519 bool
+	// signingContext is the application-level context for sr25519 signing.
+	// For Substrate, this is always "substrate".
+	signingContext []byte
 	// M is the hash of the message we're signing.
 	//
 	// This plays the same role as m in the Frost paper. One slight difference

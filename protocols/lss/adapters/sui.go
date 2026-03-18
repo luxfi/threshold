@@ -20,9 +20,8 @@ type SuiAdapter struct {
 // NewSuiAdapter creates a new Sui adapter
 func NewSuiAdapter() *SuiAdapter {
 	return &SuiAdapter{
-		// TODO: Add Ed25519 curve support when available
-		group:     curve.Secp256k1{}, // Placeholder until Ed25519 is available
-		intentApp: 0x00,              // Transaction by default
+		group:     curve.Ed25519{},
+		intentApp: 0x00, // Transaction by default
 	}
 }
 
@@ -150,8 +149,9 @@ func (s *SuiAdapter) ValidateConfig(config *UnifiedConfig) error {
 		return errors.New("Sui requires Ed25519 signatures")
 	}
 
-	// Verify Ed25519 curve
-	// TODO: Check for Ed25519 curve when available
+	if _, ok := config.Group.(curve.Ed25519); !ok {
+		return errors.New("Sui requires Ed25519 curve")
+	}
 
 	return nil
 }

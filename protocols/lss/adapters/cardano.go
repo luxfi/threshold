@@ -37,8 +37,7 @@ func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *C
 	var group curve.Curve
 	switch sigType {
 	case SignatureEdDSA:
-		// TODO: Add Ed25519 curve support when available
-		group = curve.Secp256k1{} // Placeholder
+		group = curve.Ed25519{}
 	case SignatureECDSA:
 		group = curve.Secp256k1{}
 	case SignatureSchnorr:
