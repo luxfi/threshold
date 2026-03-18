@@ -10,9 +10,10 @@ import (
 )
 
 type (
-	Config        = keygen.Config
-	TaprootConfig = keygen.TaprootConfig
-	Signature     = sign.Signature
+	Config            = keygen.Config
+	TaprootConfig     = keygen.TaprootConfig
+	Signature         = sign.Signature
+	SR25519Signature  = sign.SR25519Signature
 )
 
 // EmptyConfig creates an empty Config with a specific group.
@@ -82,6 +83,19 @@ func RefreshTaproot(config *TaprootConfig, participants []party.ID) protocol.Sta
 	return keygen.StartKeygenCommon(true, curve.Secp256k1{}, participants, config.Threshold, config.ID, config.PrivateShare, publicKey, verificationShares)
 }
 
+// KeygenSR25519 initiates the Frost key generation protocol for sr25519 keys.
+//
+// This generates key shares over the Ristretto255 group, compatible with the
+// sr25519 (Schnorrkel) signature scheme used by Substrate/Polkadot.
+func KeygenSR25519(selfID party.ID, participants []party.ID, threshold int) protocol.StartFunc {
+	return keygen.StartKeygenCommon(false, curve.Ristretto255{}, participants, threshold, selfID, nil, nil, nil)
+}
+
+// RefreshSR25519 refreshes sr25519 key shares without changing the public key.
+func RefreshSR25519(config *Config, participants []party.ID) protocol.StartFunc {
+	return keygen.StartKeygenCommon(false, config.Curve(), participants, config.Threshold, config.ID, config.PrivateShare, config.PublicKey, config.VerificationShares.Points)
+}
+
 // Sign initiates the protocol for producing a threshold signature, with Frost.
 //
 // result is the result of the key generation phase, for this participant.
@@ -130,4 +144,21 @@ func SignTaproot(config *TaprootConfig, signers []party.ID, messageHash []byte) 
 		VerificationShares: party.NewPointMap(genericVerificationShares),
 	}
 	return sign.StartSignCommon(true, normalResult, signers, messageHash)
+}
+
+// SignSR25519 initiates the protocol for producing an sr25519 (Schnorrkel) compatible
+// threshold signature.
+//
+// config must come from a KeygenSR25519 key generation (Ristretto255 group).
+//
+// signingContext is the application-level context label. For Substrate this is "substrate".
+// If nil, defaults to "substrate".
+//
+// message is the raw message bytes (NOT pre-hashed). The Merlin transcript handles
+// domain separation internally.
+func SignSR25519(config *Config, signers []party.ID, signingContext []byte, message []byte) protocol.StartFunc {
+	if signingContext == nil {
+		signingContext = []byte("substrate")
+	}
+	return sign.StartSignSR25519Common(false, true, signingContext, config, signers, message)
 }

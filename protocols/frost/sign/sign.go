@@ -11,13 +11,18 @@ import (
 
 const (
 	// Frost Sign with Threshold.
-	protocolID        = "frost/sign-threshold"
-	protocolIDTaproot = "frost/sign-threshold-taproot"
+	protocolID         = "frost/sign-threshold"
+	protocolIDTaproot  = "frost/sign-threshold-taproot"
+	protocolIDSR25519  = "frost/sign-threshold-sr25519"
 	// This protocol has 3 concrete rounds.
 	protocolRounds round.Number = 3
 )
 
 func StartSignCommon(taproot bool, result *keygen.Config, signers []party.ID, messageHash []byte) protocol.StartFunc {
+	return StartSignSR25519Common(taproot, false, nil, result, signers, messageHash)
+}
+
+func StartSignSR25519Common(taproot, sr25519 bool, signingContext []byte, result *keygen.Config, signers []party.ID, messageHash []byte) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
 		// For FROST signing, we use the original threshold from keygen
 		// The signers list should be at least threshold+1 parties
@@ -36,7 +41,9 @@ func StartSignCommon(taproot bool, result *keygen.Config, signers []party.ID, me
 			Threshold:        len(signers) - 1, // Session threshold is n-1 where n is number of participants
 			Group:            result.PublicKey.Curve(),
 		}
-		if taproot {
+		if sr25519 {
+			info.ProtocolID = protocolIDSR25519
+		} else if taproot {
 			info.ProtocolID = protocolIDTaproot
 		} else {
 			info.ProtocolID = protocolID
@@ -47,12 +54,14 @@ func StartSignCommon(taproot bool, result *keygen.Config, signers []party.ID, me
 			return nil, fmt.Errorf("sign.StartSign: %w", err)
 		}
 		return &round1{
-			Helper:  helper,
-			taproot: taproot,
-			M:       messageHash,
-			Y:       result.PublicKey,
-			YShares: result.VerificationShares.Points,
-			sI:      result.PrivateShare,
+			Helper:         helper,
+			taproot:        taproot,
+			sr25519:        sr25519,
+			signingContext: signingContext,
+			M:              messageHash,
+			Y:              result.PublicKey,
+			YShares:        result.VerificationShares.Points,
+			sI:             result.PrivateShare,
 		}, nil
 	}
 }

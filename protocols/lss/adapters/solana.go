@@ -18,8 +18,7 @@ type SolanaAdapter struct {
 // NewSolanaAdapter creates a new Solana adapter
 func NewSolanaAdapter() *SolanaAdapter {
 	return &SolanaAdapter{
-		// TODO: Add Ed25519 curve support
-		group: curve.Secp256k1{},
+		group: curve.Ed25519{},
 	}
 }
 
@@ -132,12 +131,9 @@ func (s *SolanaAdapter) ValidateConfig(config *UnifiedConfig) error {
 		return errors.New("Solana requires Ed25519 signatures")
 	}
 
-	// Verify Ed25519 curve
-	// TODO: Check for Ed25519 curve when available
-	// For now, accept Secp256k1 as a placeholder since Ed25519 is not yet implemented
-	// if _, ok := config.Group.(curve.Ed25519); !ok {
-	//     return errors.New("Solana requires Ed25519 curve")
-	// }
+	if _, ok := config.Group.(curve.Ed25519); !ok {
+		return errors.New("Solana requires Ed25519 curve")
+	}
 
 	return nil
 }

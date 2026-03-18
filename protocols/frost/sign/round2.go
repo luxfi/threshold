@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/cronokirby/saferith"
+	"github.com/gtank/merlin"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -194,7 +195,37 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		R = R.Add(RShares[l])
 	}
 	var c curve.Scalar
-	if r.taproot {
+	if r.sr25519 {
+		// sr25519 / Schnorrkel challenge via Merlin transcript.
+		// The transcript labels must exactly match the Rust schnorrkel crate
+		// so that threshold-produced signatures cross-verify with standard sr25519 verifiers.
+		//
+		// Transcript flow (from schnorrkel sign.rs + context.rs):
+		//   1. NewTranscript("SigningContext")
+		//   2. AppendMessage("", signingContext)      -- e.g. "substrate"
+		//   3. AppendMessage("sign-bytes", message)
+		//   4. AppendMessage("proto-name", "Schnorr-sig")
+		//   5. AppendMessage("sign:pk", groupKeyBytes)
+		//   6. AppendMessage("sign:R", RBytes)
+		//   7. challengeBytes = ExtractBytes("sign:c", 64)
+		//   8. c = Scalar.FromUniformBytes(challengeBytes)
+		groupKeyBytes, _ := r.Y.MarshalBinary()
+		RBytes, _ := R.MarshalBinary()
+
+		t := merlin.NewTranscript("SigningContext")
+		t.AppendMessage([]byte(""), r.signingContext)
+		t.AppendMessage([]byte("sign-bytes"), r.M)
+		t.AppendMessage([]byte("proto-name"), []byte("Schnorr-sig"))
+		t.AppendMessage([]byte("sign:pk"), groupKeyBytes)
+		t.AppendMessage([]byte("sign:R"), RBytes)
+
+		challengeBytes := t.ExtractBytes([]byte("sign:c"), 64)
+		// Reduce 64 uniform bytes to a scalar mod the Ristretto255 group order.
+		// Use the group's NewScalar() to get a properly initialized scalar.
+		cScalar := r.Group().NewScalar().(*curve.Ristretto255Scalar)
+		cScalar.FromUniformBytes(challengeBytes)
+		c = cScalar
+	} else if r.taproot {
 		// BIP-340 adjustment: We need R to have an even y coordinate. This means
 		// conditionally negating k = ∑ᵢ (dᵢ + (eᵢ ρᵢ)), which we can accomplish
 		// by negating our dᵢ, eᵢ, if necessary. This entails negating the RShares
