@@ -39,8 +39,7 @@ func NewXRPLAdapter(sigType SignatureType, multiSign bool) *XRPLAdapter {
 	case SignatureECDSA:
 		group = curve.Secp256k1{}
 	case SignatureEdDSA:
-		// TODO: Add Ed25519 curve support when available
-		group = curve.Secp256k1{} // Placeholder until Ed25519 is available
+		group = curve.Ed25519{}
 	default:
 		panic("unsupported signature type for XRPL")
 	}
