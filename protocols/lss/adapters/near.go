@@ -23,8 +23,7 @@ func NewNEARAdapter(networkID string) *NEARAdapter {
 		networkID = "mainnet"
 	}
 	return &NEARAdapter{
-		// TODO: Add Ed25519 curve support when available
-		group:     curve.Secp256k1{}, // Placeholder until Ed25519 is available
+		group:     curve.Ed25519{},
 		networkID: networkID,
 	}
 }
@@ -140,8 +139,9 @@ func (n *NEARAdapter) ValidateConfig(config *UnifiedConfig) error {
 		return errors.New("NEAR requires Ed25519 signatures")
 	}
 
-	// Verify Ed25519 curve
-	// TODO: Check for Ed25519 curve when available
+	if _, ok := config.Group.(curve.Ed25519); !ok {
+		return errors.New("NEAR requires Ed25519 curve")
+	}
 
 	return nil
 }
