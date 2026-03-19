@@ -8,7 +8,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0
 	// Lux crypto stack - this is the HIGH-LEVEL orchestration layer
 	// that consumes primitives from these packages (LP-5703, LP-5704)
-	github.com/luxfi/crypto v1.17.28 // ECDSA, EdDSA, BLS curves
+	github.com/luxfi/crypto v1.17.43 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
 	github.com/luxfi/lattice/v7 v7.0.0 // Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/luxfi/corona v0.2.0 // Post-quantum threshold signatures (uses lattice/v7)
@@ -16,24 +16,28 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/zeebo/blake3 v0.2.4
-	golang.org/x/crypto v0.47.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/crypto v0.49.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
+	filippo.io/edwards25519 v1.2.0
+	github.com/ChainSafe/go-schnorrkel v1.1.0
 	github.com/cronokirby/saferith v0.33.0
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1
+	github.com/gtank/merlin v0.1.1
+	github.com/gtank/ristretto255 v0.2.0
 	github.com/luxfi/log v1.4.1
 	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.38.3
 )
 
 require (
-	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/ALTree/bigfloat v0.2.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
@@ -43,23 +47,24 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
+	github.com/montanaflynn/stats v0.8.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
-	github.com/prometheus/procfs v0.19.2 // indirect
+	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/mod v0.32.0 // indirect
-	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
-	golang.org/x/tools v0.41.0 // indirect
+	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
+	golang.org/x/mod v0.34.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/tools v0.43.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
