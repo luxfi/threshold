@@ -2,6 +2,7 @@ package sign
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -28,7 +29,8 @@ type round3 struct {
 	// z contains the response from each participant
 	//
 	// z[i] corresponds to zᵢ in the Frost paper
-	z map[party.ID]curve.Scalar
+	z   map[party.ID]curve.Scalar
+	zMu *sync.Mutex
 
 	// Lambda contains all Lagrange coefficients of the parties participating in this session.
 	// Lambda[l] = λₗ
@@ -75,7 +77,9 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 		return fmt.Errorf("failed to verify response from %v", from)
 	}
 
+	r.zMu.Lock()
 	r.z[from] = body.ZI
+	r.zMu.Unlock()
 
 	return nil
 }
@@ -91,8 +95,15 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 	// These steps come from Figure 3 of the Frost paper.
 
 	// 7.c "Compute the group's response z = ∑ᵢ zᵢ"
+	r.zMu.Lock()
+	zMap := make(map[party.ID]curve.Scalar, len(r.z))
+	for k, v := range r.z {
+		zMap[k] = v
+	}
+	r.zMu.Unlock()
+
 	z := r.Group().NewScalar()
-	for _, z_l := range r.z {
+	for _, z_l := range zMap {
 		z.Add(z_l)
 	}
 
