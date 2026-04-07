@@ -2,6 +2,7 @@ package sign
 
 import (
 	"crypto/rand"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -122,6 +123,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 		e_i:    eI,
 		D:      D,
 		E:      E,
+		deMu:   &sync.Mutex{},
 	}, nil
 }
 
