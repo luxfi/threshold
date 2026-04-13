@@ -1,0 +1,127 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\title{Efficient Threshold ML-DSA\\ (Integration Notes for luxfi/threshold)}
+\author{Sof\'ia Celi \and Rafael del Pino \and Thomas Espitau \and Guilhem Niot \and Thomas Prest}
+\date{USENIX Security 2026 — integrated into luxfi/threshold as \texttt{protocols/mldsa}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document records the reference for the Threshold ML-DSA paper
+(Celi, del Pino, Espitau, Niot, Prest, USENIX Security 2026) as integrated
+into \texttt{github.com/luxfi/threshold}. The implementation lives in
+\texttt{protocols/mldsa/} and provides the first practical threshold
+signature scheme fully compatible with NIST FIPS 204 (ML-DSA).
+
+Output signatures are byte-compatible with standard ML-DSA, enabling drop-in
+replacement of classical threshold ECDSA/Schnorr wallets with a post-quantum
+scheme that keeps the standardized verification path.
+\end{abstract}
+
+\section{Summary of Construction}
+
+The scheme tailors the template of Finally! (del Pino \& Niot, PKC 2025) to
+ML-DSA's specific constraints:
+
+\begin{itemize}
+  \item \textbf{Short Replicated Secret Sharing (RSS).} For $(T,N)$, sample
+        $\binom{N}{N-T+1}$ ML-DSA secrets $s_I \leftarrow \chi_s$ and distribute
+        each $s_I$ to every party in $I$. The final public key is
+        $\mathrm{vk} = \lfloor A\sum_I s_I \rceil$, matching the ML-DSA public
+        key shape.
+  \item \textbf{Unbalanced hyperball rejection.} Replace ML-DSA's uniform
+        rejection with per-party hyperball rejection. The first $\ell$
+        coordinates (no hint check) accept a wider ball than the last $k$
+        coordinates (hint check), parameterized by $\nu > 1$.
+  \item \textbf{Per-party + combination rejection.} Two rejection stages:
+        (i) each party checks its local partial response has bounded norm;
+        (ii) the combiner checks the aggregated $z^{(1)}$ satisfies
+        $\|z^{(1)}\|_\infty < \gamma_1 - \beta$ and the hint is within the
+        ML-DSA bound.
+  \item \textbf{$K$ parallel instances.} To mitigate the probabilistic abort
+        at $T$ parties, the protocol runs $K$ parallel sessions and outputs
+        the first successful one. This amortizes the cost at the expense of
+        bandwidth.
+  \item \textbf{Optimized share reconstruction.} The RSS partition minimizes
+        $\max_i |m_i|$ (number of secrets per party per session) via a
+        max-flow on the bipartite \texttt{users × secrets} graph.
+        For $N \leq 6$ the optimal partitions are hardcoded.
+\end{itemize}
+
+\section{Rounds and Communication}
+
+Per-attempt signing requires three rounds (plus a one-shot commit phase):
+\begin{enumerate}
+  \item Each party samples $r_i \leftarrow \chi_r$, computes
+        $w_i = A \cdot r_i$, publishes $\mathrm{cmt}_i = H_\mathrm{cmt}(\mathrm{vk}, i, w_i)$.
+  \item Reveal $w_i$. All parties derive
+        $\tilde c = H(\mu \| \mathrm{HighBits}(w, 2\gamma_2))$,
+        $c = \mathrm{SampleInBall}(\tilde c)$.
+  \item Compute local response $z_i = c \cdot s^{\mathrm{part}}_i + r_i$,
+        apply hyperball rejection, publish $z_i^{(1)}$.
+\end{enumerate}
+
+Per-party communication at security level ML-DSA-44 (Table~3 of the paper):
+
+\begin{center}
+\begin{tabular}{rrrrrr}
+\toprule
+$N \setminus T$ & 2 & 3 & 4 & 5 & 6 \\
+\midrule
+2 & 10.5\,kB & & & & \\
+3 & 15.8\,kB & 21.0\,kB & & & \\
+4 & 15.8\,kB & 36.8\,kB & 42.0\,kB & & \\
+5 & 15.8\,kB & 73.5\,kB & 157.4\,kB & 84.0\,kB & \\
+6 & 21.0\,kB & 99.8\,kB & 388.4\,kB & 524.8\,kB & 194.2\,kB \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Security}
+
+Unforgeability reduces tightly to (i) the unforgeability of standard ML-DSA
+and (ii) $\mathrm{MLWE}_{q,k,\ell,\chi}$ for
+$\chi \in \{\chi_s, \chi_r, \chi_z\}$ (Theorem~3.2 of the paper). Static
+dishonest-majority security is proven in the ROM; for $N \leq 6$ adaptive
+security follows via complexity leveraging with at most 5 bits of loss.
+
+\section{Integration Scope}
+
+The luxfi/threshold package \texttt{protocols/mldsa} implements the scheme
+on top of \texttt{cloudflare/circl/sign/mldsa} and reuses
+\texttt{luxfi/lattice} primitives already present in this tree:
+
+\begin{itemize}
+  \item \texttt{protocols/mldsa/params.go} — parameter sets for
+        ML-DSA-44/65/87, ports Tables 3, 10, 11.
+  \item \texttt{protocols/mldsa/rss.go} — replicated secret sharing,
+        with hardcoded optimal partitions for $N \leq 6$ per Appendix~B.
+  \item \texttt{protocols/mldsa/hrej.go} — imbalanced hyperball rejection
+        (Fig.~4 of the paper).
+  \item \texttt{protocols/mldsa/keygen.go} — centralized keygen (Fig.~5)
+        and DKG (Appendix~D).
+  \item \texttt{protocols/mldsa/sign.go} — three-round signing protocol
+        (Fig.~6).
+  \item \texttt{protocols/mldsa/combine.go} — combine + verify (Fig.~7),
+        producing standard ML-DSA signatures.
+  \item \texttt{protocols/mldsa/a\_posteriori.go} — a~posteriori key
+        sharing (\S3.3, Appendix~E) for migrating an existing ML-DSA key.
+\end{itemize}
+
+\section{References}
+
+Celi, S., del Pino, R., Espitau, T., Niot, G., Prest, T.
+\emph{Efficient Threshold ML-DSA}. USENIX Security Symposium, 2026.
+Artifact: \texttt{doi.org/10.5281/zenodo.17963721}.
+
+Reference implementation builds on CIRCL
+(\texttt{github.com/cloudflare/circl}) and Lattigo
+(\texttt{github.com/tuneinsight/lattigo}, mirrored as \texttt{github.com/luxfi/lattice}).
+
+\end{document}
