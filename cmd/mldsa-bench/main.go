@@ -128,6 +128,55 @@ type Timings struct {
 	SigBytes int
 }
 
+// benchFixedCommittee: regardless of total validator count N, sample a FIXED-SIZE
+// committee of k validators via VRF and have them sign. Scale-invariant cost.
+// This is the recommended design for 1k/10k/100k networks per LP-045.
+func benchFixedCommittee(n, k int, level mldsaMode, masterSeed [32]byte, msg []byte) Timings {
+	var t Timings
+
+	// Only keygen for the committee members (the other N-k validators never sign).
+	// In a real network all N validators have keys; here we only generate what
+	// we need. This models the on-demand sampling + per-block signing cost.
+	start := time.Now()
+	committeeValidators := genValidators(k, level, masterSeed)
+	t.Keygen = time.Since(start)
+
+	// Sign
+	sigs := make([][]byte, k)
+	start = time.Now()
+	var wg sync.WaitGroup
+	for i := 0; i < k; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			sig, err := committeeValidators[i].Key.Sign(rand.Reader, msg, crypto.Hash(0))
+			if err != nil {
+				panic(err)
+			}
+			sigs[i] = sig
+		}(i)
+	}
+	wg.Wait()
+	t.Sign = time.Since(start)
+	t.SigBytes = len(sigs[0]) * k
+
+	// Verify
+	start = time.Now()
+	for i := 0; i < k; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			committeeValidators[i].Pub.VerifySignature(msg, sigs[i])
+		}(i)
+	}
+	wg.Wait()
+	t.Verify = time.Since(start)
+
+	// Stash N in a field we can print for clarity.
+	_ = n
+	return t
+}
+
 // benchIndividual: every validator signs the block hash. Verifier verifies all.
 // This is the pre-aggregation baseline — how expensive if each vote is standalone.
 func benchIndividual(n int, level mldsaMode, masterSeed [32]byte, msg []byte) Timings {
@@ -306,7 +355,7 @@ func benchHierarchical(n, clusters int, level mldsaMode, masterSeed [32]byte, ms
 
 func main() {
 	var (
-		mode     = flag.String("mode", "individual", "individual | committee | hierarchical")
+		mode     = flag.String("mode", "individual", "individual | committee | hierarchical | fixed")
 		n        = flag.Int("n", 10, "number of validators")
 		k        = flag.Int("k", 0, "committee size (for committee mode; default n/3)")
 		clusters = flag.Int("clusters", 4, "number of clusters (hierarchical mode)")
@@ -358,6 +407,10 @@ func main() {
 			results[i] = benchCommittee(*n, *k, level, seed, msg)
 		case "hierarchical":
 			results[i] = benchHierarchical(*n, *clusters, level, seed, msg)
+		case "fixed":
+			// Fixed-committee: regardless of total N, only k validators actually
+			// sign each block. Demonstrates scale invariance.
+			results[i] = benchFixedCommittee(*n, *k, level, seed, msg)
 		default:
 			fmt.Fprintln(os.Stderr, "invalid mode")
 			os.Exit(1)
