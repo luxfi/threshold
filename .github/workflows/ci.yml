@@ -27,7 +27,9 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # Pin to v1.64.8 (last v1 release) to pair with the v1-format
+          # .golangci.yml. `latest` can drift to v2 and fail config parsing.
+          version: v1.64.8
           args: --timeout=5m
           skip-cache: true
 
