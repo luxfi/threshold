@@ -11,12 +11,18 @@
 // scheme — luxfi/threshold/protocols/tfhe is the single canonical home
 // for these types so call sites do not invent parallel definitions.
 //
-// Scheme: the in-tree implementation is a deterministic toy threshold
-// over symmetric KeyShares — sufficient for unit tests of the policy
-// dispatcher and for development environments where real TFHE keys are
-// not provisioned. Production deployments swap ShareAggregateService
-// for the real lattice-based aggregator (see Protocol.CombineShares for
-// the lattice path).
+// Combine path: there is one and only one combine routine — the lattice
+// combine implemented by Protocol.CombineShares (see tfhe.go). When a
+// Protocol is wired into ShareAggregator, the aggregator authenticates
+// each FHEThresholdShare at the committee boundary (MAC + session +
+// ciphertext-id + dedup) and dispatches the deduplicated share set
+// directly to Protocol.CombineShares — no parallel aggregator, no
+// HMAC-derived recovery mask, no XOR-shaped recovery. When no Protocol
+// is wired (the policy-1-bit-verdict envelope path used by FChain
+// policy gates), the aggregator certifies that ≥t parties witnessed the
+// same ciphertext and returns the verdict envelope unchanged; the
+// embedded plaintext is the 1-bit verdict produced by the FHE policy
+// circuit.
 //
 // Copyright (c) 2024-2026 Lux Industries Inc.
 // SPDX-License-Identifier: BSD-3-Clause
@@ -24,12 +30,14 @@
 package tfhe
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
 	"fmt"
+
+	"github.com/luxfi/fhe"
+	"github.com/luxfi/threshold/pkg/party"
 )
 
 // FHECiphertext is the opaque ciphertext wrapper exchanged between the
@@ -57,15 +65,17 @@ type KeyShare struct {
 	Bytes   []byte
 }
 
-// FHEThresholdShare is one party's partial-decrypt response. Mask is
-// the HMAC-derived partial output; MAC binds (PartyID, SessionID,
-// CiphertextID, Mask) under the party's KeyShare so a malicious peer
-// cannot impersonate a different party.
+// FHEThresholdShare is one party's partial-decrypt response. Partial
+// carries the per-party partial-decryption bytes consumed by
+// Protocol.CombineShares when a lattice combine is wired in. MAC binds
+// (PartyID, SessionID, CiphertextID, Partial) under the party's
+// KeyShare so a malicious peer cannot impersonate a different party or
+// rebind a fresh share to a different ciphertext / session.
 type FHEThresholdShare struct {
 	PartyID      uint32
 	SessionID    [32]byte
 	CiphertextID [32]byte
-	Mask         []byte
+	Partial      []byte
 	MAC          [32]byte
 }
 
@@ -73,10 +83,10 @@ type FHEThresholdShare struct {
 type Status string
 
 const (
-	StatusOK                  Status = "ok"
-	StatusBadShare            Status = "bad_share"
-	StatusInsufficientQuorum  Status = "insufficient_quorum"
-	StatusCiphertextMismatch  Status = "ciphertext_mismatch"
+	StatusOK                 Status = "ok"
+	StatusBadShare           Status = "bad_share"
+	StatusInsufficientQuorum Status = "insufficient_quorum"
+	StatusCiphertextMismatch Status = "ciphertext_mismatch"
 )
 
 // AggregateResult reports the terminal status of an aggregate round.
@@ -98,13 +108,24 @@ type ShareAggregateService interface {
 	) (AggregateResult, []byte, error)
 }
 
-// ShareAggregator is the in-tree aggregator. When PartyKeys is set, MACs
-// are verified against each party's KeyShare. When PartyKeys is nil,
-// MAC verification is skipped — used during cross-committee bootstrap
-// before CDS noise proofs ship; production self-checks always populate
-// PartyKeys.
+// ShareAggregator authenticates committee shares at the wire boundary
+// and dispatches the combine step.
+//
+// PartyKeys: when set, MACs are verified against each party's KeyShare.
+// When nil, MAC verification is skipped — used during cross-committee
+// bootstrap before CDS noise proofs ship; production self-checks always
+// populate PartyKeys.
+//
+// Protocol: when set, after wire authentication passes the deduplicated
+// share set is dispatched to Protocol.CombineShares (the canonical
+// lattice combine — see tfhe.go). When nil, the aggregator returns the
+// ciphertext envelope unchanged: this is the FChain policy-verdict path
+// where the embedded plaintext is the 1-bit verdict produced by the
+// policy circuit and the committee's only job is to ratify that ≥t
+// parties saw the same ciphertext.
 type ShareAggregator struct {
 	PartyKeys map[uint32]KeyShare
+	Protocol  *Protocol
 }
 
 // NewShareAggregator returns a ready-to-use aggregator with no party
@@ -121,16 +142,10 @@ var ErrShareCount = errors.New("tfhe: share count below threshold")
 
 // Aggregate verifies each share's MAC (when PartyKeys is set), confirms
 // each share's CiphertextID matches the request, ensures unique
-// PartyIDs, and returns the recovered plaintext when ≥threshold shares
-// pass verification.
-//
-// The toy scheme returns ct.Bytes as the plaintext once a valid quorum
-// is established. This is correct for the policy use case where
-// FChain emits a 1-bit verdict in the clear inside the ciphertext
-// envelope and the committee's only job is to ratify "≥t parties saw
-// the same ciphertext".
+// PartyIDs, and on success either dispatches to Protocol.CombineShares
+// (when Protocol is set) or returns the verdict envelope (Protocol nil).
 func (a *ShareAggregator) Aggregate(
-	_ context.Context,
+	ctx context.Context,
 	ct FHECiphertext,
 	shares []FHEThresholdShare,
 	threshold uint32,
@@ -141,13 +156,13 @@ func (a *ShareAggregator) Aggregate(
 	}
 
 	seen := make(map[uint32]struct{}, threshold)
-	valid := 0
+	deduped := make([]FHEThresholdShare, 0, len(shares))
 	for _, s := range shares {
 		if s.CiphertextID != ct.ID {
-			return AggregateResult{Status: StatusCiphertextMismatch, ShareCount: valid}, nil, fmt.Errorf("tfhe: share from party %d for ciphertext %x, expected %x", s.PartyID, s.CiphertextID, ct.ID)
+			return AggregateResult{Status: StatusCiphertextMismatch, ShareCount: len(deduped)}, nil, fmt.Errorf("tfhe: share from party %d for ciphertext %x, expected %x", s.PartyID, s.CiphertextID, ct.ID)
 		}
 		if s.SessionID != sessionID {
-			return AggregateResult{Status: StatusBadShare, ShareCount: valid}, nil, fmt.Errorf("tfhe: share from party %d carries wrong sessionID", s.PartyID)
+			return AggregateResult{Status: StatusBadShare, ShareCount: len(deduped)}, nil, fmt.Errorf("tfhe: share from party %d carries wrong sessionID", s.PartyID)
 		}
 		if _, dup := seen[s.PartyID]; dup {
 			continue
@@ -155,24 +170,68 @@ func (a *ShareAggregator) Aggregate(
 		if a.PartyKeys != nil {
 			key, ok := a.PartyKeys[s.PartyID]
 			if !ok {
-				return AggregateResult{Status: StatusBadShare, ShareCount: valid}, nil, fmt.Errorf("tfhe: no key registered for party %d", s.PartyID)
+				return AggregateResult{Status: StatusBadShare, ShareCount: len(deduped)}, nil, fmt.Errorf("tfhe: no key registered for party %d", s.PartyID)
 			}
 			if !verifyShareMAC(key, s) {
-				return AggregateResult{Status: StatusBadShare, ShareCount: valid}, nil, fmt.Errorf("tfhe: bad MAC on share from party %d", s.PartyID)
+				return AggregateResult{Status: StatusBadShare, ShareCount: len(deduped)}, nil, fmt.Errorf("tfhe: bad MAC on share from party %d", s.PartyID)
 			}
 		}
 		seen[s.PartyID] = struct{}{}
-		valid++
+		deduped = append(deduped, s)
 	}
 
-	if uint32(valid) < threshold {
-		return AggregateResult{Status: StatusInsufficientQuorum, ShareCount: valid}, nil, nil
+	if uint32(len(deduped)) < threshold {
+		return AggregateResult{Status: StatusInsufficientQuorum, ShareCount: len(deduped)}, nil, nil
 	}
 
-	// Toy threshold scheme: plaintext bytes ARE the ciphertext bytes
-	// once a valid quorum certifies them.
+	// Lattice path: dispatch the authenticated share set directly to
+	// Protocol.CombineShares — the single canonical combine routine.
+	if a.Protocol != nil {
+		plaintext, err := a.dispatchCombine(ctx, ct, deduped)
+		if err != nil {
+			return AggregateResult{Status: StatusBadShare, ShareCount: len(deduped)}, nil, err
+		}
+		return AggregateResult{Status: StatusOK, ShareCount: len(deduped)}, plaintext, nil
+	}
+
+	// Envelope path: the policy circuit emitted a 1-bit verdict in the
+	// clear inside the ciphertext envelope; the committee's job is to
+	// ratify "≥t parties saw the same ciphertext".
 	plaintext := append([]byte(nil), ct.Bytes...)
-	return AggregateResult{Status: StatusOK, ShareCount: valid}, plaintext, nil
+	return AggregateResult{Status: StatusOK, ShareCount: len(deduped)}, plaintext, nil
+}
+
+// dispatchCombine translates the committee-boundary share set onto
+// Protocol's per-party DecryptionShare and invokes the lattice combine.
+// The translation is mechanical: PartyID/SessionID/CiphertextID identify
+// the share, Partial carries the per-party partial-decryption bytes,
+// and CiphertextHash uses the Protocol's hash convention so
+// CombineShares' integrity check passes.
+func (a *ShareAggregator) dispatchCombine(
+	ctx context.Context,
+	ct FHECiphertext,
+	shares []FHEThresholdShare,
+) ([]byte, error) {
+	bc := &fhe.BitCiphertext{}
+	if err := bc.UnmarshalBinary(ct.Bytes); err != nil {
+		return nil, fmt.Errorf("tfhe: ciphertext unmarshal: %w", err)
+	}
+	ctHash := computeCiphertextHash(bc)
+
+	a.Protocol.ClearShares()
+	for _, s := range shares {
+		ds := &DecryptionShare{
+			PartyID:        party.ID(fmt.Sprintf("%d", s.PartyID)),
+			Index:          int(s.PartyID) - 1,
+			Generation:     a.Protocol.config.Generation,
+			CiphertextHash: ctHash,
+			PartialResult:  append([]byte(nil), s.Partial...),
+		}
+		if err := a.Protocol.AddDecryptionShare(ds); err != nil {
+			return nil, fmt.Errorf("tfhe: add share party %d: %w", s.PartyID, err)
+		}
+	}
+	return a.Protocol.CombineShares(ctx, bc)
 }
 
 // PartialDecrypter is the per-party partial-decrypt engine. Given a
@@ -186,37 +245,39 @@ func NewPartialDecrypter() *PartialDecrypter { return &PartialDecrypter{} }
 
 // PartialDecrypt computes the party's share for the given ciphertext.
 //
-// The mask is HMAC-SHA256(key, "LUX/FHE/THRESHOLD/MASK/v1" || sessionID
-// || ciphertextID). The MAC is HMAC-SHA256(key, "LUX/FHE/THRESHOLD/MAC/v1"
-// || partyID || sessionID || ciphertextID || mask), so a malicious
-// peer cannot replay another party's share or rebind a fresh share to
-// a different ciphertext / session.
+// Partial is HMAC-SHA256(key, "LUX/FHE/THRESHOLD/PARTIAL/v1" || sessionID
+// || ciphertextID) — a deterministic, per-party byte sequence that
+// fingerprints the (party, session, ciphertext) tuple. MAC is
+// HMAC-SHA256(key, "LUX/FHE/THRESHOLD/MAC/v1" || partyID || sessionID
+// || ciphertextID || Partial), so a malicious peer cannot replay
+// another party's share or rebind a fresh share to a different
+// ciphertext / session.
 func (p *PartialDecrypter) PartialDecrypt(
 	_ context.Context,
 	key KeyShare,
 	ct FHECiphertext,
 	sessionID [32]byte,
 ) (FHEThresholdShare, error) {
-	mask := computeMask(key, sessionID, ct.ID)
-	mac := computeMAC(key, key.PartyID, sessionID, ct.ID, mask)
+	partial := computePartial(key, sessionID, ct.ID)
+	mac := computeMAC(key, key.PartyID, sessionID, ct.ID, partial)
 	return FHEThresholdShare{
 		PartyID:      key.PartyID,
 		SessionID:    sessionID,
 		CiphertextID: ct.ID,
-		Mask:         mask,
+		Partial:      partial,
 		MAC:          mac,
 	}, nil
 }
 
-func computeMask(key KeyShare, sessionID, ctID [32]byte) []byte {
+func computePartial(key KeyShare, sessionID, ctID [32]byte) []byte {
 	h := hmac.New(sha256.New, key.Bytes)
-	h.Write([]byte("LUX/FHE/THRESHOLD/MASK/v1"))
+	h.Write([]byte("LUX/FHE/THRESHOLD/PARTIAL/v1"))
 	h.Write(sessionID[:])
 	h.Write(ctID[:])
 	return h.Sum(nil)
 }
 
-func computeMAC(key KeyShare, partyID uint32, sessionID, ctID [32]byte, mask []byte) [32]byte {
+func computeMAC(key KeyShare, partyID uint32, sessionID, ctID [32]byte, partial []byte) [32]byte {
 	h := hmac.New(sha256.New, key.Bytes)
 	h.Write([]byte("LUX/FHE/THRESHOLD/MAC/v1"))
 	var pid [4]byte
@@ -227,13 +288,13 @@ func computeMAC(key KeyShare, partyID uint32, sessionID, ctID [32]byte, mask []b
 	h.Write(pid[:])
 	h.Write(sessionID[:])
 	h.Write(ctID[:])
-	h.Write(mask)
+	h.Write(partial)
 	var out [32]byte
 	copy(out[:], h.Sum(nil))
 	return out
 }
 
 func verifyShareMAC(key KeyShare, s FHEThresholdShare) bool {
-	want := computeMAC(key, s.PartyID, s.SessionID, s.CiphertextID, s.Mask)
-	return hmac.Equal(want[:], s.MAC[:]) && bytes.Equal(computeMask(key, s.SessionID, s.CiphertextID), s.Mask)
+	want := computeMAC(key, s.PartyID, s.SessionID, s.CiphertextID, s.Partial)
+	return hmac.Equal(want[:], s.MAC[:])
 }
