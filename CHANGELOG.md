@@ -6,6 +6,16 @@ This document narrates the original Dec 2025 implementation timeline. All work w
 
 ---
 
+## Published tags
+
+### v1.6.5 — 2026-04-28
+- fix(lss/adapters): ed25519 nil/cross-curve guard — kill xrpl.go:185 panic
+- fix(ringtail): use SignWithConfig in tests after Sign API expanded
+- fix(go.sum): add missing h1 hashes for luxfi/log and 4 deps
+- sec(tfhe): UNSAFE markers + panic guards remain canonical (Red F5 fail-closed)
+
+---
+
 ## 2025-12-25 — TFHE marked UNSAFE
 
 The `committee.go` HMAC shim removal exposed a deeper architectural flaw in the TFHE path: the master key is replicated to all parties, the partial-decrypt step is HMAC theatre rather than a real partial decryption, and `CombineShares` ignores the partials entirely. None of this is real threshold FHE.
