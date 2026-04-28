@@ -280,7 +280,7 @@ func TestSolanaFeatures(t *testing.T) {
 		// Solana only supports Ed25519
 		config := &adapters.UnifiedConfig{
 			SignatureScheme: adapters.SignatureEdDSA,
-			Group:           curve.Secp256k1{}, // Using Secp256k1 as Edwards25519 not available
+			Group:           curve.Ed25519{},
 		}
 
 		err := sol.ValidateConfig(config)
@@ -544,10 +544,9 @@ func TestCrossChainCompatibility(t *testing.T) {
 	ed25519Chains := []string{"xrpl", "solana"}
 
 	config.SignatureScheme = adapters.SignatureEdDSA
-	// Using Secp256k1 as Edwards25519 not available
-	config.Group = curve.Secp256k1{}
-	config.SecretShare = curve.Secp256k1{}.NewScalar()
-	config.PublicKey = curve.Secp256k1{}.NewBasePoint()
+	config.Group = curve.Ed25519{}
+	config.SecretShare = curve.Ed25519{}.NewScalar()
+	config.PublicKey = curve.Ed25519{}.NewBasePoint()
 
 	for _, chain := range ed25519Chains {
 		adapter := factory.NewAdapter(chain, adapters.SignatureEdDSA)

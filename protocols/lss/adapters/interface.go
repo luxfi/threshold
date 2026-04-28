@@ -2,9 +2,34 @@
 package adapters
 
 import (
+	"fmt"
+
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
 )
+
+// coerceScalar returns a scalar on the target curve. If src is nil, a fresh
+// zero scalar on the curve is returned. If src already lives on the target
+// curve, it is returned as-is. Otherwise, src is re-encoded onto the curve
+// via MarshalBinary/UnmarshalBinary so cross-curve mock shares do not panic
+// during aggregation.
+func coerceScalar(group curve.Curve, src curve.Scalar) (curve.Scalar, error) {
+	if src == nil {
+		return group.NewScalar(), nil
+	}
+	if src.Curve().Name() == group.Name() {
+		return src, nil
+	}
+	bz, err := src.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("marshal share scalar: %w", err)
+	}
+	out := group.NewScalar()
+	if err := out.UnmarshalBinary(bz); err != nil {
+		return nil, fmt.Errorf("coerce share scalar to %s: %w", group.Name(), err)
+	}
+	return out, nil
+}
 
 // SignatureType defines the signature algorithm
 type SignatureType int

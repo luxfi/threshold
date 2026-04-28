@@ -105,10 +105,14 @@ func (x *XRPLAdapter) signEd25519(digest []byte, share Share) (PartialSig, error
 	// This would integrate with FROST protocol
 	// Return partial signature share
 	// For testing, provide a placeholder R value
+	z, err := coerceScalar(x.group, share.Value)
+	if err != nil {
+		return nil, fmt.Errorf("xrpl: %w", err)
+	}
 	return &EdDSAPartialSig{
 		PartyID: share.ID,
 		R:       x.group.NewBasePoint(), // Placeholder for testing
-		Z:       share.Value,
+		Z:       z,
 	}, nil
 }
 
@@ -171,14 +175,25 @@ func (x *XRPLAdapter) aggregateEd25519(parts []PartialSig) (FullSig, error) {
 	// Aggregate R and z values from partial signatures
 	var r curve.Point
 	z := x.group.NewScalar()
+	expectedCurve := x.group.Name()
 
-	for _, part := range parts {
+	for i, part := range parts {
 		eddsaPart, ok := part.(*EdDSAPartialSig)
 		if !ok {
 			return nil, errors.New("invalid Ed25519 partial signature")
 		}
 
+		if eddsaPart.Z == nil {
+			return nil, fmt.Errorf("xrpl: ed25519 partial[%d] has nil scalar Z", i)
+		}
+		if got := eddsaPart.Z.Curve().Name(); got != expectedCurve {
+			return nil, fmt.Errorf("xrpl: ed25519 partial[%d] scalar Z on wrong curve (got %s, want %s)", i, got, expectedCurve)
+		}
+
 		if r == nil && eddsaPart.R != nil {
+			if got := eddsaPart.R.Curve().Name(); got != expectedCurve {
+				return nil, fmt.Errorf("xrpl: ed25519 partial[%d] point R on wrong curve (got %s, want %s)", i, got, expectedCurve)
+			}
 			r = eddsaPart.R
 		}
 
