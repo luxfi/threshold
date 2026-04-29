@@ -247,11 +247,18 @@ func (r *RingtailFullSig) Serialize() []byte {
 // AdapterFactory creates appropriate adapter for a chain
 type AdapterFactory struct{}
 
-// NewAdapter creates a chain-specific adapter
+// NewAdapter creates a chain-specific adapter. Returns nil if the chain
+// is unsupported or the (chain, sigType) pair is invalid. Callers that
+// need the underlying error should construct the adapter directly via
+// the typed New*Adapter functions.
 func (f *AdapterFactory) NewAdapter(chain string, sigType SignatureType) SignerAdapter {
 	switch chain {
 	case "xrpl":
-		return NewXRPLAdapter(sigType, false)
+		a, err := NewXRPLAdapter(sigType, false)
+		if err != nil {
+			return nil
+		}
+		return a
 	case "ethereum":
 		return NewEthereumAdapter()
 	case "bitcoin":
@@ -261,7 +268,11 @@ func (f *AdapterFactory) NewAdapter(chain string, sigType SignatureType) SignerA
 	case "ton":
 		return NewTONAdapter(0) // basechain by default
 	case "cardano":
-		return NewCardanoAdapter(sigType, 0x01, EraBabbage) // mainnet, current era
+		a, err := NewCardanoAdapter(sigType, 0x01, EraBabbage) // mainnet, current era
+		if err != nil {
+			return nil
+		}
+		return a
 	case "cosmos":
 		// Cosmos adapter not yet available.
 		return nil

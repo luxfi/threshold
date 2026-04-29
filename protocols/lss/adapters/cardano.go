@@ -32,8 +32,10 @@ const (
 	EraConway  // Upcoming with governance
 )
 
-// NewCardanoAdapter creates a new Cardano adapter
-func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *CardanoAdapter {
+// NewCardanoAdapter creates a new Cardano adapter. Returns an error if
+// sigType is not one of EdDSA / ECDSA / Schnorr (Cardano's three valid
+// signature schemes for Babbage+ eras).
+func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) (*CardanoAdapter, error) {
 	var group curve.Curve
 	switch sigType {
 	case SignatureEdDSA:
@@ -43,7 +45,7 @@ func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *C
 	case SignatureSchnorr:
 		group = curve.Secp256k1{}
 	default:
-		panic("unsupported signature type for Cardano")
+		return nil, fmt.Errorf("cardano: unsupported signature type %v (want SignatureEdDSA, SignatureECDSA, or SignatureSchnorr)", sigType)
 	}
 
 	return &CardanoAdapter{
@@ -51,7 +53,7 @@ func NewCardanoAdapter(sigType SignatureType, networkID byte, era CardanoEra) *C
 		sigType:   sigType,
 		networkID: networkID,
 		era:       era,
-	}
+	}, nil
 }
 
 // Digest computes Cardano transaction digest

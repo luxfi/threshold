@@ -32,7 +32,8 @@ func TestAllChainsSupported(t *testing.T) {
 // TestXRPLAdapter tests XRPL-specific features
 func TestXRPLAdapter(t *testing.T) {
 	t.Run("ECDSA", func(t *testing.T) {
-		adapter := NewXRPLAdapter(SignatureECDSA, false)
+		adapter, err := NewXRPLAdapter(SignatureECDSA, false)
+		require.NoError(t, err)
 		require.NotNil(t, adapter)
 
 		// Test digest computation with STX prefix
@@ -44,14 +45,16 @@ func TestXRPLAdapter(t *testing.T) {
 		assert.Len(t, digest, 32, "SHA-512Half should be 32 bytes")
 
 		// Test multi-signing with SMT prefix
-		multiAdapter := NewXRPLAdapter(SignatureECDSA, true)
+		multiAdapter, err := NewXRPLAdapter(SignatureECDSA, true)
+		require.NoError(t, err)
 		multiDigest, err := multiAdapter.Digest(txBlob)
 		require.NoError(t, err)
 		assert.NotEqual(t, digest, multiDigest, "STX and SMT should produce different digests")
 	})
 
 	t.Run("EdDSA", func(t *testing.T) {
-		adapter := NewXRPLAdapter(SignatureEdDSA, false)
+		adapter, err := NewXRPLAdapter(SignatureEdDSA, false)
+		require.NoError(t, err)
 		require.NotNil(t, adapter)
 
 		// Test Ed25519 public key formatting
@@ -61,7 +64,8 @@ func TestXRPLAdapter(t *testing.T) {
 	})
 
 	t.Run("ValidateConfig", func(t *testing.T) {
-		adapter := NewXRPLAdapter(SignatureECDSA, false)
+		adapter, err := NewXRPLAdapter(SignatureECDSA, false)
+		require.NoError(t, err)
 		config := &UnifiedConfig{
 			SignatureScheme: SignatureECDSA,
 			Threshold:       3,
@@ -73,7 +77,7 @@ func TestXRPLAdapter(t *testing.T) {
 			},
 		}
 
-		err := adapter.ValidateConfig(config)
+		err = adapter.ValidateConfig(config)
 		assert.NoError(t, err)
 
 		// Test invalid threshold
@@ -307,7 +311,8 @@ func TestTONAdapter(t *testing.T) {
 // TestCardanoAdapter tests Cardano-specific features
 func TestCardanoAdapter(t *testing.T) {
 	t.Run("Ed25519Native", func(t *testing.T) {
-		adapter := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		adapter, err := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		require.NoError(t, err)
 		require.NotNil(t, adapter)
 
 		tx := &CardanoTransaction{
@@ -330,7 +335,8 @@ func TestCardanoAdapter(t *testing.T) {
 	})
 
 	t.Run("ECDSAInterop", func(t *testing.T) {
-		adapter := NewCardanoAdapter(SignatureECDSA, 0x01, EraBabbage)
+		adapter, err := NewCardanoAdapter(SignatureECDSA, 0x01, EraBabbage)
+		require.NoError(t, err)
 		require.NotNil(t, adapter)
 
 		config := &UnifiedConfig{
@@ -338,12 +344,13 @@ func TestCardanoAdapter(t *testing.T) {
 			Group:           curve.Secp256k1{},
 		}
 
-		err := adapter.ValidateConfig(config)
+		err = adapter.ValidateConfig(config)
 		assert.NoError(t, err)
 	})
 
 	t.Run("SchnorrInterop", func(t *testing.T) {
-		adapter := NewCardanoAdapter(SignatureSchnorr, 0x01, EraBabbage)
+		adapter, err := NewCardanoAdapter(SignatureSchnorr, 0x01, EraBabbage)
+		require.NoError(t, err)
 		require.NotNil(t, adapter)
 
 		// Test Schnorr signature aggregation
@@ -360,7 +367,8 @@ func TestCardanoAdapter(t *testing.T) {
 	})
 
 	t.Run("AddressGeneration", func(t *testing.T) {
-		adapter := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		adapter, err := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		require.NoError(t, err)
 
 		var paymentKey, stakeKey [32]byte
 		rand.Read(paymentKey[:])
@@ -372,7 +380,8 @@ func TestCardanoAdapter(t *testing.T) {
 	})
 
 	t.Run("FeeEstimation", func(t *testing.T) {
-		adapter := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		adapter, err := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		require.NoError(t, err)
 
 		tx := &CardanoTransaction{
 			Body: &TransactionBody{
@@ -602,7 +611,10 @@ func BenchmarkAdapters(b *testing.B) {
 	rand.Read(message)
 
 	b.Run("XRPL_Digest", func(b *testing.B) {
-		adapter := NewXRPLAdapter(SignatureECDSA, false)
+		adapter, err := NewXRPLAdapter(SignatureECDSA, false)
+		if err != nil {
+			b.Fatal(err)
+		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_, _ = adapter.Digest(message)
@@ -626,7 +638,10 @@ func BenchmarkAdapters(b *testing.B) {
 	})
 
 	b.Run("Cardano_Digest", func(b *testing.B) {
-		adapter := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		adapter, err := NewCardanoAdapter(SignatureEdDSA, 0x01, EraBabbage)
+		if err != nil {
+			b.Fatal(err)
+		}
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_, _ = adapter.Digest(message)
