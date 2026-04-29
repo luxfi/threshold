@@ -23,6 +23,7 @@ import (
 
 // Mock round implementation for testing
 type mockRound struct {
+	mu                sync.Mutex
 	number            round.Number
 	threshold         int
 	n                 int
@@ -69,6 +70,8 @@ func (m *mockRound) StoreMessage(msg round.Message) error {
 	if m.storeShouldErr {
 		return errors.New("store error")
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.messages == nil {
 		m.messages = make(map[party.ID]*round.Message)
 	}
@@ -138,6 +141,8 @@ func (m *mockBroadcastRound) StoreBroadcastMessage(msg round.Message) error {
 	if m.storeShouldErr {
 		return errors.New("store broadcast error")
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.broadcasts == nil {
 		m.broadcasts = make(map[party.ID]*round.Message)
 	}

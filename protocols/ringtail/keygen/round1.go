@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"io"
+	"sync"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"
@@ -13,6 +14,12 @@ import (
 
 	realring "github.com/luxfi/ringtail/threshold"
 )
+
+// UpstreamMu serializes calls into github.com/luxfi/ringtail v0.2.0,
+// whose internal precomputed-randomness buffer is a package global and not
+// safe for concurrent use. Exported so the sign package can share it.
+// Remove once upstream is goroutine-safe.
+var UpstreamMu sync.Mutex
 
 // round1 generates key shares using real Ringtail and distributes commitments
 type round1 struct {
@@ -92,8 +99,12 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	n := len(r.participants)
 	t := r.Threshold()
 
-	// Generate real Ringtail key shares using the threshold package
+	// Generate real Ringtail key shares using the threshold package.
+	// Upstream v0.2.0 uses package-level globals for precomputed randomness;
+	// serialize calls until that is fixed.
+	UpstreamMu.Lock()
 	keyShares, groupKey, err := realring.GenerateKeys(t, n, rand.Reader)
+	UpstreamMu.Unlock()
 	if err != nil {
 		return nil, err
 	}
