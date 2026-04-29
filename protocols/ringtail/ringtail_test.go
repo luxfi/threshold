@@ -276,7 +276,7 @@ func TestConfigValidation(t *testing.T) {
 
 				params := cfg.GetParameters()
 				assert.Greater(t, params.N, 0)
-				assert.Greater(t, params.Q, 0)
+				assert.Greater(t, params.Q, uint64(0))
 				assert.Greater(t, params.Sigma, 0.0)
 			}
 		})
@@ -297,7 +297,7 @@ func TestSecurityLevels(t *testing.T) {
 
 		params := cfg.GetParameters()
 		assert.Greater(t, params.N, 0)
-		assert.Greater(t, params.Q, 0)
+		assert.Greater(t, params.Q, uint64(0))
 		assert.Greater(t, params.Sigma, 0.0)
 
 		switch level {

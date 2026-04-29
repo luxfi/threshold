@@ -29,9 +29,12 @@ type Harness struct {
 	errors   map[party.ID]error
 }
 
-// NewHarness creates a new test harness with proper context management
+// NewHarness creates a new test harness with proper context management.
+// Default 5-minute timeout matches the per-handler ProtocolTimeout below;
+// `go test ./...` runs many packages in parallel and harness wall-clock can
+// stretch under CPU contention even when the protocol itself takes <1s.
 func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
 	h := &Harness{
 		t:        t,
