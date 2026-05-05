@@ -79,7 +79,7 @@ import (
 )
 ```
 
-Never use ava-labs packages. Use `luxfi/crypto`, `luxfi/log`, `luxfi/zmq`.
+Use `luxfi/crypto`, `luxfi/log`, `luxfi/zmq` exclusively.
 
 ## Recent Changes (December 2024)
 
@@ -90,9 +90,9 @@ Never use ava-labs packages. Use `luxfi/crypto`, `luxfi/log`, `luxfi/zmq`.
 - New functions: `randFe`, `pluckColumnToFieldElement`, `transposeToFieldSizeElements`, `adjustBatchSize`
 
 ### Cleanup
-- Renamed Avalanche references to Lux throughout
+- Renamed legacy upstream references to Lux throughout
 - Removed obsolete `.old` and `.bak` files
-- Updated chain symbol from AVAX to LUX
+- Updated chain symbol to LUX
 
 ## Testing
 
