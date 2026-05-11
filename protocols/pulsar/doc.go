@@ -174,7 +174,7 @@
 // # See also
 //
 //	github.com/luxfi/pulsar              — math kernel
-//	github.com/luxfi/pulsar/DESIGN.md    — design source of truth
+//	github.com/luxfi/corona/DESIGN.md    — design source of truth
 //	luxcpp/crypto/pulsar/                — byte-equal C++ port
 //	protocols/quasar/                    — Quasar consensus orchestration
 //	protocols/lss/reshare/               — round-based ECDSA reshare reference
