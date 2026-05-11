@@ -24,7 +24,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/luxfi/pulsar/reshare"
+	"github.com/luxfi/corona/reshare"
 )
 
 // lssBaselineTranscript builds the baseline TranscriptInputs an
