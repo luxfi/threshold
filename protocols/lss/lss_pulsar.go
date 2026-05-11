@@ -33,7 +33,7 @@
 // What this adapter must NOT do:
 //
 //   - Reimplement Pulsar VSR math (commits, complaints, transcript).
-//     That lives in github.com/luxfi/pulsar/reshare and is called via
+//     That lives in github.com/luxfi/corona/reshare and is called via
 //     pulsar.KeyEra.Reshare.
 //   - Inherit ECDSA-specific assumptions from LSS-CMP / LSS-FROST
 //     (auxiliary secrets w, q; curve.Point commits; nonce blinding).
@@ -53,10 +53,10 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 
-	"github.com/luxfi/pulsar/hash"
-	"github.com/luxfi/pulsar/keyera"
-	"github.com/luxfi/pulsar/reshare"
-	pulsarThreshold "github.com/luxfi/pulsar/threshold"
+	"github.com/luxfi/corona/hash"
+	"github.com/luxfi/corona/keyera"
+	"github.com/luxfi/corona/reshare"
+	pulsarThreshold "github.com/luxfi/corona/threshold"
 )
 
 // PulsarConfig is the LSS-Pulsar adapter's per-party configuration.

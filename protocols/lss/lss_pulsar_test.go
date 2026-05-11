@@ -9,8 +9,8 @@ import (
 
 	"github.com/luxfi/threshold/pkg/party"
 
-	"github.com/luxfi/pulsar/keyera"
-	pulsarThreshold "github.com/luxfi/pulsar/threshold"
+	"github.com/luxfi/corona/keyera"
+	pulsarThreshold "github.com/luxfi/corona/threshold"
 
 	"github.com/zeebo/blake3"
 )

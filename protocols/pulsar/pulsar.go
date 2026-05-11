@@ -33,8 +33,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/luxfi/pulsar/keyera"
-	"github.com/luxfi/pulsar/threshold"
+	"github.com/luxfi/corona/keyera"
+	"github.com/luxfi/corona/threshold"
 
 	"github.com/luxfi/threshold/pkg/party"
 )
@@ -127,7 +127,7 @@ func Bootstrap(t int, validators []party.ID, groupID PulsarGroupID, eraID Pulsar
 // preserving GroupKey. The kernel runs in-process. For distributed
 // deployments, the consensus layer wraps this in the full VSR exchange
 // (commits, complaints, activation cert) defined in
-// github.com/luxfi/pulsar/reshare.
+// github.com/luxfi/corona/reshare.
 //
 // rand defaults to crypto/rand.Reader.
 func Reshare(era *KeyEra, newValidators []party.ID, newThreshold int, randSource io.Reader) (*EpochShareState, error) {

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/luxfi/pulsar/keyera"
+	"github.com/luxfi/corona/keyera"
 	"github.com/luxfi/threshold/pkg/party"
 )
 
