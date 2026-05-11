@@ -72,7 +72,7 @@ require (
 
 require (
 	github.com/luxfi/lens v0.1.0-rc1-pq-consensus-freeze
-	github.com/luxfi/pulsar v0.1.0-rc1-pq-consensus-freeze
+	github.com/luxfi/corona v0.1.0-rc1-pq-consensus-freeze
 )
 
 // Local-dev replace directives. Tagged versions above pin the
@@ -81,5 +81,5 @@ require (
 // SHA → tag mapping.
 replace (
 	github.com/luxfi/lens => ../lens // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
-	github.com/luxfi/pulsar => ../pulsar // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
+	github.com/luxfi/corona => ../corona // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
 )
