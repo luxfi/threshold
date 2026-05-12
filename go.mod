@@ -71,8 +71,8 @@ require (
 )
 
 require (
+	github.com/luxfi/corona v0.2.0
 	github.com/luxfi/lens v0.1.0-rc1-pq-consensus-freeze
-	github.com/luxfi/corona v0.1.0-rc1-pq-consensus-freeze
 )
 
 // Local-dev replace directives. Tagged versions above pin the
@@ -80,6 +80,6 @@ require (
 // ~/work/lux/consensus/CROSS-REPO-VERSION-PIN.md for the canonical commit
 // SHA → tag mapping.
 replace (
-	github.com/luxfi/lens => ../lens // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
 	github.com/luxfi/corona => ../corona // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
+	github.com/luxfi/lens => ../lens // pinned to v0.1.0-rc1-pq-consensus-freeze; see go-mod-pin.md
 )
