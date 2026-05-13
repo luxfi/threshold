@@ -133,14 +133,58 @@ func TestFrostRoundTrip(t *testing.T) {
 	roundtrip(t, "frost", 2, 3)
 }
 
-func TestPulsarRoundTrip(t *testing.T) {
+// TestPulsarExplicitlyNotImplemented asserts the dispatcher refuses to
+// mint in-process tokens for the Pulsar namespace until upstream ships
+// stable wire encodings. See pulsar.go header (Red HIGH B2).
+func TestPulsarExplicitlyNotImplemented(t *testing.T) {
 	t.Parallel()
-	roundtrip(t, "pulsar", 2, 3)
+	assertSchemeReturnsTypedError(t, "pulsar", "not yet implemented")
 }
 
-func TestCoronaRoundTrip(t *testing.T) {
+// TestCoronaExplicitlyNotImplemented mirrors TestPulsarExplicitlyNotImplemented.
+func TestCoronaExplicitlyNotImplemented(t *testing.T) {
 	t.Parallel()
-	roundtrip(t, "corona", 2, 3)
+	assertSchemeReturnsTypedError(t, "corona", "not yet implemented")
+}
+
+// assertSchemeReturnsTypedError posts every op on `scheme` and verifies
+// the daemon surfaces an explicit error message containing `wantSub`
+// rather than silently returning bad data.
+func assertSchemeReturnsTypedError(t *testing.T, scheme, wantSub string) {
+	t.Helper()
+	url, stop := startTestServer(t)
+	defer stop()
+
+	for _, op := range []struct {
+		method string
+		params any
+	}{
+		{scheme + ".keygen", map[string]any{"threshold": 2, "participants": 3}},
+		{scheme + ".sign", map[string]any{"messageHex": "00", "pubKeyHex": "00"}},
+		{scheme + ".verify", map[string]any{"messageHex": "00", "signatureHex": "00", "pubKeyHex": "00"}},
+	} {
+		body, _ := json.Marshal(map[string]any{
+			"jsonrpc": "2.0", "id": 1, "method": op.method, "params": op.params,
+		})
+		resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("%s: post: %v", op.method, err)
+		}
+		var env struct {
+			Error *struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&env)
+		resp.Body.Close()
+		if env.Error == nil {
+			t.Fatalf("%s: expected typed error, got success", op.method)
+		}
+		if !strings.Contains(env.Error.Message, wantSub) {
+			t.Fatalf("%s: error %q does not contain %q", op.method, env.Error.Message, wantSub)
+		}
+	}
 }
 
 func TestBLSRoundTrip(t *testing.T) {
@@ -218,6 +262,112 @@ func TestUnknownMethod(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&env)
 	if env.Error == nil || env.Error.Code != -32601 {
 		t.Fatalf("expected -32601 method-not-found, got %+v", env.Error)
+	}
+}
+
+// TestAuthTokenRejectsMissingHeader asserts that a Server with a non-empty
+// auth token rejects requests without an Authorization header.
+// Red HIGH B1 — dispatcher must not be an anonymous local signing oracle.
+func TestAuthTokenRejectsMissingHeader(t *testing.T) {
+	t.Parallel()
+	srv, err := NewServer()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	srv.SetAuthToken("secret-token")
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	body, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": "bls.keygen",
+		"params": map[string]any{"threshold": 2, "participants": 3},
+	})
+	resp, err := http.Post(ts.URL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("missing-token: got status %d, want 401", resp.StatusCode)
+	}
+}
+
+// TestAuthTokenRejectsWrongToken asserts wrong-token requests fail 401.
+func TestAuthTokenRejectsWrongToken(t *testing.T) {
+	t.Parallel()
+	srv, err := NewServer()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	srv.SetAuthToken("secret-token")
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	body, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": "bls.keygen",
+		"params": map[string]any{"threshold": 2, "participants": 3},
+	})
+	req, _ := http.NewRequest("POST", ts.URL, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer wrong-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong-token: got status %d, want 401", resp.StatusCode)
+	}
+}
+
+// TestAuthTokenAcceptsValid asserts the correct token reaches the handler.
+func TestAuthTokenAcceptsValid(t *testing.T) {
+	t.Parallel()
+	srv, err := NewServer()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	srv.SetAuthToken("secret-token")
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	body, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": "bls.keygen",
+		"params": map[string]any{"threshold": 2, "participants": 3},
+	})
+	req, _ := http.NewRequest("POST", ts.URL, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer secret-token")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("valid-token: got status %d, want 200", resp.StatusCode)
+	}
+}
+
+// TestAuthTokenEmptyAllowsAnonymous asserts that the default (empty
+// token) preserves the standalone CLI's dev-loopback behaviour — no
+// gate engaged. The mpcd embedder always sets a token; this test
+// covers the standalone `cmd/thresholdd` path.
+func TestAuthTokenEmptyAllowsAnonymous(t *testing.T) {
+	t.Parallel()
+	url, stop := startTestServer(t)
+	defer stop()
+
+	body, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": 1, "method": "bls.keygen",
+		"params": map[string]any{"threshold": 2, "participants": 3},
+	})
+	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("empty-token: got status %d, want 200", resp.StatusCode)
 	}
 }
 
