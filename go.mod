@@ -8,7 +8,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0
 	// Lux crypto stack - this is the HIGH-LEVEL orchestration layer
 	// that consumes primitives from these packages (LP-5703, LP-5704)
-	github.com/luxfi/crypto v1.17.43 // ECDSA, EdDSA, BLS curves
+	github.com/luxfi/crypto v1.19.0 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
 	github.com/luxfi/lattice/v7 v7.1.0 // Lattice ops for Ringtail (post-quantum) + GPU acceleration
 	github.com/luxfi/ringtail v0.2.0 // Post-quantum threshold signatures (uses lattice/v7)
@@ -35,6 +35,7 @@ require (
 require (
 	github.com/ALTree/bigfloat v0.2.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20260215031811-a0ab0b218a81 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
@@ -45,10 +46,16 @@ require (
 	github.com/google/pprof v0.0.0-20251213031049-b05bdaca462f // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/luxfi/accel v1.0.7 // indirect
+	github.com/luxfi/cache v1.1.0 // indirect
+	github.com/luxfi/ids v1.2.9 // indirect
+	github.com/luxfi/mock v0.1.0 // indirect
+	github.com/luxfi/utils v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
+	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -57,6 +64,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	go.uber.org/mock v0.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
