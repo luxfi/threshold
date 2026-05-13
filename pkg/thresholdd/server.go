@@ -1,6 +1,7 @@
 package thresholdd
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,12 +74,31 @@ type scheme interface {
 }
 
 // Server is the JSON-RPC dispatcher.
+//
+// Auth: a non-empty `authToken` gates every JSON-RPC request behind a
+// constant-time `Authorization: Bearer <token>` comparison. Empty token
+// disables the gate (used by the standalone `thresholdd` CLI for dev
+// tooling on loopback). Production embedders (luxfi/mpc's mpcd) MUST
+// call `SetAuthToken` with a per-cluster shared secret derived from the
+// node identity — see luxfi/mpc/cmd/mpcd/main.go.
+//
+// Closes Red HIGH B1: an unauthenticated dispatcher on a known port is
+// a signing oracle for any local process (and via SSRF, any code that
+// can issue an HTTP request from inside mpcd).
 type Server struct {
-	mu      sync.RWMutex
-	schemes map[string]scheme
+	mu        sync.RWMutex
+	schemes   map[string]scheme
+	authToken string
 }
 
-// NewServer builds the dispatcher with all six schemes wired up.
+// NewServer builds the dispatcher with the five wired schemes
+// (cggmp21, frost, bls + the reserved-error doerner slot). Pulsar and
+// Corona are NOT wired here: their Signature / GroupKey types lack
+// stable wire encodings, so the previous "in-memory token" surface was
+// unverifiable by any second party (Red HIGH B2). The wire surface for
+// pulsar/corona is reserved by `newNotYetImplementedScheme` until the
+// underlying primitives ship `MarshalBinary` / `UnmarshalBinary` that
+// any independent verifier can consume. See pulsar.go / corona.go.
 func NewServer() (*Server, error) {
 	s := &Server{schemes: make(map[string]scheme)}
 
@@ -92,11 +112,38 @@ func NewServer() (*Server, error) {
 	return s, nil
 }
 
+// SetAuthToken installs a bearer token. Subsequent requests must carry
+// `Authorization: Bearer <token>` or receive HTTP 401. Empty token
+// removes the gate. Constant-time comparison defeats timing attacks.
+func (s *Server) SetAuthToken(token string) {
+	s.mu.Lock()
+	s.authToken = token
+	s.mu.Unlock()
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Auth gate. Read under the same RLock as the schemes map so
+	// SetAuthToken can flip the gate atomically.
+	s.mu.RLock()
+	wantTok := s.authToken
+	s.mu.RUnlock()
+	if wantTok != "" {
+		const prefix = "Bearer "
+		got := r.Header.Get("Authorization")
+		if !strings.HasPrefix(got, prefix) ||
+			subtle.ConstantTimeCompare([]byte(got[len(prefix):]), []byte(wantTok)) != 1 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+			return
+		}
+	}
+
 	body, err := io.ReadAll(io.LimitReader(r.Body, 16*1024*1024))
 	if err != nil {
 		writeError(w, nil, -32700, "read body: "+err.Error())
