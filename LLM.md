@@ -11,6 +11,7 @@ Production-ready universal threshold signature implementation supporting 20+ blo
 ```
 threshold/
 ├── cmd/threshold-cli/     # CLI tool
+├── cmd/thresholdd/        # JSON-RPC 2.0 daemon — all six schemes over one socket (127.0.0.1:7300)
 ├── internal/              # Private implementation details
 │   ├── bip32/            # BIP-32 key derivation
 │   ├── elgamal/          # ElGamal encryption
@@ -80,6 +81,55 @@ import (
 ```
 
 Use `luxfi/crypto`, `luxfi/log`, `luxfi/zmq` exclusively.
+
+## thresholdd — unified JSON-RPC dispatcher
+
+The dispatcher itself lives in **`pkg/thresholdd/`** (importable
+package: `github.com/luxfi/threshold/pkg/thresholdd`). Two startup
+paths consume the same `NewServer()`:
+
+1. **`cmd/thresholdd/`** — standalone CLI binary used for development,
+   CI, and the JSON-RPC test rig in `pkg/thresholdd/thresholdd_test.go`.
+2. **`luxfi/mpc`'s production daemon `mpcd`** — embeds the dispatcher
+   on `--threshold-listen` (default `127.0.0.1:7300`). In production
+   there is exactly one daemon: `mpcd`. The standalone `thresholdd`
+   exists for dev tooling and as the canonical test surface.
+
+Both expose every scheme (cggmp21, frost, pulsar, corona, bls,
+doerner) on one process-local socket. Wire format mirrors the teleport
+mpc bus (`teleport/mpc/src/signers/rpc.ts`):
+
+```
+POST / with body:
+  {"jsonrpc":"2.0","id":N,"method":"<scheme>.<op>","params":{...}}
+```
+
+Methods (three ops per namespace):
+
+| Method | Params | Result |
+|--------|--------|--------|
+| `<scheme>.keygen` | `{threshold, participants}` | `{publicKey: hex, shares: [hex, ...]}` |
+| `<scheme>.sign` | `{messageHex, pubKeyHex}` | `{signatureHex}` |
+| `<scheme>.verify` | `{messageHex, signatureHex, pubKeyHex}` | `{ok: bool}` |
+
+Bind defaults to `127.0.0.1:7300` (process-local IPC; not network-
+exposed). `--listen :0` takes a random port for parallel test runs.
+
+Status per scheme:
+- `cggmp21` — full keygen + sign via `protocols/cmp` (CGGMP21 fork)
+- `frost` — full RFC 9591 secp256k1 via `protocols/frost`
+- `pulsar` — full Pulsar M-LWE via `luxfi/corona/threshold`
+- `corona` — full Corona R-LWE via `luxfi/corona/threshold`
+- `bls` — full Shamir/Lagrange via `protocols/bls.TrustedDealer`
+- `doerner` — round-protocol non-functional upstream; surface reserved,
+  every op returns an explicit error. Fix upstream and remove the guard.
+
+Pulsar/Corona Signature/GroupKey types lack stable wire encodings, so
+the daemon mints opaque 32-byte tokens for `publicKey` and signature
+handles and stashes the live objects in-process. Tokens are not durable
+across daemon restarts — this is by design for process-local IPC.
+
+Tests: `go test ./cmd/thresholdd/ -timeout 600s` (8 tests, ~15s total).
 
 ## Recent Changes (December 2024)
 
