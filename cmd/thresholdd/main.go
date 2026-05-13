@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -46,6 +47,27 @@ func main() {
 	srv, err := thresholdd.NewServer()
 	if err != nil {
 		log.Fatalf("thresholdd: build server: %v", err)
+	}
+
+	// Optional bearer-token auth (Red HIGH B1). Empty token = no gate;
+	// matches the historical dev-tooling default but lets operators
+	// flip it on without touching the binary.
+	if tok := os.Getenv("THRESHOLDD_AUTH_TOKEN"); tok != "" {
+		srv.SetAuthToken(tok)
+		fmt.Fprintln(os.Stderr, "thresholdd: bearer-token auth enabled")
+	}
+
+	// Refuse non-loopback binds unless explicitly overridden. Closes
+	// the operator-typo attack: a stray `--listen 0.0.0.0:7300` would
+	// otherwise expose the dispatcher cluster-wide. Override knob is
+	// THRESHOLDD_ALLOW_REMOTE=1 (mirrors the MPC_THRESHOLD_ALLOW_REMOTE
+	// knob in luxfi/mpc's mpcd).
+	if !isLoopbackBind(*listen) && os.Getenv("THRESHOLDD_ALLOW_REMOTE") != "1" {
+		log.Fatalf(
+			"thresholdd: refusing non-loopback bind %q without "+
+				"THRESHOLDD_ALLOW_REMOTE=1 (use 127.0.0.1:* / [::1]:* or set the env)",
+			*listen,
+		)
 	}
 
 	ln, err := net.Listen("tcp", *listen)
@@ -75,4 +97,31 @@ func main() {
 		log.Fatalf("thresholdd: serve: %v", err)
 	}
 	<-idle
+}
+
+// isLoopbackBind reports whether the given listen address resolves to
+// a loopback or unspecified-but-explicit-loopback host. Accepts the
+// historical `:port` shorthand only when paired with `127.0.0.1` /
+// `[::1]`; bare `:7300` (which resolves to 0.0.0.0:7300) is NOT
+// considered loopback — operators must spell out the host.
+func isLoopbackBind(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if host == "" {
+		// Bare `:port` binds to all interfaces → not loopback.
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	if strings.EqualFold(host, "::1") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback()
 }
