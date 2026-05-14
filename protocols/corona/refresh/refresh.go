@@ -10,7 +10,7 @@ import (
 	"github.com/luxfi/threshold/protocols/corona/config"
 )
 
-// Start initiates the Ringtail key refresh protocol
+// Start initiates the Corona key refresh protocol
 // This protocol refreshes shares while maintaining the same public key
 func Start(cfg *config.Config, newParticipants []party.ID, newThreshold int, pl *pool.Pool) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
@@ -32,7 +32,7 @@ func Start(cfg *config.Config, newParticipants []party.ID, newThreshold int, pl 
 		}
 
 		info := round.Info{
-			ProtocolID:       "ringtail/refresh",
+			ProtocolID:       "corona/refresh",
 			FinalRoundNumber: 3, // Refresh has 3 rounds
 			SelfID:           cfg.ID,
 			PartyIDs:         newParticipants,

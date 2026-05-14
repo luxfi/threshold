@@ -78,7 +78,7 @@ func TestNewXRPLAdapter_RejectsUnsupportedSigType(t *testing.T) {
 		st   SignatureType
 	}{
 		{"schnorr_unsupported", SignatureSchnorr},
-		{"ringtail_unsupported", SignatureCorona},
+		{"corona_unsupported", SignatureCorona},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

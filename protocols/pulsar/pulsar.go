@@ -16,15 +16,15 @@
 //	  ├── party.ID, pool.Pool conventions
 //	  └── distributed protocol entrypoints (StartFunc).
 //
-// This package is the equivalent of protocols/ringtail/ but built on
+// This package is the equivalent of protocols/corona/ but built on
 // the pulsar fork — proper t-of-n via general Shamir, lattice-correct
 // Pedersen DKG (dkg2), full VSR with activation cert (reshare), and
 // the keyera lifecycle (Bootstrap → Reshare* → Reanchor).
 //
-// Use this for new code. The protocols/ringtail/ package is kept for
+// Use this for new code. The protocols/corona/ package is kept for
 // backwards compatibility but its refresh body is a stub and its DKG
 // inherits the upstream pseudoinverse-recoverable Feldman commit (see
-// luxcpp/crypto/ringtail/RED-DKG-REVIEW.md).
+// luxcpp/crypto/corona/RED-DKG-REVIEW.md).
 package pulsar
 
 import (
