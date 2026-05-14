@@ -65,7 +65,7 @@ const (
 	Zcash  Chain = "zcash"
 
 	// Post-Quantum
-	Ringtail Chain = "ringtail"
+	Corona Chain = "corona"
 )
 
 // ChainType represents the type of blockchain
@@ -232,10 +232,10 @@ func GetChainInfo(chain Chain) *ChainInfo {
 			Symbol:        "CELO",
 			Decimals:      18,
 		},
-		Ringtail: {
-			Name:          "Ringtail (Post-Quantum)",
+		Corona: {
+			Name:          "Corona (Post-Quantum)",
 			Type:          TypePostQuantum,
-			SignatureType: adapters.SignatureRingtail,
+			SignatureType: adapters.SignatureCorona,
 			Curve:         "Lattice",
 			Symbol:        "PQ",
 			Decimals:      0,
@@ -344,8 +344,8 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 
 	case TypePostQuantum:
 		// Post-quantum chains
-		if chain == Ringtail {
-			return adapters.NewRingtailAdapter(128, 100), nil
+		if chain == Corona {
+			return adapters.NewCoronaAdapter(128, 100), nil
 		}
 		return nil, fmt.Errorf("unsupported post-quantum chain: %s", chain)
 
@@ -379,7 +379,7 @@ func SupportedChains() []Chain {
 		Arbitrum, Optimism, Base, zkSync, Scroll,
 		BSC, Celo, Fantom, Cronos, Harmony,
 		Moonbeam, Aurora, Gnosis, Kava, Klaytn,
-		Ringtail,
+		Corona,
 	}
 }
 
