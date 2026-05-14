@@ -278,7 +278,7 @@ func (r *signRound2) Finalize(out chan<- *round.Message) (round.Session, error) 
 	}
 
 	// Return the final signature
-	return r.ResultRound(&CoronaSignature{
+	return r.ResultRound(&Signature{
 		Signature: sig,
 		Message:   r.message,
 		Signers:   r.PartyIDs(),
@@ -297,8 +297,8 @@ func (signBroadcast2) RoundNumber() round.Number {
 	return 2
 }
 
-// CoronaSignature represents a completed threshold signature
-type CoronaSignature struct {
+// Signature represents a completed threshold signature
+type Signature struct {
 	Signature *realring.Signature
 	Message   []byte
 	Signers   []party.ID
@@ -306,7 +306,7 @@ type CoronaSignature struct {
 }
 
 // Verify checks if the signature is valid using real Corona verification
-func (s *CoronaSignature) Verify(publicKey []byte) bool {
+func (s *Signature) Verify(publicKey []byte) bool {
 	if s.Signature == nil || s.GroupKey == nil {
 		return false
 	}
@@ -314,7 +314,7 @@ func (s *CoronaSignature) Verify(publicKey []byte) bool {
 }
 
 // Bytes serializes the signature
-func (s *CoronaSignature) Bytes() []byte {
+func (s *Signature) Bytes() []byte {
 	if s.Signature == nil {
 		return nil
 	}
