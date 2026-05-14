@@ -11,7 +11,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/threshold/protocols/ringtail/config"
+	"github.com/luxfi/threshold/protocols/corona/config"
 
 	realsign "github.com/luxfi/corona/sign"
 	realring "github.com/luxfi/corona/threshold"
@@ -278,7 +278,7 @@ func (r *signRound2) Finalize(out chan<- *round.Message) (round.Session, error) 
 	}
 
 	// Return the final signature
-	return r.ResultRound(&RingtailSignature{
+	return r.ResultRound(&Signature{
 		Signature: sig,
 		Message:   r.message,
 		Signers:   r.PartyIDs(),
@@ -297,8 +297,8 @@ func (signBroadcast2) RoundNumber() round.Number {
 	return 2
 }
 
-// RingtailSignature represents a completed threshold signature
-type RingtailSignature struct {
+// Signature represents a completed threshold signature
+type Signature struct {
 	Signature *realring.Signature
 	Message   []byte
 	Signers   []party.ID
@@ -306,7 +306,7 @@ type RingtailSignature struct {
 }
 
 // Verify checks if the signature is valid using real Ringtail verification
-func (s *RingtailSignature) Verify(publicKey []byte) bool {
+func (s *Signature) Verify(publicKey []byte) bool {
 	if s.Signature == nil || s.GroupKey == nil {
 		return false
 	}
@@ -314,7 +314,7 @@ func (s *RingtailSignature) Verify(publicKey []byte) bool {
 }
 
 // Bytes serializes the signature
-func (s *RingtailSignature) Bytes() []byte {
+func (s *Signature) Bytes() []byte {
 	if s.Signature == nil {
 		return nil
 	}
