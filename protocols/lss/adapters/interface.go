@@ -39,7 +39,7 @@ const (
 	SignatureEdDSA
 	SignatureSchnorr
 	SignatureBLS
-	SignatureRingtail  // Post-quantum lattice-based
+	SignatureCorona  // Post-quantum lattice-based
 	SignatureDilithium // Post-quantum ML-DSA (NIST standard)
 )
 
@@ -101,7 +101,7 @@ type UnifiedConfig struct {
 	// Additional scheme-specific data
 	ECDSAConfig     *ECDSAExtensions
 	EdDSAConfig     *EdDSAExtensions
-	RingtailConfig  *RingtailExtensions
+	CoronaConfig  *CoronaExtensions
 	DilithiumConfig *DilithiumExtensions
 
 	// Verification shares for all parties
@@ -120,8 +120,8 @@ type EdDSAExtensions struct {
 	AuxRand []byte // Auxiliary randomness for deterministic nonces
 }
 
-// RingtailExtensions holds Ringtail PQ-specific configuration
-type RingtailExtensions struct {
+// CoronaExtensions holds Corona PQ-specific configuration
+type CoronaExtensions struct {
 	// Lattice parameters
 	N             int     // Lattice dimension
 	Q             int     // Modulus
@@ -129,14 +129,14 @@ type RingtailExtensions struct {
 	SecurityLevel int     // 128, 192, or 256 bits
 
 	// Offline preprocessing store
-	PreprocessingShares []RingtailPreprocessing
+	PreprocessingShares []CoronaPreprocessing
 
 	// Public parameters
 	PublicMatrix interface{} // A matrix for LWE
 }
 
-// RingtailPreprocessing represents offline preprocessing for Ringtail
-type RingtailPreprocessing struct {
+// CoronaPreprocessing represents offline preprocessing for Corona
+type CoronaPreprocessing struct {
 	ID       string
 	Round1   interface{} // Offline round 1 data
 	Round2   interface{} // Offline round 2 data
@@ -217,30 +217,30 @@ func (e *EdDSAFullSig) Serialize() []byte {
 	return append(rBytes, zBytes...)
 }
 
-// Ringtail PQ signature components
-type RingtailPartialSig struct {
+// Corona PQ signature components
+type CoronaPartialSig struct {
 	PartyID party.ID
 	Share   interface{} // Lattice element
 }
 
-func (r *RingtailPartialSig) GetPartyID() party.ID { return r.PartyID }
-func (r *RingtailPartialSig) Serialize() []byte {
+func (r *CoronaPartialSig) GetPartyID() party.ID { return r.PartyID }
+func (r *CoronaPartialSig) Serialize() []byte {
 	// Serialize lattice element
 	return []byte{} // Placeholder
 }
 
-type RingtailFullSig struct {
+type CoronaFullSig struct {
 	Signature interface{} // Complete lattice signature
 	Size      int         // Signature size in bytes
 }
 
-func (r *RingtailFullSig) Verify(pubKey curve.Point, message []byte) bool {
-	// Ringtail verification logic
+func (r *CoronaFullSig) Verify(pubKey curve.Point, message []byte) bool {
+	// Corona verification logic
 	return true // Placeholder
 }
 
-func (r *RingtailFullSig) Serialize() []byte {
-	// ~13.4KB for 128-bit security as per Ringtail paper
+func (r *CoronaFullSig) Serialize() []byte {
+	// ~13.4KB for 128-bit security as per Corona paper
 	return make([]byte, r.Size)
 }
 

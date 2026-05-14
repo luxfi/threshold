@@ -332,17 +332,17 @@ func TestSolanaFeatures(t *testing.T) {
 	})
 }
 
-// TestRingtailPQAdapter tests post-quantum Ringtail adapter
-func TestRingtailPQAdapter(t *testing.T) {
+// TestCoronaPQAdapter tests post-quantum Corona adapter
+func TestCoronaPQAdapter(t *testing.T) {
 	t.Run("SecurityLevels", func(t *testing.T) {
 		levels := []int{128, 192, 256}
 
 		for _, level := range levels {
-			ringtail := adapters.NewRingtailAdapter(level, 100)
+			corona := adapters.NewCoronaAdapter(level, 100)
 
 			// Test DKG
 			parties := []party.ID{"alice", "bob", "charlie"}
-			pubKey, shares, err := ringtail.RingtailDKG(parties, 2)
+			pubKey, shares, err := corona.CoronaDKG(parties, 2)
 			require.NoError(t, err)
 			assert.NotNil(t, pubKey)
 			assert.Len(t, shares, 3)
@@ -350,23 +350,23 @@ func TestRingtailPQAdapter(t *testing.T) {
 	})
 
 	t.Run("OfflinePreprocessing", func(t *testing.T) {
-		ringtail := adapters.NewRingtailAdapter(128, 10)
+		corona := adapters.NewCoronaAdapter(128, 10)
 
 		// Setup
 		parties := []party.ID{"alice", "bob", "charlie"}
-		_, _, err := ringtail.RingtailDKG(parties, 2)
+		_, _, err := corona.CoronaDKG(parties, 2)
 		require.NoError(t, err)
 		// Note: shares would be used for actual signing, using mock values for test
 
 		// Generate offline preprocessing
-		err = ringtail.PreprocessOffline(5)
+		err = corona.PreprocessOffline(5)
 		require.NoError(t, err)
 
 		// Use preprocessing for signing
 		message := []byte("test message")
-		digest, _ := ringtail.Digest(message)
+		digest, _ := corona.Digest(message)
 
-		// Note: shares[parties[0]] is RingtailSecretShare, not curve.Scalar
+		// Note: shares[parties[0]] is CoronaSecretShare, not curve.Scalar
 		// For testing, create a mock scalar value
 		mockScalar := curve.Secp256k1{}.NewScalar()
 		share := adapters.Share{
@@ -374,7 +374,7 @@ func TestRingtailPQAdapter(t *testing.T) {
 			Value: mockScalar,
 		}
 
-		partial, err := ringtail.SignEC(digest, share)
+		partial, err := corona.SignEC(digest, share)
 		require.NoError(t, err)
 		assert.NotNil(t, partial)
 	})
@@ -385,7 +385,7 @@ func TestRingtailPQAdapter(t *testing.T) {
 		}
 
 		// Test with 100 parties as mentioned in paper
-		ringtail := adapters.NewRingtailAdapter(128, 100)
+		corona := adapters.NewCoronaAdapter(128, 100)
 
 		parties := make([]party.ID, 100)
 		for i := 0; i < 100; i++ {
@@ -393,25 +393,25 @@ func TestRingtailPQAdapter(t *testing.T) {
 		}
 
 		// 67-of-100 threshold
-		_, shares, err := ringtail.RingtailDKG(parties, 67)
+		_, shares, err := corona.CoronaDKG(parties, 67)
 		require.NoError(t, err)
 		assert.Len(t, shares, 100)
 	})
 
 	t.Run("SignatureSize", func(t *testing.T) {
-		ringtail := adapters.NewRingtailAdapter(128, 10)
+		corona := adapters.NewCoronaAdapter(128, 10)
 
 		// Expected ~13.4KB for 128-bit security
 		params := adapters.GetRecommendedParams(128, 10)
 		assert.Equal(t, 13400, params.SignatureSize)
 
 		// Create mock signature
-		fullSig := &adapters.RingtailFullSig{
+		fullSig := &adapters.CoronaFullSig{
 			Signature: make([]int64, params.N),
 			Size:      params.SignatureSize,
 		}
 
-		encoded, err := ringtail.Encode(fullSig)
+		encoded, err := corona.Encode(fullSig)
 		require.NoError(t, err)
 		assert.LessOrEqual(t, len(encoded), params.SignatureSize)
 	})
@@ -438,7 +438,7 @@ func BenchmarkAdapters(b *testing.B) {
 		{"Bitcoin_ECDSA", adapters.NewBitcoinAdapter(adapters.SignatureECDSA), adapters.SignatureECDSA},
 		{"Bitcoin_Schnorr", adapters.NewBitcoinAdapter(adapters.SignatureSchnorr), adapters.SignatureSchnorr},
 		{"Solana", adapters.NewSolanaAdapter(), adapters.SignatureEdDSA},
-		{"Ringtail_128", adapters.NewRingtailAdapter(128, 10), adapters.SignatureRingtail},
+		{"Corona_128", adapters.NewCoronaAdapter(128, 10), adapters.SignatureCorona},
 	}
 
 	for _, bench := range benchmarks {
@@ -489,7 +489,7 @@ func createMockShares(t testing.TB, sigType adapters.SignatureType, n, threshold
 
 	for i := 0; i < n; i++ {
 		// For testing purposes, use scalar values for all share types
-		// Real Ringtail shares would be RingtailSecretShare structs
+		// Real Corona shares would be CoronaSecretShare structs
 		scalar := curve.Secp256k1{}.NewScalar()
 
 		shares = append(shares, adapters.Share{
