@@ -11,7 +11,7 @@ import (
 	"github.com/luxfi/threshold/protocols/ringtail/config"
 	"golang.org/x/crypto/blake2b"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // round2 distributes key shares to all parties

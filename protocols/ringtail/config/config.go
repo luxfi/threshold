@@ -11,8 +11,8 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/luxfi/lattice/v7/ring"
-	realsign "github.com/luxfi/ringtail/sign"
-	realring "github.com/luxfi/ringtail/threshold"
+	realsign "github.com/luxfi/corona/sign"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // SecurityLevel defines the security parameters for Ringtail
