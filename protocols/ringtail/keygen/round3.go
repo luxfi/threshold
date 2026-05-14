@@ -8,7 +8,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/protocols/ringtail/config"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // round3 finalizes key generation and outputs the config with real ringtail shares

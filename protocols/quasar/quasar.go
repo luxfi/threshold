@@ -34,7 +34,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/luxfi/crypto/bls"
-	"github.com/luxfi/ringtail/threshold"
+	"github.com/luxfi/corona/threshold"
 	"github.com/luxfi/threshold/pkg/party"
 	blsThreshold "github.com/luxfi/threshold/protocols/bls"
 	"github.com/zeebo/blake3"

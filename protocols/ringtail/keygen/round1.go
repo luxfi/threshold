@@ -12,7 +12,7 @@ import (
 	"github.com/luxfi/threshold/protocols/ringtail/config"
 	"golang.org/x/crypto/blake2b"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // UpstreamMu serializes calls into github.com/luxfi/ringtail v0.2.0,

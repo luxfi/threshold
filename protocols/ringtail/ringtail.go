@@ -22,7 +22,7 @@ import (
 	"github.com/luxfi/threshold/protocols/ringtail/refresh"
 	"github.com/luxfi/threshold/protocols/ringtail/sign"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // Config holds the configuration for a Ringtail threshold signing participant

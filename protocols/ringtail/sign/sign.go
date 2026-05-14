@@ -13,8 +13,8 @@ import (
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/ringtail/config"
 
-	realsign "github.com/luxfi/ringtail/sign"
-	realring "github.com/luxfi/ringtail/threshold"
+	realsign "github.com/luxfi/corona/sign"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // Start initiates the Ringtail threshold signing protocol.
