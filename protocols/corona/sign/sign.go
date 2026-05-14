@@ -1,5 +1,5 @@
-// Package sign implements threshold signing for Ringtail.
-// This package wraps the real Ringtail signing from github.com/luxfi/ringtail/threshold.
+// Package sign implements threshold signing for Corona.
+// This package wraps the real Corona signing from github.com/luxfi/corona/threshold.
 package sign
 
 import (
@@ -17,8 +17,8 @@ import (
 	realring "github.com/luxfi/corona/threshold"
 )
 
-// Start initiates the Ringtail threshold signing protocol.
-// This wraps the real Ringtail signing from github.com/luxfi/ringtail/threshold.
+// Start initiates the Corona threshold signing protocol.
+// This wraps the real Corona signing from github.com/luxfi/corona/threshold.
 func Start(cfg *config.Config, keyShare *realring.KeyShare, groupKey *realring.GroupKey, signers []party.ID, message []byte, pl *pool.Pool) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
 		// Validate we have enough signers
@@ -46,8 +46,8 @@ func Start(cfg *config.Config, keyShare *realring.KeyShare, groupKey *realring.G
 		}
 
 		info := round.Info{
-			ProtocolID:       "ringtail/sign",
-			FinalRoundNumber: 2, // Ringtail signing has 2 rounds
+			ProtocolID:       "corona/sign",
+			FinalRoundNumber: 2, // Corona signing has 2 rounds
 			SelfID:           cfg.ID,
 			PartyIDs:         signers,
 			Threshold:        cfg.Threshold,
@@ -64,7 +64,7 @@ func Start(cfg *config.Config, keyShare *realring.KeyShare, groupKey *realring.G
 			return nil, err
 		}
 
-		// Create real ringtail signer
+		// Create real corona signer
 		signer := realring.NewSigner(keyShare)
 
 		// Start with signing round 1
@@ -82,7 +82,7 @@ func Start(cfg *config.Config, keyShare *realring.KeyShare, groupKey *realring.G
 	}
 }
 
-// signRound1 performs real Ringtail signing round 1
+// signRound1 performs real Corona signing round 1
 type signRound1 struct {
 	*round.Helper
 	config        *config.Config
@@ -142,7 +142,7 @@ func (r *signRound1) Finalize(out chan<- *round.Message) (round.Session, error) 
 	// Generate session ID from message hash
 	sessionID := hashToInt(r.message)
 
-	// Perform real Ringtail Round 1
+	// Perform real Corona Round 1
 	round1Data := r.signer.Round1(sessionID, r.prfKey, r.signerIndices)
 
 	// Serialize and broadcast
@@ -173,7 +173,7 @@ func (r *signRound1) Finalize(out chan<- *round.Message) (round.Session, error) 
 	}, nil
 }
 
-// signBroadcast1 contains real Ringtail Round 1 data
+// signBroadcast1 contains real Corona Round 1 data
 type signBroadcast1 struct {
 	round.NormalBroadcastContent
 	Round1DataBytes []byte
@@ -185,7 +185,7 @@ func (signBroadcast1) RoundNumber() round.Number {
 	return 1
 }
 
-// signRound2 performs real Ringtail signing round 2 and finalizes
+// signRound2 performs real Corona signing round 2 and finalizes
 type signRound2 struct {
 	*round.Helper
 	config        *config.Config
@@ -247,7 +247,7 @@ func (r *signRound2) Finalize(out chan<- *round.Message) (round.Session, error) 
 	sessionID := hashToInt(r.message)
 	messageStr := string(r.message)
 
-	// Perform real Ringtail Round 2
+	// Perform real Corona Round 2
 	round2Data, err := r.signer.Round2(sessionID, messageStr, r.prfKey, r.signerIndices, r.round1Data)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func (r *signRound2) Finalize(out chan<- *round.Message) (round.Session, error) 
 	}), nil
 }
 
-// signBroadcast2 contains real Ringtail Round 2 data
+// signBroadcast2 contains real Corona Round 2 data
 type signBroadcast2 struct {
 	round.NormalBroadcastContent
 	Round2DataBytes []byte
@@ -305,7 +305,7 @@ type Signature struct {
 	GroupKey  *realring.GroupKey
 }
 
-// Verify checks if the signature is valid using real Ringtail verification
+// Verify checks if the signature is valid using real Corona verification
 func (s *Signature) Verify(publicKey []byte) bool {
 	if s.Signature == nil || s.GroupKey == nil {
 		return false

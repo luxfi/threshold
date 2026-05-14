@@ -26,7 +26,7 @@ const (
 	ProtocolFROST    MPCProtocolType = "FROST"
 	ProtocolCMP      MPCProtocolType = "CMP"
 	ProtocolDoerner  MPCProtocolType = "Doerner"
-	ProtocolRingtail MPCProtocolType = "Ringtail"
+	ProtocolCorona MPCProtocolType = "Corona"
 )
 
 // MPCTestSuite provides a unified test suite for all MPC protocols
