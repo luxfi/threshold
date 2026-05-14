@@ -6,7 +6,7 @@
 // This file is the LSS-Pulsar adapter: it wires LSS dynamic-resharing
 // lifecycle (Generation tracking, snapshot history, rollback) into
 // Pulsar's lattice threshold kernel (R_q share representation,
-// Pedersen commitments, Ringtail-compatible signing material).
+// Pedersen commitments, Corona-compatible signing material).
 //
 // Architectural contract (per pulsar/DESIGN.md):
 //
@@ -19,7 +19,7 @@
 //   Pulsar (kernel) owns:
 //     - R_q share representation and Shamir over R_q
 //     - Pedersen commits (A·NTT(s) + B·NTT(r)) over R_q
-//     - Ringtail Sign1/Sign2/Combine
+//     - Corona Sign1/Sign2/Combine
 //     - Lambda + PRF Seeds + MACKeys regeneration
 //     - Activation cert message bytes (lattice signature)
 //
@@ -37,7 +37,7 @@
 //     pulsar.KeyEra.Reshare.
 //   - Inherit ECDSA-specific assumptions from LSS-CMP / LSS-FROST
 //     (auxiliary secrets w, q; curve.Point commits; nonce blinding).
-//     Pulsar/Ringtail's signing protocol has Gaussian blinding built
+//     Pulsar/Corona's signing protocol has Gaussian blinding built
 //     into Sign1/Sign2; no w, q needed.
 //   - Invent its own rollback semantics. Use the snapshot store; on
 //     activation failure, return an error and let the caller decide.

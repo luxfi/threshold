@@ -396,20 +396,20 @@ func TestCardanoAdapter(t *testing.T) {
 	})
 }
 
-// TestRingtailAdapter tests post-quantum Ringtail features
+// TestRingtailAdapter tests post-quantum Corona features
 func TestRingtailAdapter(t *testing.T) {
 	t.Run("SecurityLevels", func(t *testing.T) {
 		levels := []int{128, 192, 256}
 
 		for _, level := range levels {
-			adapter := NewRingtailAdapter(level, 5)
+			adapter := NewCoronaAdapter(level, 5)
 			require.NotNil(t, adapter)
 
 			config := &UnifiedConfig{
-				SignatureScheme: SignatureRingtail,
+				SignatureScheme: SignatureCorona,
 				Threshold:       3,
 				PartyIDs:        []party.ID{"alice", "bob", "charlie", "dave", "eve"},
-				RingtailConfig: &RingtailExtensions{
+				CoronaConfig: &CoronaExtensions{
 					SecurityLevel: level,
 				},
 			}
@@ -420,7 +420,7 @@ func TestRingtailAdapter(t *testing.T) {
 	})
 
 	t.Run("PreprocessingGeneration", func(t *testing.T) {
-		adapter := NewRingtailAdapter(128, 5)
+		adapter := NewCoronaAdapter(128, 5)
 
 		parties := []party.ID{"alice", "bob", "charlie", "dave", "eve"}
 		// GeneratePreprocessing would be called here if it existed
@@ -443,7 +443,7 @@ func TestRingtailAdapter(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			_ = NewRingtailAdapter(tc.securityLevel, 5)
+			_ = NewCoronaAdapter(tc.securityLevel, 5)
 			params := GetRecommendedParams(tc.securityLevel, 5)
 			assert.Equal(t, tc.expectedSize, params.SignatureSize)
 		}
@@ -553,8 +553,8 @@ func TestSignatureTypes(t *testing.T) {
 		assert.NotEmpty(t, serialized)
 	})
 
-	t.Run("RingtailPartialSig", func(t *testing.T) {
-		sig := &RingtailPartialSig{
+	t.Run("CoronaPartialSig", func(t *testing.T) {
+		sig := &CoronaPartialSig{
 			PartyID: "charlie",
 			Share:   []byte("lattice_element"),
 		}

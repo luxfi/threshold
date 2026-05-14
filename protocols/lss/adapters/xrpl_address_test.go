@@ -78,7 +78,7 @@ func TestNewXRPLAdapter_RejectsUnsupportedSigType(t *testing.T) {
 		st   SignatureType
 	}{
 		{"schnorr_unsupported", SignatureSchnorr},
-		{"ringtail_unsupported", SignatureRingtail},
+		{"ringtail_unsupported", SignatureCorona},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -96,7 +96,7 @@ func TestNewXRPLAdapter_RejectsUnsupportedSigType(t *testing.T) {
 // TestNewCardanoAdapter_RejectsUnsupportedSigType mirrors the XRPL
 // check for the Cardano constructor.
 func TestNewCardanoAdapter_RejectsUnsupportedSigType(t *testing.T) {
-	a, err := NewCardanoAdapter(SignatureRingtail, 0x01, EraBabbage)
+	a, err := NewCardanoAdapter(SignatureCorona, 0x01, EraBabbage)
 	if err == nil {
 		t.Fatal("expected error for unsupported signature type, got nil")
 	}
