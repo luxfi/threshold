@@ -28,7 +28,7 @@ func TestQuasarKeyGeneration(t *testing.T) {
 	require.Len(t, configs, 3)
 	require.NotNil(t, groupKey)
 	require.NotNil(t, groupKey.BLS)
-	require.NotNil(t, groupKey.Ringtail)
+	require.NotNil(t, groupKey.Corona)
 
 	// Verify each party has valid config
 	for _, id := range parties {
@@ -38,7 +38,7 @@ func TestQuasarKeyGeneration(t *testing.T) {
 		require.Equal(t, 3, cfg.TotalParties)
 		require.NotNil(t, cfg.BLSSecretShare)
 		require.NotNil(t, cfg.BLSPublicKey)
-		require.NotNil(t, cfg.RingtailShare)
+		require.NotNil(t, cfg.CoronaShare)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestQuasarBLSOnlySign(t *testing.T) {
 		protocols[id] = proto
 	}
 
-	// Each party signs (BLS only, no signer indices for Ringtail)
+	// Each party signs (BLS only, no signer indices for Corona)
 	shares := make([]*quasar.SignatureShare, 0, 3)
 	for _, id := range parties {
 		share, err := protocols[id].Sign(ctx, message, 1, nil, nil)
@@ -90,13 +90,13 @@ func TestQuasarBLSOnlySign(t *testing.T) {
 	sig, err := proto.Finalize(message)
 	require.NoError(t, err)
 	require.True(t, sig.HasBLS())
-	require.False(t, sig.HasRingtail()) // No Ringtail without signer indices
+	require.False(t, sig.HasCorona()) // No Corona without signer indices
 
 	// Verify BLS only
 	valid := quasar.VerifyBLSOnly(groupKey.BLS, message, sig)
 	require.True(t, valid)
 
-	// Full verification (BLS only since no Ringtail)
+	// Full verification (BLS only since no Corona)
 	valid, err = quasar.Verify(groupKey, message, sig)
 	require.NoError(t, err)
 	require.True(t, valid)
@@ -329,5 +329,5 @@ func TestQuasarVerifyNilInputs(t *testing.T) {
 
 	// BLS-only verification with nil
 	require.False(t, quasar.VerifyBLSOnly(nil, []byte("msg"), nil))
-	require.False(t, quasar.VerifyRingtailOnly(nil, "msg", nil))
+	require.False(t, quasar.VerifyCoronaOnly(nil, "msg", nil))
 }

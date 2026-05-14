@@ -1,5 +1,5 @@
-// Package config provides configuration for the Ringtail threshold signature scheme.
-// This package wraps the real Ringtail implementation from github.com/luxfi/ringtail.
+// Package config provides configuration for the Corona threshold signature scheme.
+// This package wraps the real Corona implementation from github.com/luxfi/corona.
 package config
 
 import (
@@ -15,7 +15,7 @@ import (
 	realring "github.com/luxfi/corona/threshold"
 )
 
-// SecurityLevel defines the security parameters for Ringtail
+// SecurityLevel defines the security parameters for Corona
 type SecurityLevel int
 
 const (
@@ -28,7 +28,7 @@ const (
 )
 
 // Parameters holds the lattice parameters for different security levels
-// These are derived from the actual Ringtail parameters
+// These are derived from the actual Corona parameters
 type Parameters struct {
 	N            int     // Lattice dimension (ring polynomial degree)
 	Q            uint64  // Modulus (NTT-friendly prime)
@@ -38,7 +38,7 @@ type Parameters struct {
 	SecurityBits int
 }
 
-// Default parameters from real Ringtail implementation
+// Default parameters from real Corona implementation
 var parameterSets = map[SecurityLevel]Parameters{
 	Security128: {
 		N:            1 << realsign.LogN, // 256
@@ -103,16 +103,16 @@ type Config struct {
 	RingXi *ring.Ring
 	RingNu *ring.Ring
 
-	// Real ringtail objects (set after keygen)
+	// Real corona objects (set after keygen)
 	KeyShare *realring.KeyShare
 	GroupKey *realring.GroupKey
 }
 
-// NewConfig creates a new Ringtail configuration with real lattice initialization
+// NewConfig creates a new Corona configuration with real lattice initialization
 func NewConfig(id party.ID, threshold int, level SecurityLevel) *Config {
 	params := parameterSets[level]
 
-	// Create the rings using real Ringtail parameters
+	// Create the rings using real Corona parameters
 	ringQ, _ := ring.NewRing(params.N, []uint64{params.Q})
 	ringXi, _ := ring.NewRing(params.N, []uint64{realsign.QXi})
 	ringNu, _ := ring.NewRing(params.N, []uint64{realsign.QNu})
@@ -138,23 +138,23 @@ func (c *Config) GetParameters() Parameters {
 	return c.params
 }
 
-// GetRealParams returns the parameters compatible with real Ringtail
+// GetRealParams returns the parameters compatible with real Corona
 func (c *Config) GetRealParams() (n, m, dbar int, q uint64, sigma float64) {
 	return c.params.N, c.params.M, c.params.Dbar, c.params.Q, c.params.Sigma
 }
 
-// SetRealKeyShare sets the real ringtail key share from keygen
+// SetRealKeyShare sets the real corona key share from keygen
 func (c *Config) SetRealKeyShare(keyShare *realring.KeyShare, groupKey *realring.GroupKey) {
 	c.KeyShare = keyShare
 	c.GroupKey = groupKey
 }
 
-// GetRealKeyShare returns the real ringtail key share
+// GetRealKeyShare returns the real corona key share
 func (c *Config) GetRealKeyShare() *realring.KeyShare {
 	return c.KeyShare
 }
 
-// GetRealGroupKey returns the real ringtail group key
+// GetRealGroupKey returns the real corona group key
 func (c *Config) GetRealGroupKey() *realring.GroupKey {
 	return c.GroupKey
 }
@@ -174,7 +174,7 @@ func (c *Config) ValidateShare(from party.ID, share []byte) bool {
 	return subtle.ConstantTimeCompare(computed, verificationShare) == 1
 }
 
-// VerifySignature verifies a Ringtail signature using real lattice verification.
+// VerifySignature verifies a Corona signature using real lattice verification.
 // For full verification, use VerifyWithGroupKey which has access to the
 // deserialized lattice objects.
 func VerifySignature(publicKey []byte, message []byte, signature []byte) bool {
@@ -199,7 +199,7 @@ func VerifySignature(publicKey []byte, message []byte, signature []byte) bool {
 	return true
 }
 
-// VerifyWithRealObjects performs full verification using real ringtail objects
+// VerifyWithRealObjects performs full verification using real corona objects
 func VerifyWithRealObjects(groupKey *realring.GroupKey, message string, sig *realring.Signature) bool {
 	if groupKey == nil || sig == nil {
 		return false

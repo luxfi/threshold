@@ -396,8 +396,8 @@ func TestCardanoAdapter(t *testing.T) {
 	})
 }
 
-// TestRingtailAdapter tests post-quantum Corona features
-func TestRingtailAdapter(t *testing.T) {
+// TestCoronaAdapter tests post-quantum Corona features
+func TestCoronaAdapter(t *testing.T) {
 	t.Run("SecurityLevels", func(t *testing.T) {
 		levels := []int{128, 192, 256}
 

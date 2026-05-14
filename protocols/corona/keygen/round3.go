@@ -11,7 +11,7 @@ import (
 	realring "github.com/luxfi/corona/threshold"
 )
 
-// round3 finalizes key generation and outputs the config with real ringtail shares
+// round3 finalizes key generation and outputs the config with real corona shares
 type round3 struct {
 	*round.Helper
 
@@ -19,7 +19,7 @@ type round3 struct {
 	selfIndex    int
 	participants []party.ID
 
-	// Real ringtail key generation results
+	// Real corona key generation results
 	keyShares []*realring.KeyShare
 	groupKey  *realring.GroupKey
 
@@ -53,7 +53,7 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 		return nil, errors.New("insufficient shares received")
 	}
 
-	// Get our real ringtail key share
+	// Get our real corona key share
 	myKeyShare := r.keyShares[r.selfIndex]
 	if myKeyShare == nil {
 		return nil, errors.New("missing own key share")
@@ -73,7 +73,7 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 		}
 	}
 
-	// Create the final configuration with real ringtail data
+	// Create the final configuration with real corona data
 	finalConfig := &config.Config{
 		ID:                 r.SelfID(),
 		Threshold:          r.Threshold(),
@@ -88,7 +88,7 @@ func (r *round3) Finalize(_ chan<- *round.Message) (round.Session, error) {
 		RingNu:             r.config.RingNu,
 	}
 
-	// Return the result with real ringtail objects
+	// Return the result with real corona objects
 	return r.ResultRound(&KeygenOutput{
 		Config:   finalConfig,
 		KeyShare: myKeyShare,

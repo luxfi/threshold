@@ -22,7 +22,7 @@ type round2 struct {
 	selfIndex    int
 	participants []party.ID
 
-	// Real ringtail key generation results from round 1
+	// Real corona key generation results from round 1
 	keyShares []*realring.KeyShare
 	groupKey  *realring.GroupKey
 

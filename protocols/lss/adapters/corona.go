@@ -257,7 +257,7 @@ func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 
 	// For now, create a placeholder Corona secret share from scalar
 	// Convert curve scalar bytes to CoronaSecretShare format.
-	ringtailShare := &CoronaSecretShare{
+	coronaShare := &CoronaSecretShare{
 		PartyID: share.ID,
 		Index:   share.Index,
 		// Value would be the lattice element derived from share.Value
@@ -265,7 +265,7 @@ func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 
 	// Online round 1: Use preprocessed nonces
 	// Online round 2: Compute signature share using masked shares
-	sigShare := r.computeSignatureShare(digest, ringtailShare, offlineData)
+	sigShare := r.computeSignatureShare(digest, coronaShare, offlineData)
 
 	return &CoronaPartialSig{
 		PartyID: share.ID,
@@ -291,13 +291,13 @@ func (r *CoronaAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 
 // Encode converts Corona signature to wire format
 func (r *CoronaAdapter) Encode(full FullSig) ([]byte, error) {
-	ringtailSig, ok := full.(*CoronaFullSig)
+	coronaSig, ok := full.(*CoronaFullSig)
 	if !ok {
 		return nil, errors.New("invalid signature type for Corona")
 	}
 
 	// Encode lattice signature
-	encoded := r.encodeLatticeSignature(ringtailSig.Signature)
+	encoded := r.encodeLatticeSignature(coronaSig.Signature)
 
 	// Ensure size matches expected
 	if len(encoded) > r.params.SignatureSize {
@@ -487,8 +487,8 @@ func (r *CoronaAdapter) encodeLatticeSignature(sig interface{}) []byte {
 	return encoded
 }
 
-// RingtailBenchmark provides performance metrics
-type RingtailBenchmark struct {
+// CoronaBenchmark provides performance metrics
+type CoronaBenchmark struct {
 	DKGTime           int64 // microseconds
 	PreprocessingTime int64 // microseconds per session
 	SigningTime       int64 // microseconds (online only)
@@ -498,10 +498,10 @@ type RingtailBenchmark struct {
 }
 
 // Benchmark runs performance tests for Corona
-func (r *CoronaAdapter) Benchmark(parties int, threshold int) *RingtailBenchmark {
+func (r *CoronaAdapter) Benchmark(parties int, threshold int) *CoronaBenchmark {
 	// This would run actual benchmarks
 	// Placeholder values based on paper's reported results
-	return &RingtailBenchmark{
+	return &CoronaBenchmark{
 		DKGTime:           1000000, // 1 second for DKG
 		PreprocessingTime: 50000,   // 50ms per session
 		SigningTime:       5000,    // 5ms online signing

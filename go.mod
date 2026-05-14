@@ -10,7 +10,7 @@ require (
 	// that consumes primitives from these packages (LP-5703, LP-5704)
 	github.com/luxfi/crypto v1.19.0 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
-	github.com/luxfi/lattice/v7 v7.1.0 // Lattice ops for Ringtail (post-quantum) + GPU acceleration
+	github.com/luxfi/lattice/v7 v7.1.0 // Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
