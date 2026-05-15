@@ -387,8 +387,8 @@ func TestPulsarAdapter_BuildActivationTranscript_NewFields(t *testing.T) {
 	if got.NebulaRoot != nebulaRoot {
 		t.Errorf("NebulaRoot not threaded through: want %x got %x", nebulaRoot, got.NebulaRoot)
 	}
-	if got.HashSuiteID != "Pulsar-SHA3" {
-		t.Errorf("HashSuiteID default: want %q got %q", "Pulsar-SHA3", got.HashSuiteID)
+	if got.HashSuiteID != "Corona-SHA3" {
+		t.Errorf("HashSuiteID default: want %q got %q", "Corona-SHA3", got.HashSuiteID)
 	}
 	if got.ImplementationVersion != "lss-pulsar-test-1.0" {
 		t.Errorf("ImplementationVersion default: want %q got %q", "lss-pulsar-test-1.0", got.ImplementationVersion)
