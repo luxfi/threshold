@@ -14,7 +14,7 @@
 // (which DO implement real Shamir share generation + partial-decrypt + combine).
 // See lps/LP-137-TFHE-REAL-THRESHOLD-SPEC.md.
 //
-// Test opt-in: set LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 to bypass the
+// Test opt-in: set ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 to bypass the
 // fail-loud panics at every entry point. Production must crash if reached.
 //
 // Committee surface for the threshold-FHE policy gate.
@@ -266,7 +266,7 @@ func NewPartialDecrypter() *PartialDecrypter { return &PartialDecrypter{} }
 //
 // UNSAFE: this returns an HMAC tag bound to (party, session, ciphertext) —
 // it is NOT a partial decryption. The downstream combine ignores Partial and
-// runs single-party decrypt. Panics unless LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
+// runs single-party decrypt. Panics unless ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
 //
 // Partial is HMAC-SHA256(key, "LUX/FHE/THRESHOLD/PARTIAL/v1" || sessionID
 // || ciphertextID) — a deterministic, per-party byte sequence that
