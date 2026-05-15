@@ -355,7 +355,7 @@ func DynamicResharePulsar(
 	// computation; this adapter exists for the in-process / coordinator
 	// path used by Quasar consensus orchestration.
 	era := &keyera.KeyEra{
-		EraID:        keyera.PulsarKeyEraID(refKeyEraID),
+		EraID:        keyera.CoronaKeyEraID(refKeyEraID),
 		GroupKey:     refGroupKey,
 		GenesisEpoch: 0,
 		State: &keyera.EpochShareState{
