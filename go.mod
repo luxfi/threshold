@@ -11,7 +11,6 @@ require (
 	github.com/luxfi/crypto v1.19.0 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
 	github.com/luxfi/lattice/v7 v7.1.0 // Lattice ops for Corona (post-quantum) + GPU acceleration
-	github.com/luxfi/corona v0.2.0 // Post-quantum threshold signatures (uses lattice/v7)
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
