@@ -9,7 +9,7 @@ import (
 )
 
 // TestMain opts the existing fake-threshold tests into the UNSAFE
-// implementation by setting LUX_ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 for
+// implementation by setting ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 for
 // the duration of the test binary. Production paths are guarded by
 // guardUnsafe() and panic when this env var is unset.
 //
