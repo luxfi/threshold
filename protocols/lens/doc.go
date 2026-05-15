@@ -17,7 +17,7 @@
 //	Pulsar (~/work/lux/pulsar)
 //	  - PQ lattice threshold kernel
 //	  - Module-LWE / R_q
-//	  - Sign1/Sign2/Combine math forked byte-equal from upstream Ringtail
+//	  - Sign1/Sign2/Combine math forked byte-equal from upstream Corona
 //	  - Pulsar replaces upstream's broken Feldman DKG and the
 //	    trusted-dealer-per-epoch lifecycle
 //

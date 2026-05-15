@@ -1,25 +1,25 @@
 // Copyright (C) 2024-2026 Lux Industries Inc.
 // SPDX-License-Identifier: BSD-3-Clause-Eco
 //
-// ringtail_oracle — pure-Go re-implementation of the C++ Ringtail body in
-// luxcpp/crypto/ringtail/cpp/ringtail.{hpp,cpp}, used as a cross-language KAT
+// corona_oracle — pure-Go re-implementation of the C++ Corona body in
+// luxcpp/crypto/corona/cpp/corona.{hpp,cpp}, used as a cross-language KAT
 // oracle. Same parameters (Q = 998244353, N = 512, L = K = 4, σ = 1.7,
 // τ = 30, B_∞ = Q/4), same StreamPRNG (SHA-256 counter mode), same Gaussian
 // CDT, same negacyclic schoolbook multiply, same wire format. Run once to
-// emit ringtail_kat.h consumed by ringtail_kat_test.cpp.
+// emit corona_kat.h consumed by corona_kat_test.cpp.
 //
 // Why a re-implementation rather than the network-protocol Go reference at
-// github.com/luxfi/ringtail (which wraps Lattigo with a different ring
+// github.com/luxfi/corona (which wraps Lattigo with a different ring
 // Q = 0x1000000004A01 / N = 256)? The C++ body is deliberately scoped as a
-// single-process oracle with luxcpp's own NTT prime — see ringtail.hpp lines
+// single-process oracle with luxcpp's own NTT prime — see corona.hpp lines
 // 31-39. The two Go paths cover different surfaces:
-//   * github.com/luxfi/ringtail covers the 2-round network protocol.
+//   * github.com/luxfi/corona covers the 2-round network protocol.
 //   * This file covers the C++ single-process algebraic shape.
 // Both are first-party algebraic primitives, neither wraps the other.
 //
 // Usage:
-//   cd lux/threshold/cmd/ringtail_oracle
-//   go run . > ../../../../luxcpp/crypto/ringtail/test/ringtail_kat.h
+//   cd lux/threshold/cmd/corona_oracle
+//   go run . > ../../../../luxcpp/crypto/corona/test/corona_kat.h
 //
 // Determinism:
 //   * StreamPRNG: SHA-256(seed || counter_LE8) → 32-byte block, counter++.
@@ -41,7 +41,7 @@ import (
 )
 
 // ============================================================================
-// Algebra parameters — keep in sync with luxcpp/crypto/ringtail/cpp/ringtail.hpp
+// Algebra parameters — keep in sync with luxcpp/crypto/corona/cpp/corona.hpp
 // ============================================================================
 
 const (
@@ -239,7 +239,7 @@ func sampleUniformPoly(p *Poly, rng *streamPRNG) {
 	}
 }
 
-// gaussianCDT mirrors the C++ ctor in ringtail.cpp lines 187-218. We computed
+// gaussianCDT mirrors the C++ ctor in corona.cpp lines 187-218. We computed
 // the CDT once with both libm (Apple clang) and Go math.Exp on darwin/arm64
 // and observed byte-identical uint64 entries — see /tmp/cdt_check.go in the
 // authoring transcript. The fp pmf differs by 1-2 ULPs but that's far below
@@ -278,7 +278,7 @@ func newGaussianCDT() *gaussianCDT {
 }
 
 // sample returns a signed Gaussian in [-GAUSS_BOUND, GAUSS_BOUND] using the
-// half-CDT + uniform-sign trick from ringtail.cpp lines 220-236.
+// half-CDT + uniform-sign trick from corona.cpp lines 220-236.
 func (g *gaussianCDT) sample(rng *streamPRNG) int32 {
 	u := rng.nextU64()
 	mag := int32(0)
@@ -312,7 +312,7 @@ func sampleGaussianPoly(p *Poly, rng *streamPRNG) {
 }
 
 // challengePoly: Fisher-Yates pick TAU positions, ±1 sign per pick.
-// Matches ringtail.cpp lines 267-287.
+// Matches corona.cpp lines 267-287.
 func challengePoly(c *Poly, tag []byte) {
 	rng := newStreamPRNG(tag)
 	for i := range c {
@@ -326,7 +326,7 @@ func challengePoly(c *Poly, tag []byte) {
 		span := uint32(N) - i
 		// Compute bound as u64 to avoid the C++ `static_cast<uint32_t>`
 		// wrap-to-zero when span divides 2^32 — see comment in
-		// ringtail.cpp challenge_poly. For span = 512 the largest u32
+		// corona.cpp challenge_poly. For span = 512 the largest u32
 		// multiple of span is exactly 2^32, which narrows to 0 in u32.
 		bound64 := uint64(1) << 32 / uint64(span) * uint64(span)
 		var r uint32
@@ -365,7 +365,7 @@ func polyToBytes(p *Poly, out []byte) {
 // Shamir secret sharing in R_q (per-coefficient over Z_q, evaluated polywise)
 // ============================================================================
 
-// shamirSharePolys mirrors ringtail.cpp lines 324-358.
+// shamirSharePolys mirrors corona.cpp lines 324-358.
 func shamirSharePolys(s []Poly, t, n int, rng *streamPRNG) [][]Poly {
 	shares := make([][]Poly, n)
 	for i := range shares {
@@ -457,7 +457,7 @@ func linfWithin(v []Poly, bound uint64) bool {
 // ============================================================================
 
 func buildChallengeTag(pk []byte, w []Poly, msg []byte) []byte {
-	domain := []byte("RINGTAIL.v1")
+	domain := []byte("CORONA.v1")
 	buf := make([]byte, 0, len(domain)+len(pk)+len(w)*POLY_BYTES+len(msg))
 	buf = append(buf, domain...)
 	buf = append(buf, pk...)
@@ -490,7 +490,7 @@ type Context struct {
 	signCounter  uint64
 }
 
-// Setup mirrors ringtail.cpp Setup.
+// Setup mirrors corona.cpp Setup.
 func Setup(t, n uint32, seed []byte) *Context {
 	if n < 1 || t < 1 || t > n {
 		panic("invalid (t,n)")
@@ -641,7 +641,7 @@ type vectorSpec struct {
 
 // Sixteen deterministic vectors covering: t=1,n=1; t=2,n=3; t=3,n=5; t=4,n=7;
 // t=5,n=9; threshold edges; varying message lengths from 0 to 96 bytes.
-// Identical schedule lives in cpp/ringtail_kat_test.cpp.
+// Identical schedule lives in cpp/corona_kat_test.cpp.
 var katVectors = []vectorSpec{
 	{"single_party", 1, 1, "RT-KAT-V1-S00", ""},
 	{"single_party_short_msg", 1, 1, "RT-KAT-V1-S01", "hi"},
@@ -650,7 +650,7 @@ var katVectors = []vectorSpec{
 	{"three_of_five", 3, 5, "RT-KAT-V1-S04", "block-height=12345 epoch=42"},
 	{"three_of_five_alt", 3, 5, "RT-KAT-V1-S05", "validator-rotation"},
 	{"four_of_seven", 4, 7, "RT-KAT-V1-S06", strings.Repeat("X", 32)},
-	{"four_of_seven_alt", 4, 7, "RT-KAT-V1-S07", "ringtail post-quantum check"},
+	{"four_of_seven_alt", 4, 7, "RT-KAT-V1-S07", "corona post-quantum check"},
 	{"five_of_nine", 5, 9, "RT-KAT-V1-S08", strings.Repeat("a", 16)},
 	{"five_of_nine_alt", 5, 9, "RT-KAT-V1-S09", "ten-byte-m"},
 	{"two_of_two", 2, 2, "RT-KAT-V1-S10", "small group"},
@@ -678,10 +678,10 @@ func emitCBytes(w io.Writer, b []byte) {
 func main() {
 	w := os.Stdout
 	fmt.Fprint(w, `// SPDX-License-Identifier: BSD-3-Clause-Eco
-// ringtail_kat.h — generated by lux/threshold/cmd/ringtail_oracle.
+// corona_kat.h — generated by lux/threshold/cmd/corona_oracle.
 //
-// Source of truth: this Go reimplementation of the C++ Ringtail body
-// (luxcpp/crypto/ringtail/cpp/ringtail.{hpp,cpp}). Same parameters
+// Source of truth: this Go reimplementation of the C++ Corona body
+// (luxcpp/crypto/corona/cpp/corona.{hpp,cpp}). Same parameters
 // (Q = 998244353, N = 512, L = K = 4, σ = 1.7, τ = 30, B_∞ = Q/4),
 // same StreamPRNG (SHA-256 counter mode), same Gaussian CDT, same
 // negacyclic schoolbook multiply, same wire format.
@@ -693,17 +693,17 @@ func main() {
 // message lengths from 0 to 96 bytes.
 //
 // To regenerate:
-//   cd lux/threshold/cmd/ringtail_oracle
-//   go run . > ../../../../luxcpp/crypto/ringtail/test/ringtail_kat.h
+//   cd lux/threshold/cmd/corona_oracle
+//   go run . > ../../../../luxcpp/crypto/corona/test/corona_kat.h
 //
 // DO NOT EDIT.
 #pragma once
 #include <cstdint>
 #include <cstddef>
 
-namespace lux::crypto::ringtail::kat {
+namespace lux::crypto::corona::kat {
 
-struct RingtailKAT {
+struct CoronaKAT {
     const char*    name;
     std::uint32_t  t;
     std::uint32_t  n;
@@ -716,8 +716,8 @@ struct RingtailKAT {
 };
 
 `)
-	fmt.Fprintf(w, "constexpr int kRingtailKATCount = %d;\n\n", len(katVectors))
-	fmt.Fprint(w, "inline const RingtailKAT kRingtailKAT[] = {\n")
+	fmt.Fprintf(w, "constexpr int kCoronaKATCount = %d;\n\n", len(katVectors))
+	fmt.Fprint(w, "inline const CoronaKAT kCoronaKAT[] = {\n")
 
 	for vi, v := range katVectors {
 		ctx := Setup(v.t, v.n, []byte(v.seed))
@@ -756,5 +756,5 @@ struct RingtailKAT {
 			fmt.Fprintf(w, "    },\n")
 		}
 	}
-	fmt.Fprint(w, "};\n\n}  // namespace lux::crypto::ringtail::kat\n")
+	fmt.Fprint(w, "};\n\n}  // namespace lux::crypto::corona::kat\n")
 }

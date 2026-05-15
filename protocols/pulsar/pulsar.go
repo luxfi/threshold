@@ -16,15 +16,15 @@
 //	  ├── party.ID, pool.Pool conventions
 //	  └── distributed protocol entrypoints (StartFunc).
 //
-// This package is the equivalent of protocols/ringtail/ but built on
+// This package is the equivalent of protocols/corona/ but built on
 // the pulsar fork — proper t-of-n via general Shamir, lattice-correct
 // Pedersen DKG (dkg2), full VSR with activation cert (reshare), and
 // the keyera lifecycle (Bootstrap → Reshare* → Reanchor).
 //
-// Use this for new code. The protocols/ringtail/ package is kept for
+// Use this for new code. The protocols/corona/ package is kept for
 // backwards compatibility but its refresh body is a stub and its DKG
 // inherits the upstream pseudoinverse-recoverable Feldman commit (see
-// luxcpp/crypto/ringtail/RED-DKG-REVIEW.md).
+// luxcpp/crypto/corona/RED-DKG-REVIEW.md).
 package pulsar
 
 import (
@@ -53,12 +53,15 @@ type (
 	EpochShareState = keyera.EpochShareState
 
 	// PulsarKeyEraID is a monotonically increasing identifier for a
-	// key era; bumped only at Reanchor.
-	PulsarKeyEraID = keyera.PulsarKeyEraID
+	// key era; bumped only at Reanchor. Aliased to the canonical
+	// luxfi/corona/keyera.CoronaKeyEraID — the rename in corona only
+	// touched the type name; the semantic is unchanged.
+	PulsarKeyEraID = keyera.CoronaKeyEraID
 
 	// PulsarGroupID identifies one Pulsar group for partitioned-set
-	// deployments (each group has its own GroupKey lineage).
-	PulsarGroupID = keyera.PulsarGroupID
+	// deployments (each group has its own GroupKey lineage). Aliased
+	// to luxfi/corona/keyera.CoronaGroupID.
+	PulsarGroupID = keyera.CoronaGroupID
 
 	// GroupKey is the persistent (A, bTilde) public key. Pointer is
 	// shared across all share states within a key era.
