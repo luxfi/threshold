@@ -1,4 +1,4 @@
-// Package adapters - Ringtail post-quantum threshold signature implementation
+// Package adapters - Corona post-quantum threshold signature implementation
 package adapters
 
 import (
@@ -11,15 +11,15 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 )
 
-// RingtailAdapter implements post-quantum threshold signatures using lattice-based cryptography
-// Based on the Ringtail protocol: 2-round threshold signatures from LWE
-type RingtailAdapter struct {
-	params *RingtailParams
-	state  *RingtailState
+// CoronaAdapter implements post-quantum threshold signatures using lattice-based cryptography
+// Based on the Corona protocol: 2-round threshold signatures from LWE
+type CoronaAdapter struct {
+	params *CoronaParams
+	state  *CoronaState
 }
 
-// RingtailParams defines lattice parameters for different security levels
-type RingtailParams struct {
+// CoronaParams defines lattice parameters for different security levels
+type CoronaParams struct {
 	N             int     // Lattice dimension
 	Q             int64   // Modulus
 	D             int     // Module rank
@@ -30,33 +30,33 @@ type RingtailParams struct {
 	SignatureSize int     // Expected signature size in bytes
 }
 
-// RingtailState maintains the current state of the Ringtail instance
-type RingtailState struct {
+// CoronaState maintains the current state of the Corona instance
+type CoronaState struct {
 	Generation         uint64
 	Threshold          int
 	Parties            []party.ID
-	PublicKey          *RingtailPublicKey
-	PreprocessingStore map[string]*RingtailOfflineData
+	PublicKey          *CoronaPublicKey
+	PreprocessingStore map[string]*CoronaOfflineData
 	ConsumedPreproc    map[string]bool
 }
 
-// RingtailPublicKey represents a lattice-based public key
-type RingtailPublicKey struct {
+// CoronaPublicKey represents a lattice-based public key
+type CoronaPublicKey struct {
 	A      [][]int64 // Public matrix A ∈ Z_q^{n×m}
 	B      []int64   // Public vector B = As + e
-	Params *RingtailParams
+	Params *CoronaParams
 }
 
-// RingtailSecretShare represents a party's share of the secret key
-type RingtailSecretShare struct {
+// CoronaSecretShare represents a party's share of the secret key
+type CoronaSecretShare struct {
 	PartyID party.ID
 	S       []int64 // Secret share vector
 	E       []int64 // Error share vector
 	Index   int
 }
 
-// RingtailOfflineData stores precomputed data for the offline phase
-type RingtailOfflineData struct {
+// CoronaOfflineData stores precomputed data for the offline phase
+type CoronaOfflineData struct {
 	ID         string
 	Round1Data *OfflineRound1
 	Round2Data *OfflineRound2
@@ -77,10 +77,10 @@ type OfflineRound2 struct {
 }
 
 // GetRecommendedParams returns recommended parameters for a security level
-func GetRecommendedParams(securityLevel int, maxParties int) *RingtailParams {
+func GetRecommendedParams(securityLevel int, maxParties int) *CoronaParams {
 	switch securityLevel {
 	case 128:
-		return &RingtailParams{
+		return &CoronaParams{
 			N:             512,
 			Q:             12289,
 			D:             8,
@@ -91,7 +91,7 @@ func GetRecommendedParams(securityLevel int, maxParties int) *RingtailParams {
 			SignatureSize: 13400, // ~13.4KB as per paper
 		}
 	case 192:
-		return &RingtailParams{
+		return &CoronaParams{
 			N:             768,
 			Q:             24593,
 			D:             10,
@@ -102,7 +102,7 @@ func GetRecommendedParams(securityLevel int, maxParties int) *RingtailParams {
 			SignatureSize: 28600, // ~28.6KB as per test expectation
 		}
 	case 256:
-		return &RingtailParams{
+		return &CoronaParams{
 			N:             1024,
 			Q:             40961,
 			D:             12,
@@ -117,24 +117,24 @@ func GetRecommendedParams(securityLevel int, maxParties int) *RingtailParams {
 	}
 }
 
-// NewRingtailAdapter creates a new Ringtail adapter with specified parameters
-func NewRingtailAdapter(securityLevel int, maxParties int) *RingtailAdapter {
+// NewCoronaAdapter creates a new Corona adapter with specified parameters
+func NewCoronaAdapter(securityLevel int, maxParties int) *CoronaAdapter {
 	if maxParties > 1024 {
 		maxParties = 1024 // Cap at tested maximum
 	}
 
-	return &RingtailAdapter{
+	return &CoronaAdapter{
 		params: GetRecommendedParams(securityLevel, maxParties),
-		state: &RingtailState{
+		state: &CoronaState{
 			Generation:         0,
-			PreprocessingStore: make(map[string]*RingtailOfflineData),
+			PreprocessingStore: make(map[string]*CoronaOfflineData),
 			ConsumedPreproc:    make(map[string]bool),
 		},
 	}
 }
 
-// RingtailDKG performs distributed key generation for Ringtail
-func (r *RingtailAdapter) RingtailDKG(parties []party.ID, threshold int) (*RingtailPublicKey, map[party.ID]*RingtailSecretShare, error) {
+// CoronaDKG performs distributed key generation for Corona
+func (r *CoronaAdapter) CoronaDKG(parties []party.ID, threshold int) (*CoronaPublicKey, map[party.ID]*CoronaSecretShare, error) {
 	if threshold < 1 || threshold > len(parties) {
 		return nil, nil, fmt.Errorf("invalid threshold %d for %d parties", threshold, len(parties))
 	}
@@ -147,7 +147,7 @@ func (r *RingtailAdapter) RingtailDKG(parties []party.ID, threshold int) (*Ringt
 	A := r.generatePublicMatrix()
 
 	// Each party generates a secret share
-	shares := make(map[party.ID]*RingtailSecretShare)
+	shares := make(map[party.ID]*CoronaSecretShare)
 	combinedS := make([]int64, r.params.N)
 	combinedE := make([]int64, r.params.N)
 
@@ -156,7 +156,7 @@ func (r *RingtailAdapter) RingtailDKG(parties []party.ID, threshold int) (*Ringt
 		s := r.sampleGaussianVector(r.params.N)
 		e := r.sampleGaussianVector(r.params.N)
 
-		shares[pid] = &RingtailSecretShare{
+		shares[pid] = &CoronaSecretShare{
 			PartyID: pid,
 			S:       s,
 			E:       e,
@@ -176,7 +176,7 @@ func (r *RingtailAdapter) RingtailDKG(parties []party.ID, threshold int) (*Ringt
 		B[i] = (B[i] + combinedE[i]) % r.params.Q
 	}
 
-	publicKey := &RingtailPublicKey{
+	publicKey := &CoronaPublicKey{
 		A:      A,
 		B:      B,
 		Params: r.params,
@@ -192,7 +192,7 @@ func (r *RingtailAdapter) RingtailDKG(parties []party.ID, threshold int) (*Ringt
 }
 
 // PreprocessOffline generates offline preprocessing data for faster online signing
-func (r *RingtailAdapter) PreprocessOffline(numSessions int) error {
+func (r *CoronaAdapter) PreprocessOffline(numSessions int) error {
 	if r.state.PublicKey == nil {
 		return errors.New("no public key generated")
 	}
@@ -213,7 +213,7 @@ func (r *RingtailAdapter) PreprocessOffline(numSessions int) error {
 			Proofs:       r.generateProofs(r.state.Threshold),
 		}
 
-		r.state.PreprocessingStore[sessionID] = &RingtailOfflineData{
+		r.state.PreprocessingStore[sessionID] = &CoronaOfflineData{
 			ID:         sessionID,
 			Round1Data: round1,
 			Round2Data: round2,
@@ -224,8 +224,8 @@ func (r *RingtailAdapter) PreprocessOffline(numSessions int) error {
 	return nil
 }
 
-// Digest computes message digest for Ringtail (identity function for PQ)
-func (r *RingtailAdapter) Digest(tx interface{}) ([]byte, error) {
+// Digest computes message digest for Corona (identity function for PQ)
+func (r *CoronaAdapter) Digest(tx interface{}) ([]byte, error) {
 	// For post-quantum signatures, we typically use the message directly
 	// or apply a quantum-resistant hash function
 	switch v := tx.(type) {
@@ -238,10 +238,10 @@ func (r *RingtailAdapter) Digest(tx interface{}) ([]byte, error) {
 	}
 }
 
-// SignEC performs threshold signing using Ringtail protocol
-func (r *RingtailAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
+// SignEC performs threshold signing using Corona protocol
+func (r *CoronaAdapter) SignEC(digest []byte, share Share) (PartialSig, error) {
 	// Find available preprocessing data
-	var offlineData *RingtailOfflineData
+	var offlineData *CoronaOfflineData
 	for id, data := range r.state.PreprocessingStore {
 		if !data.Consumed {
 			offlineData = data
@@ -255,9 +255,9 @@ func (r *RingtailAdapter) SignEC(digest []byte, share Share) (PartialSig, error)
 		return nil, errors.New("no available preprocessing data")
 	}
 
-	// For now, create a placeholder Ringtail secret share from scalar
-	// Convert curve scalar bytes to RingtailSecretShare format.
-	ringtailShare := &RingtailSecretShare{
+	// For now, create a placeholder Corona secret share from scalar
+	// Convert curve scalar bytes to CoronaSecretShare format.
+	coronaShare := &CoronaSecretShare{
 		PartyID: share.ID,
 		Index:   share.Index,
 		// Value would be the lattice element derived from share.Value
@@ -265,16 +265,16 @@ func (r *RingtailAdapter) SignEC(digest []byte, share Share) (PartialSig, error)
 
 	// Online round 1: Use preprocessed nonces
 	// Online round 2: Compute signature share using masked shares
-	sigShare := r.computeSignatureShare(digest, ringtailShare, offlineData)
+	sigShare := r.computeSignatureShare(digest, coronaShare, offlineData)
 
-	return &RingtailPartialSig{
+	return &CoronaPartialSig{
 		PartyID: share.ID,
 		Share:   sigShare,
 	}, nil
 }
 
-// AggregateEC combines Ringtail partial signatures
-func (r *RingtailAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
+// AggregateEC combines Corona partial signatures
+func (r *CoronaAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	if len(parts) < r.state.Threshold {
 		return nil, fmt.Errorf("insufficient partial signatures: %d < %d",
 			len(parts), r.state.Threshold)
@@ -283,21 +283,21 @@ func (r *RingtailAdapter) AggregateEC(parts []PartialSig) (FullSig, error) {
 	// Aggregate lattice signatures
 	aggregated := r.aggregateLatticeSignatures(parts)
 
-	return &RingtailFullSig{
+	return &CoronaFullSig{
 		Signature: aggregated,
 		Size:      r.params.SignatureSize,
 	}, nil
 }
 
-// Encode converts Ringtail signature to wire format
-func (r *RingtailAdapter) Encode(full FullSig) ([]byte, error) {
-	ringtailSig, ok := full.(*RingtailFullSig)
+// Encode converts Corona signature to wire format
+func (r *CoronaAdapter) Encode(full FullSig) ([]byte, error) {
+	coronaSig, ok := full.(*CoronaFullSig)
 	if !ok {
-		return nil, errors.New("invalid signature type for Ringtail")
+		return nil, errors.New("invalid signature type for Corona")
 	}
 
 	// Encode lattice signature
-	encoded := r.encodeLatticeSignature(ringtailSig.Signature)
+	encoded := r.encodeLatticeSignature(coronaSig.Signature)
 
 	// Ensure size matches expected
 	if len(encoded) > r.params.SignatureSize {
@@ -315,30 +315,30 @@ func (r *RingtailAdapter) Encode(full FullSig) ([]byte, error) {
 	return encoded, nil
 }
 
-// ValidateConfig validates configuration for Ringtail
-func (r *RingtailAdapter) ValidateConfig(config *UnifiedConfig) error {
-	if config.SignatureScheme != SignatureRingtail {
-		return errors.New("config not for Ringtail signature")
+// ValidateConfig validates configuration for Corona
+func (r *CoronaAdapter) ValidateConfig(config *UnifiedConfig) error {
+	if config.SignatureScheme != SignatureCorona {
+		return errors.New("config not for Corona signature")
 	}
 
-	if config.RingtailConfig == nil {
-		return errors.New("missing Ringtail configuration")
+	if config.CoronaConfig == nil {
+		return errors.New("missing Corona configuration")
 	}
 
 	// Validate security parameters
-	if config.RingtailConfig.SecurityLevel < 128 || config.RingtailConfig.SecurityLevel > 256 {
-		return fmt.Errorf("invalid security level: %d", config.RingtailConfig.SecurityLevel)
+	if config.CoronaConfig.SecurityLevel < 128 || config.CoronaConfig.SecurityLevel > 256 {
+		return fmt.Errorf("invalid security level: %d", config.CoronaConfig.SecurityLevel)
 	}
 
 	// Check lattice dimensions - if N is not set, use recommended params
-	if config.RingtailConfig.N == 0 {
+	if config.CoronaConfig.N == 0 {
 		// Initialize with recommended params if not set
-		params := GetRecommendedParams(config.RingtailConfig.SecurityLevel, len(config.PartyIDs))
-		config.RingtailConfig.N = params.N
-		config.RingtailConfig.Q = int(params.Q)
-		config.RingtailConfig.Sigma = params.Sigma
-	} else if config.RingtailConfig.N < 256 || config.RingtailConfig.N > 2048 {
-		return fmt.Errorf("invalid lattice dimension: %d", config.RingtailConfig.N)
+		params := GetRecommendedParams(config.CoronaConfig.SecurityLevel, len(config.PartyIDs))
+		config.CoronaConfig.N = params.N
+		config.CoronaConfig.Q = int(params.Q)
+		config.CoronaConfig.Sigma = params.Sigma
+	} else if config.CoronaConfig.N < 256 || config.CoronaConfig.N > 2048 {
+		return fmt.Errorf("invalid lattice dimension: %d", config.CoronaConfig.N)
 	}
 
 	return nil
@@ -346,7 +346,7 @@ func (r *RingtailAdapter) ValidateConfig(config *UnifiedConfig) error {
 
 // Helper functions for lattice operations
 
-func (r *RingtailAdapter) generatePublicMatrix() [][]int64 {
+func (r *CoronaAdapter) generatePublicMatrix() [][]int64 {
 	A := make([][]int64, r.params.N)
 	for i := 0; i < r.params.N; i++ {
 		A[i] = make([]int64, r.params.M)
@@ -357,7 +357,7 @@ func (r *RingtailAdapter) generatePublicMatrix() [][]int64 {
 	return A
 }
 
-func (r *RingtailAdapter) sampleGaussianVector(n int) []int64 {
+func (r *CoronaAdapter) sampleGaussianVector(n int) []int64 {
 	vec := make([]int64, n)
 	for i := 0; i < n; i++ {
 		vec[i] = r.sampleGaussian()
@@ -365,7 +365,7 @@ func (r *RingtailAdapter) sampleGaussianVector(n int) []int64 {
 	return vec
 }
 
-func (r *RingtailAdapter) sampleGaussian() int64 {
+func (r *CoronaAdapter) sampleGaussian() int64 {
 	// Box-Muller transform for Gaussian sampling
 	u1, _ := rand.Int(rand.Reader, big.NewInt(r.params.Q))
 	u2, _ := rand.Int(rand.Reader, big.NewInt(r.params.Q))
@@ -379,12 +379,12 @@ func (r *RingtailAdapter) sampleGaussian() int64 {
 	return sample % r.params.Q
 }
 
-func (r *RingtailAdapter) randomModQ() int64 {
+func (r *CoronaAdapter) randomModQ() int64 {
 	n, _ := rand.Int(rand.Reader, big.NewInt(r.params.Q))
 	return n.Int64()
 }
 
-func (r *RingtailAdapter) matrixVectorMultiply(A [][]int64, v []int64) []int64 {
+func (r *CoronaAdapter) matrixVectorMultiply(A [][]int64, v []int64) []int64 {
 	result := make([]int64, len(A))
 	for i := range A {
 		sum := int64(0)
@@ -398,7 +398,7 @@ func (r *RingtailAdapter) matrixVectorMultiply(A [][]int64, v []int64) []int64 {
 	return result
 }
 
-func (r *RingtailAdapter) generateCommitments(n int) [][]byte {
+func (r *CoronaAdapter) generateCommitments(n int) [][]byte {
 	commitments := make([][]byte, n)
 	for i := 0; i < n; i++ {
 		commitment := make([]byte, 32)
@@ -408,7 +408,7 @@ func (r *RingtailAdapter) generateCommitments(n int) [][]byte {
 	return commitments
 }
 
-func (r *RingtailAdapter) generateProofs(n int) [][]byte {
+func (r *CoronaAdapter) generateProofs(n int) [][]byte {
 	proofs := make([][]byte, n)
 	for i := 0; i < n; i++ {
 		proof := make([]byte, 64)
@@ -418,9 +418,9 @@ func (r *RingtailAdapter) generateProofs(n int) [][]byte {
 	return proofs
 }
 
-func (r *RingtailAdapter) computeSignatureShare(message []byte, share *RingtailSecretShare, offline *RingtailOfflineData) []int64 {
+func (r *CoronaAdapter) computeSignatureShare(message []byte, share *CoronaSecretShare, offline *CoronaOfflineData) []int64 {
 	// Simplified signature share computation
-	// Actual implementation would follow Ringtail protocol specification
+	// Actual implementation would follow Corona protocol specification
 	sigShare := make([]int64, r.params.N)
 
 	// Use offline data and secret share to compute signature share
@@ -450,18 +450,18 @@ func (r *RingtailAdapter) computeSignatureShare(message []byte, share *RingtailS
 	return sigShare
 }
 
-func (r *RingtailAdapter) aggregateLatticeSignatures(parts []PartialSig) []int64 {
+func (r *CoronaAdapter) aggregateLatticeSignatures(parts []PartialSig) []int64 {
 	if len(parts) == 0 {
 		return nil
 	}
 
 	// Get first signature share to determine size
-	first := parts[0].(*RingtailPartialSig).Share.([]int64)
+	first := parts[0].(*CoronaPartialSig).Share.([]int64)
 	aggregated := make([]int64, len(first))
 
 	// Sum all signature shares
 	for _, part := range parts {
-		share := part.(*RingtailPartialSig).Share.([]int64)
+		share := part.(*CoronaPartialSig).Share.([]int64)
 		for i := range aggregated {
 			aggregated[i] = (aggregated[i] + share[i]) % r.params.Q
 		}
@@ -470,7 +470,7 @@ func (r *RingtailAdapter) aggregateLatticeSignatures(parts []PartialSig) []int64
 	return aggregated
 }
 
-func (r *RingtailAdapter) encodeLatticeSignature(sig interface{}) []byte {
+func (r *CoronaAdapter) encodeLatticeSignature(sig interface{}) []byte {
 	lattice := sig.([]int64)
 
 	// Encode each coefficient as bytes
@@ -487,8 +487,8 @@ func (r *RingtailAdapter) encodeLatticeSignature(sig interface{}) []byte {
 	return encoded
 }
 
-// RingtailBenchmark provides performance metrics
-type RingtailBenchmark struct {
+// CoronaBenchmark provides performance metrics
+type CoronaBenchmark struct {
 	DKGTime           int64 // microseconds
 	PreprocessingTime int64 // microseconds per session
 	SigningTime       int64 // microseconds (online only)
@@ -497,11 +497,11 @@ type RingtailBenchmark struct {
 	CommunicationSize int   // total bytes exchanged
 }
 
-// Benchmark runs performance tests for Ringtail
-func (r *RingtailAdapter) Benchmark(parties int, threshold int) *RingtailBenchmark {
+// Benchmark runs performance tests for Corona
+func (r *CoronaAdapter) Benchmark(parties int, threshold int) *CoronaBenchmark {
 	// This would run actual benchmarks
 	// Placeholder values based on paper's reported results
-	return &RingtailBenchmark{
+	return &CoronaBenchmark{
 		DKGTime:           1000000, // 1 second for DKG
 		PreprocessingTime: 50000,   // 50ms per session
 		SigningTime:       5000,    // 5ms online signing

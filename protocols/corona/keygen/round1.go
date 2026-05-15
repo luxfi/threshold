@@ -9,19 +9,19 @@ import (
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/protocols/ringtail/config"
+	"github.com/luxfi/threshold/protocols/corona/config"
 	"golang.org/x/crypto/blake2b"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
-// UpstreamMu serializes calls into github.com/luxfi/ringtail v0.2.0,
+// UpstreamMu serializes calls into github.com/luxfi/corona v0.2.0,
 // whose internal precomputed-randomness buffer is a package global and not
 // safe for concurrent use. Exported so the sign package can share it.
 // Remove once upstream is goroutine-safe.
 var UpstreamMu sync.Mutex
 
-// round1 generates key shares using real Ringtail and distributes commitments
+// round1 generates key shares using real Corona and distributes commitments
 type round1 struct {
 	*round.Helper
 
@@ -29,7 +29,7 @@ type round1 struct {
 	selfIndex    int
 	participants []party.ID
 
-	// Real ringtail key generation results
+	// Real corona key generation results
 	keyShares []*realring.KeyShare
 	groupKey  *realring.GroupKey
 
@@ -99,7 +99,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	n := len(r.participants)
 	t := r.Threshold()
 
-	// Generate real Ringtail key shares using the threshold package.
+	// Generate real Corona key shares using the threshold package.
 	// Upstream v0.2.0 uses package-level globals for precomputed randomness;
 	// serialize calls until that is fixed.
 	UpstreamMu.Lock()
@@ -149,7 +149,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}, nil
 }
 
-// serializeKeyShare serializes a real ringtail KeyShare
+// serializeKeyShare serializes a real corona KeyShare
 func serializeKeyShare(share *realring.KeyShare) []byte {
 	// Serialize the key share components
 	var data []byte

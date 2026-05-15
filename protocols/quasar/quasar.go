@@ -1,12 +1,12 @@
 // Package quasar provides hybrid threshold signatures combining BLS (elliptic curve)
-// with Ringtail (post-quantum lattice-based) for security against both classical
+// with Corona (post-quantum lattice-based) for security against both classical
 // and quantum computer attacks.
 //
 // Quasar signatures are "quantum-safe and reliable" - they provide:
 //   - Immediate security via BLS12-381 pairing-based signatures
-//   - Future-proof post-quantum security via Ringtail (Module-LWE)
+//   - Future-proof post-quantum security via Corona (Module-LWE)
 //   - Threshold signing: t-of-n parties required to produce valid signatures
-//   - Flexible verification: verify both components, BLS-only, or Ringtail-only
+//   - Flexible verification: verify both components, BLS-only, or Corona-only
 //
 // Usage:
 //
@@ -22,7 +22,7 @@
 //	proto.AddShare(theirShare)
 //	sig, _ := proto.Finalize(message)
 //
-//	// Verify (both BLS and Ringtail)
+//	// Verify (both BLS and Corona)
 //	valid := quasar.Verify(groupKey, message, sig)
 package quasar
 
@@ -34,7 +34,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/luxfi/crypto/bls"
-	"github.com/luxfi/ringtail/threshold"
+	"github.com/luxfi/corona/threshold"
 	"github.com/luxfi/threshold/pkg/party"
 	blsThreshold "github.com/luxfi/threshold/protocols/bls"
 	"github.com/zeebo/blake3"
@@ -44,8 +44,8 @@ var (
 	// ErrNotInitialized is returned when operations are attempted before setup.
 	ErrNotInitialized = errors.New("quasar: not initialized")
 
-	// ErrRingtailFailed is returned when the post-quantum component fails.
-	ErrRingtailFailed = errors.New("quasar: ringtail component failed")
+	// ErrCoronaFailed is returned when the post-quantum component fails.
+	ErrCoronaFailed = errors.New("quasar: corona component failed")
 
 	// ErrBLSFailed is returned when the BLS component fails.
 	ErrBLSFailed = errors.New("quasar: BLS component failed")
@@ -73,9 +73,9 @@ type Config struct {
 	BLSPublicKey   *bls.PublicKey
 	BLSVerifyKeys  map[party.ID]*bls.PublicKey
 
-	// Ringtail (post-quantum) configuration
-	RingtailShare    *threshold.KeyShare
-	RingtailGroupKey *threshold.GroupKey
+	// Corona (post-quantum) configuration
+	CoronaShare    *threshold.KeyShare
+	CoronaGroupKey *threshold.GroupKey
 }
 
 // GroupKey represents the combined public key for Quasar verification.
@@ -83,8 +83,8 @@ type GroupKey struct {
 	// BLS aggregate public key
 	BLS *bls.PublicKey
 
-	// Ringtail group public key
-	Ringtail *threshold.GroupKey
+	// Corona group public key
+	Corona *threshold.GroupKey
 }
 
 // Bytes returns a serialized representation of the group key.
@@ -96,8 +96,8 @@ func (gk *GroupKey) Bytes() []byte {
 	if gk.BLS != nil {
 		result = append(result, bls.PublicKeyToCompressedBytes(gk.BLS)...)
 	}
-	if gk.Ringtail != nil {
-		result = append(result, gk.Ringtail.Bytes()...)
+	if gk.Corona != nil {
+		result = append(result, gk.Corona.Bytes()...)
 	}
 	return result
 }
@@ -109,9 +109,9 @@ type SignatureShare struct {
 	// BLS component (elliptic curve)
 	BLSShare *blsThreshold.SignatureShare
 
-	// Ringtail components (post-quantum lattice)
-	RingtailRound1 *threshold.Round1Data
-	RingtailRound2 *threshold.Round2Data
+	// Corona components (post-quantum lattice)
+	CoronaRound1 *threshold.Round1Data
+	CoronaRound2 *threshold.Round2Data
 }
 
 // Signature represents a complete Quasar hybrid signature.
@@ -120,16 +120,16 @@ type Signature struct {
 	// BLS signature (96 bytes compressed G2 point)
 	BLS *bls.Signature
 
-	// Ringtail signature (post-quantum lattice-based)
-	Ringtail *threshold.Signature
+	// Corona signature (post-quantum lattice-based)
+	Corona *threshold.Signature
 
 	// MessageHash binds the signature to a specific message
 	MessageHash []byte
 }
 
-// HasRingtail returns true if the signature includes a post-quantum component.
-func (s *Signature) HasRingtail() bool {
-	return s != nil && s.Ringtail != nil
+// HasCorona returns true if the signature includes a post-quantum component.
+func (s *Signature) HasCorona() bool {
+	return s != nil && s.Corona != nil
 }
 
 // HasBLS returns true if the signature includes a BLS component.
@@ -138,7 +138,7 @@ func (s *Signature) HasBLS() bool {
 }
 
 // Bytes serializes the Quasar signature.
-// Format: [1-byte flags][BLS sig][4-byte Ringtail len][CBOR-encoded Ringtail sig]
+// Format: [1-byte flags][BLS sig][4-byte Corona len][CBOR-encoded Corona sig]
 func (s *Signature) Bytes() ([]byte, error) {
 	if s == nil || s.BLS == nil {
 		return nil, ErrNotInitialized
@@ -147,27 +147,27 @@ func (s *Signature) Bytes() ([]byte, error) {
 	blsBytes := bls.SignatureToBytes(s.BLS)
 
 	var flags byte = 0x00
-	if s.Ringtail != nil {
-		flags |= 0x01 // Ringtail present
+	if s.Corona != nil {
+		flags |= 0x01 // Corona present
 	}
 
 	result := make([]byte, 1+len(blsBytes))
 	result[0] = flags
 	copy(result[1:], blsBytes)
 
-	if s.Ringtail != nil {
-		ringtailBytes, err := cbor.Marshal(s.Ringtail)
+	if s.Corona != nil {
+		coronaBytes, err := cbor.Marshal(s.Corona)
 		if err != nil {
-			return nil, fmt.Errorf("quasar: failed to serialize ringtail signature: %w", err)
+			return nil, fmt.Errorf("quasar: failed to serialize corona signature: %w", err)
 		}
-		// Append length-prefixed Ringtail bytes
+		// Append length-prefixed Corona bytes
 		lenBuf := make([]byte, 4)
-		lenBuf[0] = byte(len(ringtailBytes) >> 24)
-		lenBuf[1] = byte(len(ringtailBytes) >> 16)
-		lenBuf[2] = byte(len(ringtailBytes) >> 8)
-		lenBuf[3] = byte(len(ringtailBytes))
+		lenBuf[0] = byte(len(coronaBytes) >> 24)
+		lenBuf[1] = byte(len(coronaBytes) >> 16)
+		lenBuf[2] = byte(len(coronaBytes) >> 8)
+		lenBuf[3] = byte(len(coronaBytes))
 		result = append(result, lenBuf...)
-		result = append(result, ringtailBytes...)
+		result = append(result, coronaBytes...)
 	}
 
 	return result, nil
@@ -181,14 +181,14 @@ type Protocol struct {
 	// BLS threshold protocol
 	blsConfig *blsThreshold.Config
 
-	// Ringtail signer (post-quantum)
-	ringtailSigner *threshold.Signer
+	// Corona signer (post-quantum)
+	coronaSigner *threshold.Signer
 	signers        []int
 
 	// Collected shares
 	blsShares      map[party.ID]*blsThreshold.SignatureShare
-	ringtailRound1 map[int]*threshold.Round1Data
-	ringtailRound2 map[int]*threshold.Round2Data
+	coronaRound1 map[int]*threshold.Round1Data
+	coronaRound2 map[int]*threshold.Round2Data
 }
 
 // NewProtocol creates a new Quasar signing protocol instance.
@@ -210,23 +210,23 @@ func NewProtocol(config *Config) (*Protocol, error) {
 		config.BLSVerifyKeys,
 	)
 
-	// Create Ringtail signer if configured
-	var ringtailSigner *threshold.Signer
-	if config.RingtailShare != nil {
-		ringtailSigner = threshold.NewSigner(config.RingtailShare)
+	// Create Corona signer if configured
+	var coronaSigner *threshold.Signer
+	if config.CoronaShare != nil {
+		coronaSigner = threshold.NewSigner(config.CoronaShare)
 	}
 
 	return &Protocol{
 		config:         config,
 		blsConfig:      blsConfig,
-		ringtailSigner: ringtailSigner,
+		coronaSigner: coronaSigner,
 		blsShares:      make(map[party.ID]*blsThreshold.SignatureShare),
-		ringtailRound1: make(map[int]*threshold.Round1Data),
-		ringtailRound2: make(map[int]*threshold.Round2Data),
+		coronaRound1: make(map[int]*threshold.Round1Data),
+		coronaRound2: make(map[int]*threshold.Round2Data),
 	}, nil
 }
 
-// Sign creates a Quasar signature share with both BLS and Ringtail components.
+// Sign creates a Quasar signature share with both BLS and Corona components.
 func (p *Protocol) Sign(ctx context.Context, message []byte, sessionID int, prfKey []byte, signerIndices []int) (*SignatureShare, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -242,11 +242,11 @@ func (p *Protocol) Sign(ctx context.Context, message []byte, sessionID int, prfK
 	}
 	share.BLSShare = blsShare
 
-	// Create Ringtail Round 1 data if configured
-	if p.ringtailSigner != nil && len(signerIndices) > 0 {
+	// Create Corona Round 1 data if configured
+	if p.coronaSigner != nil && len(signerIndices) > 0 {
 		p.signers = signerIndices
-		round1 := p.ringtailSigner.Round1(sessionID, prfKey, signerIndices)
-		share.RingtailRound1 = round1
+		round1 := p.coronaSigner.Round1(sessionID, prfKey, signerIndices)
+		share.CoronaRound1 = round1
 	}
 
 	return share, nil
@@ -267,43 +267,43 @@ func (p *Protocol) AddShare(share *SignatureShare) {
 	if share.BLSShare != nil {
 		p.blsShares[share.PartyID] = share.BLSShare
 	}
-	if share.RingtailRound1 != nil {
-		p.ringtailRound1[share.RingtailRound1.PartyID] = share.RingtailRound1
+	if share.CoronaRound1 != nil {
+		p.coronaRound1[share.CoronaRound1.PartyID] = share.CoronaRound1
 	}
-	if share.RingtailRound2 != nil {
-		p.ringtailRound2[share.RingtailRound2.PartyID] = share.RingtailRound2
+	if share.CoronaRound2 != nil {
+		p.coronaRound2[share.CoronaRound2.PartyID] = share.CoronaRound2
 	}
 }
 
-// AddRingtailRound1 adds Ringtail Round 1 data from another party.
-func (p *Protocol) AddRingtailRound1(data *threshold.Round1Data) {
+// AddCoronaRound1 adds Corona Round 1 data from another party.
+func (p *Protocol) AddCoronaRound1(data *threshold.Round1Data) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.ringtailRound1[data.PartyID] = data
+	p.coronaRound1[data.PartyID] = data
 }
 
-// CompleteRingtailRound2 completes Ringtail signing after Round 1 data collection.
-func (p *Protocol) CompleteRingtailRound2(sessionID int, message string, prfKey []byte) (*threshold.Round2Data, error) {
+// CompleteCoronaRound2 completes Corona signing after Round 1 data collection.
+func (p *Protocol) CompleteCoronaRound2(sessionID int, message string, prfKey []byte) (*threshold.Round2Data, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.ringtailSigner == nil {
-		return nil, fmt.Errorf("%w: ringtail not configured", ErrNotInitialized)
+	if p.coronaSigner == nil {
+		return nil, fmt.Errorf("%w: corona not configured", ErrNotInitialized)
 	}
 
-	round2, err := p.ringtailSigner.Round2(sessionID, message, prfKey, p.signers, p.ringtailRound1)
+	round2, err := p.coronaSigner.Round2(sessionID, message, prfKey, p.signers, p.coronaRound1)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRingtailFailed, err)
+		return nil, fmt.Errorf("%w: %v", ErrCoronaFailed, err)
 	}
 
 	return round2, nil
 }
 
-// AddRingtailRound2 adds Ringtail Round 2 data from another party.
-func (p *Protocol) AddRingtailRound2(data *threshold.Round2Data) {
+// AddCoronaRound2 adds Corona Round 2 data from another party.
+func (p *Protocol) AddCoronaRound2(data *threshold.Round2Data) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.ringtailRound2[data.PartyID] = data
+	p.coronaRound2[data.PartyID] = data
 }
 
 // BLSShareCount returns the number of BLS shares collected.
@@ -347,13 +347,13 @@ func (p *Protocol) Finalize(message []byte) (*Signature, error) {
 		MessageHash: hashMessage(message),
 	}
 
-	// Finalize Ringtail if configured and enough shares
-	if p.ringtailSigner != nil && len(p.ringtailRound2) >= p.config.Threshold {
-		ringtailSig, err := p.ringtailSigner.Finalize(p.ringtailRound2)
+	// Finalize Corona if configured and enough shares
+	if p.coronaSigner != nil && len(p.coronaRound2) >= p.config.Threshold {
+		coronaSig, err := p.coronaSigner.Finalize(p.coronaRound2)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrRingtailFailed, err)
+			return nil, fmt.Errorf("%w: %v", ErrCoronaFailed, err)
 		}
-		sig.Ringtail = ringtailSig
+		sig.Corona = coronaSig
 	}
 
 	return sig, nil
@@ -364,12 +364,12 @@ func (p *Protocol) ClearShares() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.blsShares = make(map[party.ID]*blsThreshold.SignatureShare)
-	p.ringtailRound1 = make(map[int]*threshold.Round1Data)
-	p.ringtailRound2 = make(map[int]*threshold.Round2Data)
+	p.coronaRound1 = make(map[int]*threshold.Round1Data)
+	p.coronaRound2 = make(map[int]*threshold.Round2Data)
 }
 
 // Verify verifies a Quasar signature.
-// For full hybrid security, both BLS and Ringtail (if present) must verify.
+// For full hybrid security, both BLS and Corona (if present) must verify.
 func Verify(groupKey *GroupKey, message []byte, sig *Signature) (bool, error) {
 	if sig == nil {
 		return false, errors.New("nil signature")
@@ -386,9 +386,9 @@ func Verify(groupKey *GroupKey, message []byte, sig *Signature) (bool, error) {
 		return false, nil
 	}
 
-	// Verify Ringtail component (if present)
-	if sig.Ringtail != nil && groupKey.Ringtail != nil {
-		if !threshold.Verify(groupKey.Ringtail, string(message), sig.Ringtail) {
+	// Verify Corona component (if present)
+	if sig.Corona != nil && groupKey.Corona != nil {
+		if !threshold.Verify(groupKey.Corona, string(message), sig.Corona) {
 			return false, nil
 		}
 	}
@@ -405,13 +405,13 @@ func VerifyBLSOnly(pubKey *bls.PublicKey, message []byte, sig *Signature) bool {
 	return bls.Verify(pubKey, sig.BLS, message)
 }
 
-// VerifyRingtailOnly verifies only the Ringtail component.
+// VerifyCoronaOnly verifies only the Corona component.
 // Use for quantum-resistant verification.
-func VerifyRingtailOnly(groupKey *threshold.GroupKey, message string, sig *Signature) bool {
-	if sig == nil || sig.Ringtail == nil || groupKey == nil {
+func VerifyCoronaOnly(groupKey *threshold.GroupKey, message string, sig *Signature) bool {
+	if sig == nil || sig.Corona == nil || groupKey == nil {
 		return false
 	}
-	return threshold.Verify(groupKey, message, sig.Ringtail)
+	return threshold.Verify(groupKey, message, sig.Corona)
 }
 
 // TrustedDealer generates Quasar key shares using a trusted dealer.
@@ -438,10 +438,10 @@ func (d *TrustedDealer) GenerateShares(ctx context.Context, partyIDs []party.ID)
 	}
 	blsVerifyKeys := blsThreshold.GetVerificationKeys(blsShares)
 
-	// Generate Ringtail shares
-	ringtailShares, ringtailGroupKey, err := threshold.GenerateKeys(d.Threshold, d.TotalParties, nil)
+	// Generate Corona shares
+	coronaShares, coronaGroupKey, err := threshold.GenerateKeys(d.Threshold, d.TotalParties, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Ringtail keygen failed: %w", err)
+		return nil, nil, fmt.Errorf("Corona keygen failed: %w", err)
 	}
 
 	// Build configs for each party
@@ -454,14 +454,14 @@ func (d *TrustedDealer) GenerateShares(ctx context.Context, partyIDs []party.ID)
 			BLSSecretShare:   blsShares[id],
 			BLSPublicKey:     blsGroupPK,
 			BLSVerifyKeys:    blsVerifyKeys,
-			RingtailShare:    ringtailShares[i],
-			RingtailGroupKey: ringtailGroupKey,
+			CoronaShare:    coronaShares[i],
+			CoronaGroupKey: coronaGroupKey,
 		}
 	}
 
 	groupKey := &GroupKey{
 		BLS:      blsGroupPK,
-		Ringtail: ringtailGroupKey,
+		Corona: coronaGroupKey,
 	}
 
 	return configs, groupKey, nil

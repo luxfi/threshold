@@ -1,4 +1,4 @@
-package ringtail_test
+package corona_test
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
-	"github.com/luxfi/threshold/protocols/ringtail"
-	"github.com/luxfi/threshold/protocols/ringtail/config"
+	"github.com/luxfi/threshold/protocols/corona"
+	"github.com/luxfi/threshold/protocols/corona/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
@@ -26,7 +26,7 @@ func TestKeygen(t *testing.T) {
 		partyIDs[i] = party.ID(string(rune('a' + i)))
 	}
 
-	keygenFunc := ringtail.Keygen(partyIDs[0], partyIDs, threshold, nil)
+	keygenFunc := corona.Keygen(partyIDs[0], partyIDs, threshold, nil)
 	require.NotNil(t, keygenFunc, "Keygen should return a function")
 
 	sessionID := []byte("test-session")
@@ -62,8 +62,8 @@ func TestKeygenWithHarness(t *testing.T) {
 		}()
 
 		for _, id := range partyIDs {
-			sessionID := []byte("test-ringtail-keygen")
-			startFunc := ringtail.Keygen(id, partyIDs, threshold, pl)
+			sessionID := []byte("test-corona-keygen")
+			startFunc := corona.Keygen(id, partyIDs, threshold, pl)
 
 			handler, err := harness.CreateHandler(id, startFunc, sessionID)
 			if err != nil {
@@ -92,7 +92,7 @@ func TestSign(t *testing.T) {
 	signers := []party.ID{"a", "b"}
 	message := []byte("test message")
 
-	signFunc := ringtail.SignWithConfig(cfg, signers, message, nil)
+	signFunc := corona.SignWithConfig(cfg, signers, message, nil)
 	require.NotNil(t, signFunc, "Sign should return a function")
 
 	sessionID := []byte("test-sign-session")
@@ -136,8 +136,8 @@ func TestSignWithTimeout(t *testing.T) {
 
 		for _, id := range signers {
 			cfg := configs[id]
-			sessionID := []byte("test-ringtail-sign")
-			startFunc := ringtail.SignWithConfig(cfg, signers, message, pl)
+			sessionID := []byte("test-corona-sign")
+			startFunc := corona.SignWithConfig(cfg, signers, message, pl)
 
 			session, err := startFunc(sessionID)
 			if err != nil {
@@ -164,7 +164,7 @@ func TestRefresh(t *testing.T) {
 	parties := []party.ID{"a", "b", "c"}
 	threshold := 2
 
-	refreshFunc := ringtail.Refresh(cfg, parties, threshold, nil)
+	refreshFunc := corona.Refresh(cfg, parties, threshold, nil)
 	require.NotNil(t, refreshFunc, "Refresh should return a function")
 
 	sessionID := []byte("test-refresh-session")
@@ -206,8 +206,8 @@ func TestRefreshWithTimeout(t *testing.T) {
 
 		for _, id := range partyIDs {
 			cfg := configs[id]
-			sessionID := []byte("test-ringtail-refresh")
-			startFunc := ringtail.Refresh(cfg, partyIDs, threshold, pl)
+			sessionID := []byte("test-corona-refresh")
+			startFunc := corona.Refresh(cfg, partyIDs, threshold, pl)
 
 			session, err := startFunc(sessionID)
 			if err != nil {
@@ -235,7 +235,7 @@ func TestTimeout(t *testing.T) {
 		signers := []party.ID{"a", "b"}
 		message := []byte("test message")
 
-		signFunc := ringtail.SignWithConfig(cfg, signers, message, nil)
+		signFunc := corona.SignWithConfig(cfg, signers, message, nil)
 		sessionID := []byte("timeout-test")
 
 		_, _ = signFunc(sessionID)
