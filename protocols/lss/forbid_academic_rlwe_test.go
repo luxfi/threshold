@@ -1,20 +1,15 @@
 // Copyright (C) 2025-2026, Lux Industries Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Death test for the LSS-Pulsar / LSS-Lens adapters. After the
-// March 3, 2026 PQ-consensus architecture freeze, the LSS adapters
-// consume their threshold kernels via:
+// Regression guard for the LSS-Pulsar / LSS-Lens adapters. The
+// production R-LWE path is luxfi/corona; the Module-LWE Threshold
+// path is luxfi/pulsar; the academic upstream forks (luxfi/ringtail,
+// luxfi/nasua) are research-only and MUST NOT appear in production
+// import graphs.
 //
-//   - lss_pulsar.go → github.com/luxfi/pulsar
-//   - lss_lens.go   → github.com/luxfi/lens
-//
-// Direct imports of github.com/luxfi/ringtail from either adapter
-// are forbidden — they bypass the Pulsar key-era binding /
-// activation cert circuit-breaker that LSS-Pulsar wires in. Other
-// files in this package may still legitimately use ringtail (e.g.
-// the ringtail-specific protocol entry-points under
-// protocols/ringtail/ aren't covered by this test); this test
-// scopes the rule to the two adapter files only.
+// This test fails CI if either lss_pulsar.go or lss_lens.go imports
+// any of the academic-fork module paths directly. Other files in
+// this package are out of scope.
 
 package lss
 
@@ -27,16 +22,21 @@ import (
 	"testing"
 )
 
-// TestLSSAdaptersDoNotImportRingtail — fails if either lss_pulsar.go
-// or lss_lens.go imports github.com/luxfi/ringtail/... directly.
-func TestLSSAdaptersDoNotImportRingtail(t *testing.T) {
+// TestLSSAdaptersForbidAcademicRLWE — fails if either lss_pulsar.go
+// or lss_lens.go imports an academic-fork R-LWE library directly.
+// Production R-LWE goes through luxfi/corona; Module-LWE Threshold
+// goes through luxfi/pulsar.
+func TestLSSAdaptersForbidAcademicRLWE(t *testing.T) {
 	pkgDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("os.Getwd: %v", err)
 	}
 	files := []string{"lss_pulsar.go", "lss_lens.go"}
 
-	const forbiddenImportPrefix = "github.com/luxfi/ringtail"
+	forbiddenPrefixes := []string{
+		"github.com/luxfi/ringtail",
+		"github.com/luxfi/nasua",
+	}
 
 	fset := token.NewFileSet()
 	var violations []string
@@ -52,17 +52,18 @@ func TestLSSAdaptersDoNotImportRingtail(t *testing.T) {
 		}
 		for _, imp := range file.Imports {
 			ip := strings.Trim(imp.Path.Value, "\"")
-			if strings.HasPrefix(ip, forbiddenImportPrefix) {
-				violations = append(violations,
-					base+": forbidden import "+ip)
+			for _, forbidden := range forbiddenPrefixes {
+				if strings.HasPrefix(ip, forbidden) {
+					violations = append(violations,
+						base+": forbidden import "+ip)
+				}
 			}
 		}
 	}
 	if len(violations) > 0 {
-		t.Fatalf("LSS adapters must not import ringtail directly after "+
-			"the Mar-3-2026 PQ-consensus architecture freeze. "+
-			"lss_pulsar.go MUST go through github.com/luxfi/pulsar; "+
-			"lss_lens.go MUST go through github.com/luxfi/lens.\n\n"+
+		t.Fatalf("LSS adapters must not import academic-fork R-LWE "+
+			"libraries directly. Production R-LWE = luxfi/corona; "+
+			"production Module-LWE Threshold = luxfi/pulsar.\n\n"+
 			"Violations:\n  %s", strings.Join(violations, "\n  "))
 	}
 }
