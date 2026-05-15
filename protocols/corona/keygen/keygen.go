@@ -1,5 +1,5 @@
-// Package keygen implements distributed key generation for Ringtail threshold signatures.
-// This package wraps the real Ringtail implementation from github.com/luxfi/ringtail.
+// Package keygen implements distributed key generation for Corona threshold signatures.
+// This package wraps the real Corona implementation from github.com/luxfi/corona.
 package keygen
 
 import (
@@ -9,13 +9,13 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/threshold/protocols/ringtail/config"
+	"github.com/luxfi/threshold/protocols/corona/config"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
-// Start initiates the Ringtail key generation protocol.
-// This wraps the real Ringtail keygen from github.com/luxfi/ringtail/threshold.
+// Start initiates the Corona key generation protocol.
+// This wraps the real Corona keygen from github.com/luxfi/corona/threshold.
 func Start(selfID party.ID, participants []party.ID, threshold int, pl *pool.Pool) protocol.StartFunc {
 	return func(sessionID []byte) (round.Session, error) {
 		// Validate parameters
@@ -24,8 +24,8 @@ func Start(selfID party.ID, participants []party.ID, threshold int, pl *pool.Poo
 		}
 
 		info := round.Info{
-			ProtocolID:       "ringtail/keygen",
-			FinalRoundNumber: 3, // Ringtail keygen has 3 rounds
+			ProtocolID:       "corona/keygen",
+			FinalRoundNumber: 3, // Corona keygen has 3 rounds
 			SelfID:           selfID,
 			PartyIDs:         participants,
 			Threshold:        threshold,
@@ -36,7 +36,7 @@ func Start(selfID party.ID, participants []party.ID, threshold int, pl *pool.Poo
 			return nil, err
 		}
 
-		// Default to 128-bit security (uses real ringtail params)
+		// Default to 128-bit security (uses real corona params)
 		cfg := config.NewConfig(selfID, threshold, config.Security128)
 
 		// Find our index in the participant list
@@ -63,7 +63,7 @@ func Start(selfID party.ID, participants []party.ID, threshold int, pl *pool.Poo
 }
 
 // KeygenOutput represents the result of key generation.
-// It wraps the real ringtail KeyShare.
+// It wraps the real corona KeyShare.
 type KeygenOutput struct {
 	Config   *config.Config
 	KeyShare *realring.KeyShare
@@ -83,12 +83,12 @@ func (o *KeygenOutput) PrivateShare() []byte {
 	return o.Config.PrivateShare
 }
 
-// GetKeyShare returns the real ringtail KeyShare for use in signing
+// GetKeyShare returns the real corona KeyShare for use in signing
 func (o *KeygenOutput) GetKeyShare() *realring.KeyShare {
 	return o.KeyShare
 }
 
-// GetGroupKey returns the real ringtail GroupKey for use in signing
+// GetGroupKey returns the real corona GroupKey for use in signing
 func (o *KeygenOutput) GetGroupKey() *realring.GroupKey {
 	return o.GroupKey
 }

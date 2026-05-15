@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // Package pulsar is the Quasar PQ-threshold lane — Lux's production
-// evolution of the Ringtail lattice threshold signature scheme.
+// evolution of the Corona lattice threshold signature scheme.
 //
 // # This package owns the round-based signing and verification wrappers,
 // # NOT the dynamic-resharing lifecycle.
@@ -53,13 +53,13 @@
 //	Pulsar: each validator holds a SHARE of one group key (threshold)
 //
 // The threshold property is the only reason to use Pulsar over per-
-// validator Ringtail/ML-DSA: a Pulsar certificate is O(1) in the
+// validator Corona/ML-DSA: a Pulsar certificate is O(1) in the
 // number of signers (compact PQ threshold), where ML-DSA is O(n) raw
 // or O(1) under a Z-Chain Groth16 rollup.
 //
-// # Relation to protocols/ringtail
+// # Relation to protocols/corona
 //
-// protocols/ringtail/ wraps the upstream github.com/luxfi/ringtail
+// protocols/corona/ wraps the upstream github.com/luxfi/corona
 // (academic POC). It inherits two known issues:
 //
 //   - DKG path uses Feldman commits without MLWE noise — recoverable
@@ -68,7 +68,7 @@
 //     a fresh GroupKey, which requires a new trust event each epoch
 //     — wrong shape for permissionless validator sets.
 //
-// protocols/pulsar/ supersedes protocols/ringtail/ with:
+// protocols/pulsar/ supersedes protocols/corona/ with:
 //
 //   - Corrected lattice kernel from github.com/luxfi/pulsar.
 //   - Pedersen DKG over R_q (research path, dkg2/) for Reanchor.
@@ -78,7 +78,7 @@
 //   - Activation certificate as the chain-level circuit breaker.
 //   - Full key-era lifecycle: Bootstrap → Reshare* → Reanchor.
 //
-// protocols/ringtail/ should be marked deprecated; protocols/quasar/
+// protocols/corona/ should be marked deprecated; protocols/quasar/
 // should switch to consuming protocols/pulsar/ for the lattice lane.
 //
 // # Layer separation

@@ -8,10 +8,10 @@ import (
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/hash"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/protocols/ringtail/config"
+	"github.com/luxfi/threshold/protocols/corona/config"
 	"golang.org/x/crypto/blake2b"
 
-	realring "github.com/luxfi/ringtail/threshold"
+	realring "github.com/luxfi/corona/threshold"
 )
 
 // round2 distributes key shares to all parties
@@ -22,7 +22,7 @@ type round2 struct {
 	selfIndex    int
 	participants []party.ID
 
-	// Real ringtail key generation results from round 1
+	// Real corona key generation results from round 1
 	keyShares []*realring.KeyShare
 	groupKey  *realring.GroupKey
 

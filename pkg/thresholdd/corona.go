@@ -12,17 +12,17 @@ import (
 // unverifiable by any independent party, non-durable across daemon
 // restarts, and a DoS vector via unbounded map growth.
 //
-// `luxfi/ringtail/threshold.Signature` is a struct of ring polynomials
+// `luxfi/corona/threshold.Signature` is a struct of ring polynomials
 // (`C ring.Poly`, `Z structs.Vector[ring.Poly]`, `Delta
 // structs.Vector[ring.Poly]`). The lattice library exposes
 // `MarshalBinary` / `UnmarshalBinary` on those underlying types, but
 // composing them into a single canonical wire format — the form
 // independent peers and L1 verifier contracts actually consume — is a
-// primitive-layer change in `luxfi/ringtail`, not a dispatcher concern.
+// primitive-layer change in `luxfi/corona`, not a dispatcher concern.
 // `corona.Verify(*GroupKey, string, *Signature)` also takes the live
 // object rather than bytes.
 //
-// Until `luxfi/ringtail/threshold` ships:
+// Until `luxfi/corona/threshold` ships:
 //
 //	func (Signature) MarshalBinary() ([]byte, error)
 //	func (*Signature) UnmarshalBinary([]byte) error
@@ -36,10 +36,10 @@ type coronaScheme struct{}
 func newCoronaScheme() *coronaScheme { return &coronaScheme{} }
 
 // errCoronaNotImplemented is returned for every Corona op until
-// luxfi/ringtail/threshold ships stable wire encodings for Signature
+// luxfi/corona/threshold ships stable wire encodings for Signature
 // and GroupKey. See corona.go header for the contract.
 var errCoronaNotImplemented = errors.New(
-	"corona: not yet implemented — luxfi/ringtail/threshold.Signature/GroupKey " +
+	"corona: not yet implemented — luxfi/corona/threshold.Signature/GroupKey " +
 		"lack stable wire encodings (MarshalBinary/UnmarshalBinary + stateless " +
 		"VerifyBytes). The dispatcher refuses to mint in-process tokens that no " +
 		"second party can verify (Red HIGH B2). Fix upstream and remove this guard.",
