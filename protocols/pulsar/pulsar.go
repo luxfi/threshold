@@ -53,12 +53,15 @@ type (
 	EpochShareState = keyera.EpochShareState
 
 	// PulsarKeyEraID is a monotonically increasing identifier for a
-	// key era; bumped only at Reanchor.
-	PulsarKeyEraID = keyera.PulsarKeyEraID
+	// key era; bumped only at Reanchor. Aliased to the canonical
+	// luxfi/corona/keyera.CoronaKeyEraID — the rename in corona only
+	// touched the type name; the semantic is unchanged.
+	PulsarKeyEraID = keyera.CoronaKeyEraID
 
 	// PulsarGroupID identifies one Pulsar group for partitioned-set
-	// deployments (each group has its own GroupKey lineage).
-	PulsarGroupID = keyera.PulsarGroupID
+	// deployments (each group has its own GroupKey lineage). Aliased
+	// to luxfi/corona/keyera.CoronaGroupID.
+	PulsarGroupID = keyera.CoronaGroupID
 
 	// GroupKey is the persistent (A, bTilde) public key. Pointer is
 	// shared across all share states within a key era.
