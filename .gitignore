@@ -4,7 +4,13 @@
 *.dll
 *.so
 *.dylib
-threshold-cli
+
+# Build artifacts from `make build` / `make examples`
+# (`bin/` is the Makefile output dir; `example/example` is built from
+# `example/example.go` by the `examples` target.)
+/bin/
+/example/example
+/example/dynamic_reshare_example
 
 # Test binary, built with `go test -c`
 *.test
