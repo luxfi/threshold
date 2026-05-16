@@ -1,12 +1,68 @@
-# Pulsar — threshold Module-LWE / FIPS 204 byte-equal
+# Pulsar — Module-LWE validator authentication for Quasar
 
-Pulsar is the production-floor PQ-threshold scheme in the Lux Quasar
-consensus stack. 2-round, t-of-n, output byte-identical to single-
-party FIPS 204 ML-DSA-65.
+Pulsar is Lux's ML-DSA validator-authentication family. **It is not a
+single infinite-threshold ML-DSA key.** It splits into two distinct
+constructions that should never be conflated:
 
-## Construction (one paragraph)
+| Use | Construction | Where |
+|---|---|---|
+| **PulsarCert** — public leaderless consensus | **Unlimited-signer, stake-threshold ML-DSA certificate**. Each validator owns its own FIPS 204 ML-DSA key and signs independently. Quasar accepts the cert when the verified signer set crosses the configured stake/quorum threshold. | Lux Quasar consensus (P-Chain, finality envelopes) |
+| **Threshold Pulsar** — custody / governance / bridge | 2-round t-of-n threshold construction. Per-party aggregated signature is **byte-identical** to single-party FIPS 204 ML-DSA-65 on the same `(pk, m)`. | `~/work/lux/pulsar/`, `~/work/lux/pulsar-mptc/` (NIST MPTC submission) |
 
-Per spec `pulsar-mptc/spec/pulsar-m.tex` Algorithm sign-r1 / sign-r2 /
+These are *different cryptographic objects with different invariants*.
+The first is a quorum predicate over many independent ML-DSA
+signatures (no single threshold-produced ML-DSA σ); the second is a
+single FIPS 204 σ produced by a multi-party ceremony. Both ship in
+the Lux stack, in different lanes.
+
+## PulsarCert — public consensus
+
+PulsarCert is the cert form Quasar uses:
+
+```
+PulsarCert {
+  message m
+  validator_set_id
+  signer indices / bitmap
+  signatures σ_i
+  signed_weight
+}
+
+valid iff
+  ∀ i ∈ signers:  MLDSA.Verify(pk_i, m, σ_i) = true
+  ∧ signed_weight ≥ quorum_threshold
+```
+
+The "threshold" lives in the **certificate predicate**, not inside any
+single signature. A PulsarCert can omit signatures (e.g. by sampling
+a deterministic committee, by Avalanche-style sampling, by checkpoint
+frequency reduction, or by sidecar aggregate commitments) and remain
+valid as long as the included signer set's weight crosses the
+threshold. The verifier never sees a "threshold ML-DSA signature" —
+it sees ordinary FIPS 204 σ's and a quorum bitmap.
+
+This gives Lux **unlimited-signer semantics**: the global validator
+set can grow without changing the verifier model, while each block /
+checkpoint / epoch certificate stays bounded by policy.
+
+## Threshold Pulsar — custody track
+
+The NIST MPTC submission (`~/work/lux/pulsar-mptc/`) is the **second**
+construction: a 2-round t-of-n threshold scheme whose aggregated
+output is bit-identical to single-party FIPS 204 ML-DSA-65. This is
+the right tool for:
+
+- **Bridge custody** keys (B-Chain MPC).
+- **Governance** keys with rotating committees.
+- Any role where a single ML-DSA σ must be produced collaboratively
+  without revealing the underlying secret to any single party.
+
+Threshold Pulsar's per-party output is NOT a valid ML-DSA σ on its
+own. The Combine step aggregates them into the single FIPS 204 σ.
+
+## Construction (Threshold Pulsar, NIST MPTC track)
+
+Per spec `pulsar-mptc/spec/pulsar.tex` Algorithm sign-r1 / sign-r2 /
 sign-agg: each party samples a fresh mask `y_i ← U_{γ_1}^ℓ` and
 commits `D_i = cSHAKE(pack_w1(w_i), τ_1)` with sender-MACs. After
 collecting peer commits + recovering aggregated `w̄ = HighBits(Σ w_j,
