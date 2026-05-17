@@ -60,6 +60,7 @@ jobs:
       - name: go test (count=1, no cache)
         id: gotest
         working-directory: repo
+        shell: bash
         run: |
           set -o pipefail
           go test -count=1 -timeout 300s ./... 2>&1 | tee ../go-test.log
