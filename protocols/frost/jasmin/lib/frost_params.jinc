@@ -1,0 +1,30 @@
+// FROST shared parameters.
+//
+// These constants are shared by both pinned ciphersuites. The
+// ciphersuite-specific scalar field, curve, and hash are in the
+// single-party/ subdirectory.
+
+// Number of bytes per scalar (both Ed25519 and secp256k1).
+param int FROST_SCALAR_BYTES = 32;
+
+// Number of bytes per group element (compressed encoding).
+// Ed25519: 32-byte y-with-sign encoding (RFC 8032 §5.1.2).
+// secp256k1 BIP-340: 32-byte x-only encoding (BIP-340 §2).
+param int FROST_POINT_BYTES = 32;
+
+// Signature byte length (R || s for both ciphersuites).
+param int FROST_SIG_BYTES = 64;
+
+// Maximum supported quorum size for the threshold layer.
+// Matches the Lux profile cap in SPEC.md §2.3.
+param int FROST_MAX_QUORUM = 1024;
+
+// Maximum supported message length for the threshold layer.
+// Bounded to keep stack allocations static.
+param int FROST_MAX_MSG = 4096;
+
+// Round-1 commit byte length per party: D_i || E_i = 32 + 32 = 64.
+param int FROST_R1_COMMIT_BYTES = 64;
+
+// Round-2 response byte length per party: z_i = 32 bytes.
+param int FROST_R2_RESPONSE_BYTES = 32;

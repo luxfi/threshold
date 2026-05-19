@@ -1,0 +1,45 @@
+// FROST Lagrange coefficient computation in F_r.
+//
+// For a quorum Q and party index i in Q, this computes
+//   lambda_i(0) = prod_{j in Q, j != i} (0 - x_j) / (x_i - x_j)
+// in F_r where r is the pinned ciphersuite's scalar field order.
+//
+// CT obligation: the loop bound is the quorum size |Q|, which is
+// PUBLIC (an adversary observing the session transcript already knows
+// the quorum). Inversion (1/(x_i - x_j)) must be constant-time per
+// the underlying scalar-field implementation.
+
+require "frost_params.jinc"
+
+// Compute lambda_i(0) for party i in quorum indexed by Q[0..n).
+// Inputs:
+//   quorum_indices : array of party indices in the quorum (public).
+//   n              : |Q| (public).
+//   my_idx_pos     : position of THIS party's index in quorum_indices
+//                    (public).
+// Output:
+//   lambda_out     : 32-byte little-endian scalar mod r.
+//
+// CT: control flow + memory access depend only on (n, my_idx_pos);
+// scalar arithmetic is delegated to the ciphersuite's CT scalar API.
+inline
+fn frost_lagrange_at_zero(
+    reg ptr u32[FROST_MAX_QUORUM] quorum_indices,
+    reg u64 n,
+    reg u64 my_idx_pos,
+    reg ptr u8[FROST_SCALAR_BYTES] lambda_out
+) -> reg ptr u8[FROST_SCALAR_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode:
+    //   lambda <- 1
+    //   for j in 0..n:
+    //     if j != my_idx_pos:
+    //       lambda <- lambda * (0 - x_j) * inv(x_i - x_j)
+    //   return lambda
+    //
+    // The (j != my_idx_pos) test branches on PUBLIC data only.
+    // scalar_mul and scalar_inv must be CT per the ciphersuite.
+    return lambda_out;
+}
