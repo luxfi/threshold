@@ -9,8 +9,8 @@ require (
 	// Lux crypto stack - this is the HIGH-LEVEL orchestration layer
 	// that consumes primitives from these packages (LP-5703, LP-5704)
 	github.com/luxfi/crypto v1.19.0 // ECDSA, EdDSA, BLS curves
-	github.com/luxfi/fhe v1.7.6 // FHE primitives for TFHE protocol
-	github.com/luxfi/lattice/v7 v7.1.0 // Lattice ops for Corona (post-quantum) + GPU acceleration
+	github.com/luxfi/fhe v1.8.2 // FHE primitives for TFHE protocol
+	github.com/luxfi/lattice/v7 v7.1.0 // indirect; Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
@@ -45,6 +45,8 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/luxfi/accel v1.0.7 // indirect
+	github.com/luxfi/math v1.4.1 // indirect
+	github.com/luxfi/pq v1.0.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
