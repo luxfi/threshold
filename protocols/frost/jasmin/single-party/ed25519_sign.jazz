@@ -1,0 +1,45 @@
+// Single-party Ed25519 Sign (RFC 8032 §5.1.6).
+//
+// This file documents the call surface for the libjade port of
+// single-party Ed25519. As of this submission, libjade does not yet
+// provide Ed25519; the function below is a STUB documenting the
+// expected signature. The Lux profile's CT story for Ed25519 inherits
+// from `crypto/ed25519` (Go standard library) until a libjade port
+// lands.
+//
+// Algorithm (RFC 8032 §5.1.6):
+//   1. h    = SHA-512(sk)            // 64 bytes
+//   2. s    = clamp(h[0..32])        // scalar
+//   3. prefix = h[32..64]
+//   4. A    = sB                     // compressed Edwards public key
+//   5. r    = SHA-512(prefix || M)
+//   6. R    = rB                     // compressed Edwards point
+//   7. k    = SHA-512(R || A || M) mod L
+//   8. s'   = (r + ks) mod L
+//   9. sig  = R || s'                // 64 bytes
+
+require "../lib/frost_params.jinc"
+
+// sk:      32-byte Ed25519 secret seed (SECRET)
+// pk:      32-byte Ed25519 public key (PUBLIC)
+// msg:     up to FROST_MAX_MSG bytes (PUBLIC)
+// msg_len: actual message length in bytes (PUBLIC)
+// sig:     output 64-byte signature (PUBLIC)
+//
+// CT obligation: time + memory access independent of sk.
+// Inherited from libjade SHA-512 + ed25519 point arithmetic
+// (when those ship).
+inline
+fn ed25519_sign(
+    reg ptr u8[32] sk,
+    reg ptr u8[32] pk,
+    reg ptr u8[FROST_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[FROST_SIG_BYTES] sig
+) -> reg ptr u8[FROST_SIG_BYTES]
+{
+    // TODO: jasmin implementation. Tracked in ../SUBMISSION-STATUS.md
+    // §3.5; until libjade ports Ed25519, Lux inherits CT posture from
+    // Go `crypto/ed25519`.
+    return sig;
+}

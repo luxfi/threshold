@@ -1,0 +1,45 @@
+// Single-party BIP-340 Schnorr Sign (secp256k1 x-only).
+//
+// Algorithm (BIP-340 §3.2 Sign):
+//   1. d  = sk  // (32 bytes)
+//   2. P  = d*G; if y(P) is odd, d <- n - d.
+//   3. t  = bytes(d) XOR tagged_hash("BIP0340/aux", a) where a is
+//          32 bytes auxiliary randomness (SECRET — fresh per sign).
+//   4. rand = tagged_hash("BIP0340/nonce", t || bytes(P) || m)
+//   5. k' = int(rand) mod n; fail if k' = 0
+//   6. R  = k'*G; if y(R) is odd, k <- n - k'; else k <- k'
+//   7. e  = int(tagged_hash("BIP0340/challenge",
+//                            bytes(R) || bytes(P) || m)) mod n
+//   8. sig = bytes(R) || bytes((k + e*d) mod n)
+//
+// CT obligation: time + memory access independent of (d, a, k).
+// Inherited from libjade SHA-256 (when ported) + secp256k1 scalar
+// arithmetic (CT inheritance: `cloudflare/circl` secp256k1 is CT).
+
+require "../lib/frost_params.jinc"
+
+// sk:      32-byte secp256k1 secret scalar (SECRET)
+// pk:      32-byte BIP-340 x-only public key (PUBLIC)
+// aux:     32-byte fresh auxiliary randomness (SECRET; CT obligation
+//          inherits to here)
+// msg:     up to FROST_MAX_MSG bytes (PUBLIC)
+// msg_len: actual message length (PUBLIC)
+// sig:     output 64-byte signature (PUBLIC)
+//
+// CT obligation: time + memory access independent of (sk, aux).
+inline
+fn secp256k1_bip340_sign(
+    reg ptr u8[32] sk,
+    reg ptr u8[32] pk,
+    reg ptr u8[32] aux,
+    reg ptr u8[FROST_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[FROST_SIG_BYTES] sig
+) -> reg ptr u8[FROST_SIG_BYTES]
+{
+    // TODO: jasmin implementation. Tracked in ../SUBMISSION-STATUS.md
+    // §3.5. Until libjade ports BIP-340 with secp256k1 scalar
+    // arithmetic in Jasmin, Lux inherits CT from circl's CT
+    // secp256k1 implementation.
+    return sig;
+}
