@@ -1,0 +1,76 @@
+// CGGMP21 Presign Round 3 — finalize presignature (Lux profile).
+//
+// Reference: CCS '21 §5.1 Round 3; mirrors Go reference at
+// `~/work/lux/threshold/protocols/cmp/presign/round3.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// After Round 2:
+//   - Each party holds (alpha_{i,j}, beta_{j,i}) such that
+//     alpha_{i,j} + beta_{j,i} = k_i * gamma_j (mod n) for each peer j.
+//   - Define delta_i = sum_j (alpha_{i,j} + beta_{j,i})
+//                    = sum_j (k_i * gamma_j) = k_i * (sum_j gamma_j)
+//                    Note: this includes gamma_i itself (i = j case).
+//   - Define Gamma_i = gamma_i * G (on secp256k1).
+//   - Define chi_i: per CCS '21 §5.1, the multiplication share of
+//                    k_i * x_i (the secret share contribution).
+//
+// In Round 3 each party:
+//   1. Broadcasts delta_i (in F_n).
+//   2. Broadcasts Gamma_i (point on secp256k1).
+//   3. Receives delta_j, Gamma_j from all peers.
+//   4. delta = sum_j delta_j   // public
+//   5. Gamma = sum_j Gamma_j   // public point
+//   6. delta = k * gamma where k = sum k_i, gamma = sum gamma_i.
+//      ZK invariant: delta * G = k * Gamma.
+//   7. R = (delta^{-1} * Gamma)   // = (k * gamma)^{-1} * (gamma * G)
+//                                  // = k^{-1} * G                  PUBLIC
+//   8. r = R.x mod n
+//
+// Outputs:
+//   presignature:  (R, r, k_inv_share, chi_share) — k_inv_share and
+//                   chi_share are SECRET, R and r are PUBLIC.
+//
+// CT obligations:
+//   - All scalar operations CT in (k_i, gamma_i, alpha_{i,*}).
+//   - delta^{-1} requires CT modular inverse.
+
+require "../lib/cmp_params.jinc"
+require "../lib/paillier.jinc"
+
+inline
+fn cmp_presign_round3(
+    reg ptr u8[CMP_SCALAR_BYTES] share,
+    reg ptr u8[64] nonce_state,
+    reg ptr u8[CMP_SCALAR_BYTES * CMP_MAX_QUORUM * 2] mta_state,
+    reg ptr u8[16] session_id,
+    reg u32 my_idx,
+    reg u64 n_peers,
+    reg ptr u8[CMP_POINT_BYTES] R_out,
+    reg ptr u8[CMP_SCALAR_BYTES] r_out,
+    reg ptr u8[CMP_SCALAR_BYTES] k_inv_share_out,
+    reg ptr u8[CMP_SCALAR_BYTES] chi_share_out
+) -> reg ptr u8[CMP_POINT_BYTES],
+     reg ptr u8[CMP_SCALAR_BYTES],
+     reg ptr u8[CMP_SCALAR_BYTES],
+     reg ptr u8[CMP_SCALAR_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode:
+    //   delta_i <- k_i * gamma_i + sum_{j!=i} (alpha_ij + beta_ji)
+    //   Gamma_i <- gamma_i * G
+    //   {broadcast (delta_i, Gamma_i)}
+    //   {receive (delta_j, Gamma_j)}
+    //   delta   <- sum_j delta_j
+    //   Gamma   <- sum_j Gamma_j
+    //   R       <- delta^{-1} * Gamma                                // PUBLIC
+    //   r       <- R.x mod n
+    //   k_inv_share_out <- (something derived from k_i, delta)        // SECRET
+    //   chi_share_out   <- (something derived from k_i * x_i)         // SECRET
+    //
+    // CT: scalar_inv (delta^{-1}) and all scalar arithmetic must be CT.
+    return R_out, r_out, k_inv_share_out, chi_share_out;
+}

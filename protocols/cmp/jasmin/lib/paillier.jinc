@@ -1,0 +1,82 @@
+// Paillier encryption / decryption / homomorphism stubs (Lux profile).
+//
+// CCS '21 §6.1: 2048-bit biprime modulus N = pq with p, q safe primes.
+// Decryption uses the CRT-based fast path: c -> c^{lambda} mod N^2
+// where lambda = (p-1)(q-1).
+//
+// CT obligation: time + memory access independent of (sk, plaintext).
+// The Lux profile inherits CT from `cronokirby/saferith` modular
+// arithmetic; a Jasmin port of Paillier is a multi-month undertaking
+// that has no upstream libjade equivalent today.
+
+require "cmp_params.jinc"
+
+// pk: Paillier public key (modulus N, 256 bytes)
+// m:  Plaintext (in Z_N, 256 bytes little-endian)
+// r:  Randomness (in Z_N*, 256 bytes little-endian)
+// ct: Output ciphertext (in Z_{N^2}, 512 bytes little-endian)
+//
+// CT obligation: time + memory access independent of m. The
+// randomness r is sampled fresh per call and is CT-handled.
+inline
+fn paillier_encrypt(
+    reg ptr u8[CMP_PAILLIER_N_BYTES] pk_N,
+    reg ptr u8[CMP_PAILLIER_N_BYTES] m,
+    reg ptr u8[CMP_PAILLIER_N_BYTES] r,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct
+) -> reg ptr u8[CMP_PAILLIER_CT_BYTES]
+{
+    // TODO: jasmin implementation.
+    //   ct = (1 + m*N) * r^N mod N^2
+    return ct;
+}
+
+// pk:     Paillier public key
+// sk_lam: Paillier secret key component lambda = (p-1)(q-1)
+// sk_mu:  Paillier secret key component mu = lambda^{-1} mod N
+// ct:     Ciphertext
+// m:      Output plaintext
+//
+// CT obligation: time + memory access independent of (sk_lam, sk_mu).
+inline
+fn paillier_decrypt(
+    reg ptr u8[CMP_PAILLIER_N_BYTES] pk_N,
+    reg ptr u8[CMP_PAILLIER_N_BYTES] sk_lam,
+    reg ptr u8[CMP_PAILLIER_N_BYTES] sk_mu,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct,
+    reg ptr u8[CMP_PAILLIER_N_BYTES] m
+) -> reg ptr u8[CMP_PAILLIER_N_BYTES]
+{
+    // TODO: jasmin implementation.
+    //   m = L(ct^lambda mod N^2) * mu mod N
+    //   where L(x) = (x - 1) / N
+    return m;
+}
+
+// Homomorphic addition: ct_sum = ct_a * ct_b mod N^2.
+// Equivalent to enc(a + b mod N, r_a*r_b mod N).
+inline
+fn paillier_homomorphic_add(
+    reg ptr u8[CMP_PAILLIER_N_BYTES] pk_N,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct_a,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct_b,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct_sum
+) -> reg ptr u8[CMP_PAILLIER_CT_BYTES]
+{
+    // TODO: jasmin implementation. modmul on 4096-bit numbers.
+    return ct_sum;
+}
+
+// Homomorphic scalar multiplication: ct_scaled = ct_a^b mod N^2.
+// Equivalent to enc(a*b mod N, r_a^b mod N).
+inline
+fn paillier_homomorphic_mul(
+    reg ptr u8[CMP_PAILLIER_N_BYTES] pk_N,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct_a,
+    reg ptr u8[CMP_SCALAR_BYTES] b,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] ct_scaled
+) -> reg ptr u8[CMP_PAILLIER_CT_BYTES]
+{
+    // TODO: jasmin implementation. modexp on 4096-bit numbers.
+    return ct_scaled;
+}

@@ -1,0 +1,34 @@
+// Single-party secp256k1 ECDSA Sign (RFC 6979 / SEC1).
+//
+// Algorithm (RFC 6979 §3.2 deterministic ECDSA):
+//   1. m  = SHA-256(message)          // 32 bytes
+//   2. k  = RFC6979_derive_nonce(sk, m)  // deterministic per RFC 6979
+//   3. R  = k*G                        // point on secp256k1
+//   4. r  = R.x mod n
+//   5. s  = k^{-1} * (m + r * sk) mod n
+//   6. (If using Bitcoin canonical low-S form: if s > n/2, s = n - s)
+//   7. Encode (r, s) per DER or fixed-length.
+//
+// CT obligation: time + memory access independent of (sk, k).
+// Lux profile inherits CT from `cloudflare/circl` secp256k1.
+
+require "../lib/cmp_params.jinc"
+
+// sk:       32-byte secp256k1 secret scalar (SECRET)
+// pk:       33-byte compressed public key (PUBLIC)
+// msg_hash: 32-byte message hash (PUBLIC)
+// sig:      output 64-byte raw signature (r || s) (PUBLIC)
+//
+// CT obligation: time + memory access independent of (sk, k).
+inline
+fn secp256k1_ecdsa_sign(
+    reg ptr u8[CMP_SCALAR_BYTES] sk,
+    reg ptr u8[CMP_POINT_BYTES] pk,
+    reg ptr u8[CMP_MSG_HASH_BYTES] msg_hash,
+    reg ptr u8[CMP_SIG_RAW_BYTES] sig
+) -> reg ptr u8[CMP_SIG_RAW_BYTES]
+{
+    // TODO: jasmin implementation. Tracked in ../SUBMISSION-STATUS.md
+    // §3.7. Lux inherits CT from circl's CT secp256k1 implementation.
+    return sig;
+}
