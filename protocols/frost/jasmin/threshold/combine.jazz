@@ -1,0 +1,58 @@
+// FROST Combine — aggregate quorum responses (Lux profile).
+//
+// Reference: Komlo-Goldberg Fig. 3, "Combine"; mirrors Go reference
+// at `~/work/lux/threshold/protocols/frost/sign/round3.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// Inputs:
+//   session_id     - 16-byte session id (PUBLIC)
+//   quorum_indices - quorum index list (PUBLIC, length n)
+//   n              - quorum size (PUBLIC)
+//   commits        - per-party Round-1 commits (D_j, E_j) (PUBLIC)
+//   responses      - per-party Round-2 responses z_j (PUBLIC)
+//   group_pk       - group public key (PUBLIC, 32 bytes)
+//   msg            - message (PUBLIC)
+//   msg_len        - actual message length (PUBLIC)
+//
+// Outputs:
+//   sig_out        - canonical signature (PUBLIC, FROST_SIG_BYTES)
+//                    For Ed25519: R || s, 64 bytes (RFC 8032 §5.1.6).
+//                    For secp256k1-Taproot: bytes(x(R)) || s, 64 bytes
+//                    (BIP-340 §6.6).
+//
+// Constant-time obligations:
+//   - No secret inputs => trivially CT.
+
+require "../lib/frost_params.jinc"
+require "../lib/transcript.jinc"
+
+inline
+fn frost_combine(
+    reg ptr u8[16] session_id,
+    reg ptr u32[FROST_MAX_QUORUM] quorum_indices,
+    reg u64 n,
+    reg ptr u8[64 * FROST_MAX_QUORUM] commits,
+    reg ptr u8[32 * FROST_MAX_QUORUM] responses,
+    reg ptr u8[32] group_pk,
+    reg ptr u8[FROST_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[FROST_SIG_BYTES] sig_out
+) -> reg ptr u8[FROST_SIG_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode (Komlo-Goldberg Fig. 3 Combine):
+    //   1. for j in 0..n:
+    //        rho_j = H1(session_id || msg || encoded_commits || idx_j)
+    //   2. R = SUM_j (D_j + rho_j * E_j)
+    //   3. z = SUM_j z_j
+    //   4. For BIP-340: normalize R to even-Y; flip z if needed.
+    //   5. sig_out = encode_point(R) || encode_scalar(z)
+    //
+    // CT: All inputs are PUBLIC, but we still avoid data-dependent
+    // branches for code-locality / review hygiene.
+    return sig_out;
+}
