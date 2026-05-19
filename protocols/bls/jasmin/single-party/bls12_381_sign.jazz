@@ -1,0 +1,34 @@
+// Single-party BLS12-381 Sign (IETF draft-irtf-cfrg-bls-signature-05).
+//
+// Algorithm:
+//   1. H_m = hash_to_g2(msg, ciphersuite_tag)
+//   2. sigma = sk * H_m       // G2 scalar mul
+//   3. Encode sigma per IETF draft §2.5 (compressed G2, 96 bytes).
+//
+// Ciphersuite: BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_.
+//
+// CT obligation: time + memory access independent of sk.
+// Inherits from `cloudflare/circl` BLS12-381 (CT-documented upstream).
+
+require "../lib/bls_params.jinc"
+
+// sk:      32-byte BLS12-381 secret scalar (SECRET)
+// pk:      48-byte compressed G1 public key (PUBLIC)
+// msg:     up to BLS_MAX_MSG bytes (PUBLIC)
+// msg_len: actual message length (PUBLIC)
+// sig:     output 96-byte compressed G2 signature (PUBLIC)
+//
+// CT obligation: time + memory access independent of sk.
+inline
+fn bls12_381_sign(
+    reg ptr u8[BLS_SCALAR_BYTES] sk,
+    reg ptr u8[BLS_PK_BYTES] pk,
+    reg ptr u8[BLS_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[BLS_SIG_BYTES] sig
+) -> reg ptr u8[BLS_SIG_BYTES]
+{
+    // TODO: jasmin implementation. Libjade does not yet provide
+    // BLS12-381. Lux inherits CT from circl's CT implementation.
+    return sig;
+}
