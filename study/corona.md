@@ -65,7 +65,7 @@ defense-in-depth lattice-diversity layer, not a security-tier upgrade.
 - Cross-domain isolation claim from Pulsar: weak (BLOCKERS.md). Both
   primitives rest on lattice-family hardness — a structural break
   against MLWE / RLWE compromises both. Real cross-family DiD comes
-  from Comet (hash) in the Magnetar profile.
+  from Magnetar (hash) in the Nova cert profile.
 - No EasyCrypt / Jasmin high-assurance track for Corona yet (Pulsar
   has both at theory-shell level).
 - Paper file at `papers/lux-corona-pq/lux-corona-pq.tex` retains
@@ -76,4 +76,4 @@ defense-in-depth lattice-diversity layer, not a security-tier upgrade.
 
 - [README.md](README.md) — comparative index for the 3 PQ threshold tiers.
 - [pulsar.md](pulsar.md) — Module-LWE sibling.
-- [comet.md](comet.md) — hash-based tier (cross-family diversity).
+- [magnetar.md](magnetar.md) — hash-based tier (cross-family diversity).
