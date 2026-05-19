@@ -1,0 +1,36 @@
+// CGGMP21 shared parameters.
+
+// secp256k1 scalar field byte length.
+param int CMP_SCALAR_BYTES = 32;
+
+// secp256k1 point byte length (compressed).
+param int CMP_POINT_BYTES = 33;
+
+// ECDSA signature byte length (DER-encoded, max).
+param int CMP_SIG_DER_BYTES = 72;
+
+// ECDSA signature byte length (fixed-length raw r||s).
+param int CMP_SIG_RAW_BYTES = 64;
+
+// Paillier modulus byte length (2048-bit per CCS '21 §6.1).
+param int CMP_PAILLIER_N_BYTES = 256;
+
+// Paillier ciphertext byte length (mod N^2 = 4096-bit).
+param int CMP_PAILLIER_CT_BYTES = 512;
+
+// Pedersen parameters byte length (s, t, N).
+param int CMP_PEDERSEN_PARAMS_BYTES = 768;
+
+// Maximum supported quorum size for the threshold layer.
+// Matches the Lux profile cap in SPEC.md §2.3 (n=32).
+param int CMP_MAX_QUORUM = 32;
+
+// Maximum supported message-hash length (SHA-256 output).
+param int CMP_MSG_HASH_BYTES = 32;
+
+// ZK statistical security parameter.
+param int CMP_ZK_STAT_PARAM = 80;
+
+// ZK iterations (Paillier-Blum validation, per CCS '21 §6.1).
+// Lux profile increased this from 12 to 128 (see internal/params).
+param int CMP_ZK_MOD_ITERATIONS = 128;

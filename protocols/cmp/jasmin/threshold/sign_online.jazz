@@ -1,0 +1,52 @@
+// CGGMP21 Sign Online — 1-round online phase (Lux profile).
+//
+// Reference: CCS '21 §5.2; mirrors Go reference at
+// `~/work/lux/threshold/protocols/cmp/sign/sign.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// Given a precomputed presignature (R, r, k_inv_share_i, chi_share_i)
+// and a message hash m:
+//
+//   s_i = k_inv_share_i * m + r * chi_share_i  (mod n)
+//
+// Then s = sum_j s_j  (after combine) = k^{-1} * (m + r * x)  (mod n).
+//
+// Inputs:
+//   msg_hash:        32-byte message hash (PUBLIC)
+//   presig_R:        presignature R point (PUBLIC)
+//   presig_r:        presignature r scalar (PUBLIC)
+//   k_inv_share:     SECRET share of k^{-1}
+//   chi_share:       SECRET share of k^{-1} * x = chi
+//
+// Outputs:
+//   s_i:             SECRET share of s
+//
+// CT obligations:
+//   - All scalar operations CT in (k_inv_share, chi_share).
+//   - No data-dependent branches.
+
+require "../lib/cmp_params.jinc"
+
+inline
+fn cmp_sign_online(
+    reg ptr u8[CMP_MSG_HASH_BYTES] msg_hash,
+    reg ptr u8[CMP_SCALAR_BYTES] presig_r,
+    reg ptr u8[CMP_SCALAR_BYTES] k_inv_share,
+    reg ptr u8[CMP_SCALAR_BYTES] chi_share,
+    reg ptr u8[CMP_SCALAR_BYTES] s_i_out
+) -> reg ptr u8[CMP_SCALAR_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode:
+    //   m       <- bytes_to_scalar(msg_hash)
+    //   tmp1    <- scalar_mul_s(k_inv_share, m)
+    //   tmp2    <- scalar_mul_s(presig_r, chi_share)
+    //   s_i_out <- scalar_add(tmp1, tmp2)
+    //
+    // CT: all scalar_mul / scalar_add must be CT.
+    return s_i_out;
+}
