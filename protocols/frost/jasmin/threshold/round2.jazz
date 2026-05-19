@@ -1,0 +1,69 @@
+// FROST Round-2 — per-party signature share (Lux profile).
+//
+// Reference: Komlo-Goldberg Fig. 3, Round 2; mirrors Go reference at
+// `~/work/lux/threshold/protocols/frost/sign/round2.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// Inputs:
+//   share          - secret share s_i (SECRET, 32-byte scalar)
+//   nonce_state    - (d_i, e_i) from Round 1 (SECRET, 64 bytes)
+//   session_id     - 16-byte session id (PUBLIC)
+//   my_idx_pos     - position of this party's index in the quorum (PUBLIC)
+//   quorum_indices - quorum index list (PUBLIC, length n)
+//   n              - quorum size (PUBLIC)
+//   commits        - aggregated Round-1 commits (D_j, E_j) for j in
+//                    quorum (PUBLIC, n * FROST_R1_COMMIT_BYTES bytes)
+//   group_pk       - group public key PK = g^s (PUBLIC, 32 bytes)
+//   msg            - message to sign (PUBLIC, up to FROST_MAX_MSG)
+//   msg_len        - actual message length (PUBLIC)
+//
+// Outputs:
+//   z_out          - signature share z_i (PUBLIC, FROST_R2_RESPONSE_BYTES)
+//
+// Constant-time obligations:
+//   - Time + memory access independent of (share, nonce_state).
+//   - rho_i, lambda_i, c are computed from PUBLIC inputs only.
+//   - The final scalar combination z_i = d_i + rho_i*e_i +
+//     c*lambda_i*s_i is in F_r and must use CT scalar arithmetic.
+//   - No data-dependent branches.
+
+require "../lib/frost_params.jinc"
+require "../lib/transcript.jinc"
+require "../lib/lagrange.jinc"
+
+inline
+fn frost_round2_response(
+    reg ptr u8[FROST_SCALAR_BYTES] share,
+    reg ptr u8[64] nonce_state,
+    reg ptr u8[16] session_id,
+    reg u64 my_idx_pos,
+    reg ptr u32[FROST_MAX_QUORUM] quorum_indices,
+    reg u64 n,
+    reg ptr u8[64 * FROST_MAX_QUORUM] commits,
+    reg ptr u8[32] group_pk,
+    reg ptr u8[FROST_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[FROST_R2_RESPONSE_BYTES] z_out
+) -> reg ptr u8[FROST_R2_RESPONSE_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode (Komlo-Goldberg Fig. 3 Round 2):
+    //   1. rho_i = H1(session_id || msg || encoded_commits || idx_i)
+    //   2. R     = SUM_j (D_j + rho_j * E_j)
+    //   3. c     = H2(session_id || R || PK || msg)  // tagged for BIP-340
+    //   4. lambda_i = frost_lagrange_at_zero(quorum_indices, n, my_idx_pos)
+    //   5. z_i  = d_i + rho_i * e_i + c * lambda_i * s_i    // in F_r
+    //   6. z_out <- encode_scalar(z_i)
+    //
+    // The aggregated R is recomputed locally (deterministic public
+    // function of commits + msg + session); no leakage from secret
+    // inputs in this computation.
+    //
+    // CT: every scalar multiplication / addition must use the
+    // pinned ciphersuite's CT scalar API.
+    return z_out;
+}
