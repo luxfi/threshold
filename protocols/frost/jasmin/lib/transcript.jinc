@@ -1,0 +1,41 @@
+// FROST transcript binding helpers (Lux profile).
+//
+// The Lux profile binds session transcripts via domain-separated
+// SHA-512 (Ed25519) / tagged SHA-256 (secp256k1-Taproot). These are
+// stubs documenting the call surface; concrete implementations live
+// in the upstream single-party Jasmin libraries (libjade for SHA-256;
+// upstream Ed25519 SHA-512 not yet ported).
+
+require "frost_params.jinc"
+
+// Tagged SHA-256 (BIP-340 §3.3): hash = SHA-256(SHA-256(tag) ||
+// SHA-256(tag) || msg).
+inline
+fn frost_tagged_sha256(
+    reg ptr u8[32] tag_hash,
+    reg ptr u8[FROST_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[32] out
+) -> reg ptr u8[32]
+{
+    // TODO: jasmin implementation (uses libjade SHA-256 absorb/finalize).
+    return out;
+}
+
+// SHA-512 absorb-finalize for Ed25519 transcript binding (RFC 8032
+// §5.1.6 step 2). The Ed25519 single-party path computes
+//   k = SHA-512(R || A || PH(M)) mod L
+// where PH = identity for Ed25519, identity for Ed25519ctx with the
+// ctx prefix, or SHA-512 for Ed25519ph.
+inline
+fn frost_sha512(
+    reg ptr u8[FROST_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[64] out
+) -> reg ptr u8[64]
+{
+    // TODO: jasmin implementation. libjade does not yet provide
+    // Ed25519 SHA-512; an upstream port is tracked in
+    // ../SUBMISSION-STATUS.md §3.5.
+    return out;
+}

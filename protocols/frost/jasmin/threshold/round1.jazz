@@ -1,0 +1,56 @@
+// FROST Round-1 — per-party commit (Lux profile).
+//
+// Reference: Komlo-Goldberg Fig. 3, Round 1; mirrors the Go reference
+// at `~/work/lux/threshold/protocols/frost/sign/round1.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// Inputs (in order):
+//   share        - this party's secret share s_i (SECRET, 32-byte scalar).
+//   randomness   - 64 bytes of fresh entropy (SECRET).
+//                  Used to sample (d_i, e_i) per Komlo-Goldberg §6.
+//   session_id   - 16-byte session id (PUBLIC).
+//   my_idx       - u32 party index in the quorum (PUBLIC).
+//
+// Outputs:
+//   commit_out (FROST_R1_COMMIT_BYTES = 64 bytes):
+//     [0..32)  D_i = scalar_mul(d_i, G), compressed point encoding
+//     [32..64) E_i = scalar_mul(e_i, G), compressed point encoding
+//
+//   nonce_state_out (64 bytes):
+//     [0..32)  d_i (SECRET — caller MUST store securely until Round 2)
+//     [32..64) e_i (SECRET — caller MUST store securely until Round 2)
+//
+// Constant-time obligations:
+//   - Time + memory access independent of (share, randomness).
+//   - scalar_mul d_i G and scalar_mul e_i G must be CT per the
+//     pinned ciphersuite's scalar-field + point-multiplication API.
+
+require "../lib/frost_params.jinc"
+require "../lib/transcript.jinc"
+
+inline
+fn frost_round1_commit(
+    reg ptr u8[FROST_SCALAR_BYTES] share,
+    reg ptr u8[64] randomness,
+    reg ptr u8[16] session_id,
+    reg u32 my_idx,
+    reg ptr u8[FROST_R1_COMMIT_BYTES] commit_out,
+    reg ptr u8[64] nonce_state_out
+) -> reg ptr u8[FROST_R1_COMMIT_BYTES], reg ptr u8[64]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode (Komlo-Goldberg Fig. 3 Round 1):
+    //   1. d_i <- bytes_to_scalar(randomness[0..32])        // SECRET
+    //   2. e_i <- bytes_to_scalar(randomness[32..64])       // SECRET
+    //   3. D_i <- scalar_mul(d_i, G)                         // PUBLIC
+    //   4. E_i <- scalar_mul(e_i, G)                         // PUBLIC
+    //   5. commit_out      <- encode_point(D_i) || encode_point(E_i)
+    //      nonce_state_out <- d_i || e_i
+    //
+    // CT obligation: scalar_mul and bytes_to_scalar must be CT.
+    return commit_out, nonce_state_out;
+}
