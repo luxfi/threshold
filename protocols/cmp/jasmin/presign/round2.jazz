@@ -1,0 +1,72 @@
+// CGGMP21 Presign Round 2 — MtA exchange (Lux profile).
+//
+// Reference: CCS '21 §5.1 Round 2 + §3.2 (MtA); mirrors Go reference
+// at `~/work/lux/threshold/protocols/cmp/presign/round2.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// For each peer j, party i:
+//   1. Compute D_{j,i} = K_j^{gamma_i} * enc_j(-beta_{j,i}, r_{j,i})
+//      = enc_j(k_j * gamma_i - beta_{j,i})
+//      where beta_{j,i} is fresh randomness from F_n.
+//   2. Send D_{j,i} to peer j.
+//   3. ZK proofs: range proof on gamma_i (k_j * gamma_i must be in
+//      a range that does not overflow N_j); knowledge proof on
+//      beta_{j,i}.
+//
+// On the receiving side from peer j:
+//   1. alpha_{i,j} = paillier_decrypt(N_i, D_{i,j})
+//   2. After this exchange: alpha_{i,j} + beta_{j,i} = k_i * gamma_j
+//      mod N_j, and also mod n (after range proof + reduction).
+//
+// Inputs:
+//   share:        secret share s_i (SECRET)
+//   nonce_state:  (k_i, gamma_i) from R1 (SECRET, 64 bytes)
+//   aux:          per-peer auxiliary parameters (PUBLIC)
+//   r1_msgs:      Round 1 messages from peers (PUBLIC)
+//   ...
+//
+// Outputs:
+//   round2_msgs:  D_{j,i} ciphertexts + ZK transcripts for each peer
+//   mta_state:    {alpha_{i,j}, beta_{j,i}} for each peer (SECRET)
+//
+// CT obligations:
+//   - All Paillier operations CT in (k_i, gamma_i, paillier_sk_i).
+//   - ZK prover CT in (gamma_i, beta_{j,i}).
+
+require "../lib/cmp_params.jinc"
+require "../lib/paillier.jinc"
+
+inline
+fn cmp_presign_round2(
+    reg ptr u8[CMP_SCALAR_BYTES] share,
+    reg ptr u8[64] nonce_state,
+    reg ptr u8[16] session_id,
+    reg u32 my_idx,
+    reg u64 n_peers,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES * CMP_MAX_QUORUM] r1_K_msgs,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES * CMP_MAX_QUORUM] r1_G_msgs,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES * CMP_MAX_QUORUM] D_out,
+    reg ptr u8[CMP_SCALAR_BYTES * CMP_MAX_QUORUM * 2] mta_state_out
+) -> reg ptr u8[CMP_PAILLIER_CT_BYTES * CMP_MAX_QUORUM],
+     reg ptr u8[CMP_SCALAR_BYTES * CMP_MAX_QUORUM * 2]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode (for each peer j != my_idx):
+    //   beta_ji  <- bytes_to_scalar_nonzero(fresh_randomness())  // SECRET
+    //   D_ji     <- paillier_homomorphic_mul(N_j, K_j, gamma_i)
+    //   D_ji     <- paillier_homomorphic_add(N_j, D_ji,
+    //                  paillier_encrypt(N_j, -beta_ji, fresh_r))
+    //   D_out[j] <- D_ji
+    //   mta_state_out[j*64..j*64+32] <- beta_ji      // SECRET
+    //   // alpha_ij computed below from peer's incoming D_ij:
+    //   alpha_ij <- paillier_decrypt(N_i, peer_D_msgs[j])
+    //   mta_state_out[j*64+32..j*64+64] <- alpha_ij  // SECRET
+    //   {emit ZK_MTA range proof on gamma_i, knowledge proof on beta_ji}
+    //
+    // CT: paillier_decrypt is the load-bearing CT obligation.
+    return D_out, mta_state_out;
+}
