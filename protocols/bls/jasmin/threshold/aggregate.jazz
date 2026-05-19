@@ -1,0 +1,51 @@
+// BLS Threshold — aggregate partial signatures (Lux profile).
+//
+// Reference: Boldyreva 2003 §3 Combine; mirrors Go reference at
+// `~/work/lux/threshold/protocols/bls/bls.go:65 AggregateSignatures`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// sigma = sum_{i in Q} lambda_i * sigma_i on G2
+//
+// where lambda_i is the Lagrange coefficient at X = 0 for party
+// position i in quorum Q.
+//
+// Inputs:
+//   quorum_ids:  PUBLIC, party IDs in the quorum (n * 32 bytes)
+//   n:           PUBLIC, quorum size
+//   sig_shares:  PUBLIC, per-party partial sigs (n * 96 bytes)
+//   threshold:   PUBLIC, threshold t (n must be >= t)
+//
+// Outputs:
+//   sig:         PUBLIC, aggregated 96-byte BLS signature
+//
+// CT obligation: no secret inputs => trivially CT.
+
+require "../lib/bls_params.jinc"
+require "../lib/lagrange.jinc"
+
+inline
+fn bls_aggregate(
+    reg ptr u8[BLS_SCALAR_BYTES * BLS_MAX_QUORUM] quorum_ids,
+    reg u64 n,
+    reg ptr u8[BLS_G2_COMPRESSED_BYTES * BLS_MAX_QUORUM] sig_shares,
+    reg u64 threshold,
+    reg ptr u8[BLS_SIG_BYTES] sig
+) -> reg ptr u8[BLS_SIG_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode:
+    //   sigma_sum <- g2_identity()
+    //   for i in 0..n:
+    //     lambda_i  <- bls_lagrange_at_zero(quorum_ids, n, i)
+    //     sigma_i   <- g2_decompress(sig_shares[i*96..(i+1)*96])
+    //     scaled    <- g2_scalar_mul(lambda_i, sigma_i)
+    //     sigma_sum <- g2_add(sigma_sum, scaled)
+    //   sig <- g2_compress(sigma_sum)
+    //
+    // CT: all inputs are PUBLIC, but use CT primitives for hygiene.
+    return sig;
+}
