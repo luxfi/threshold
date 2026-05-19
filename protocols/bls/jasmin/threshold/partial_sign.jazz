@@ -1,0 +1,42 @@
+// BLS Threshold — per-party partial sign (Lux profile).
+//
+// Reference: Boldyreva 2003 §3; mirrors Go reference at
+// `~/work/lux/threshold/protocols/bls/bls.go:46 Sign`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// sigma_i = H(m)^{s_i} = s_i * H(m) on G2
+//
+// Inputs:
+//   share:   secret share s_i (SECRET, 32 bytes scalar in F_r)
+//   msg:     message bytes (PUBLIC, up to BLS_MAX_MSG)
+//   msg_len: actual message length (PUBLIC)
+//
+// Outputs:
+//   sig_share: sigma_i, compressed G2 point (PUBLIC, 96 bytes)
+//
+// CT obligation: time + memory access independent of share.
+// G2 scalar mul CT comes from the underlying BLS12-381 backend.
+
+require "../lib/bls_params.jinc"
+
+inline
+fn bls_partial_sign(
+    reg ptr u8[BLS_SCALAR_BYTES] share,
+    reg ptr u8[BLS_MAX_MSG] msg,
+    reg u64 msg_len,
+    reg ptr u8[BLS_G2_COMPRESSED_BYTES] sig_share
+) -> reg ptr u8[BLS_G2_COMPRESSED_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode:
+    //   H_m       <- hash_to_g2(msg, ciphersuite_tag)
+    //   sigma_i   <- g2_scalar_mul(share, H_m)
+    //   sig_share <- g2_compress(sigma_i)
+    //
+    // CT: g2_scalar_mul must be CT in share.
+    return sig_share;
+}

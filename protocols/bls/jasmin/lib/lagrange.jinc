@@ -1,0 +1,26 @@
+// BLS-threshold Lagrange coefficient computation in F_r (BLS12-381).
+//
+// For a quorum Q = (x_1, ..., x_n) of party IDs and party position i:
+//   lambda_i(0) = prod_{j != i} (0 - x_j) / (x_i - x_j)
+// in F_r where r is the BLS12-381 group order.
+
+require "bls_params.jinc"
+
+// quorum_ids[0..n) : party IDs in the quorum (PUBLIC, 32-byte big-endian)
+// n                : |Q| (PUBLIC)
+// my_idx_pos       : position of THIS party in quorum_ids (PUBLIC)
+// lambda_out       : output 32-byte lambda_i scalar (PUBLIC)
+inline
+fn bls_lagrange_at_zero(
+    reg ptr u8[BLS_SCALAR_BYTES * BLS_MAX_QUORUM] quorum_ids,
+    reg u64 n,
+    reg u64 my_idx_pos,
+    reg ptr u8[BLS_SCALAR_BYTES] lambda_out
+) -> reg ptr u8[BLS_SCALAR_BYTES]
+{
+    // TODO: jasmin implementation.
+    //
+    // CT: the (j != my_idx_pos) test branches on PUBLIC data only.
+    // The scalar_inv (1/(x_i - x_j)) operation must be CT.
+    return lambda_out;
+}
