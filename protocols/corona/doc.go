@@ -1,7 +1,7 @@
 // Copyright (C) 2025-2026, Lux Industries Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package pulsar is the Quasar PQ-threshold lane — Lux's production
+// Package corona is the Quasar PQ-threshold lane — Lux's production
 // evolution of the Corona lattice threshold signature scheme.
 //
 // # This package owns the round-based signing and verification wrappers,
@@ -87,7 +87,7 @@
 //	  ├── primitives, sign, threshold, reshare, dkg2, keyera
 //	  └── single-process API; deterministic; KAT-replayable
 //
-//	github.com/luxfi/threshold/protocols/pulsar (this package)
+//	github.com/luxfi/threshold/protocols/corona (this package)
 //	  ├── round-based wrappers using internal/round/Session
 //	  ├── party.ID, pool.Pool conventions
 //	  └── distributed protocol entrypoints (StartFunc)
@@ -178,4 +178,4 @@
 //	luxcpp/crypto/pulsar/                — byte-equal C++ port
 //	protocols/quasar/                    — Quasar consensus orchestration
 //	protocols/lss/reshare/               — round-based ECDSA reshare reference
-package pulsar
+package corona
