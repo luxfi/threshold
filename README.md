@@ -145,8 +145,9 @@ Heavy computations are automatically parallelized for optimal performance.
 - [Production Readiness Report](PRODUCTION_READY.md)
 - [LSS Protocol Paper](protocols/lss/README.md)
 - [CMP Implementation](docs/Threshold.pdf)
-- [API Reference](docs/api.md)
-- [Integration Guide](docs/integration.md)
+- [FROST Protocol](docs/FROST.md)
+- [Broadcast Channel](docs/Broadcast.md)
+- [Lux Integration Guide](docs/LUX_INTEGRATION.md)
 - [Security Audit](docs/audit.md)
 
 ## 🧪 Testing
