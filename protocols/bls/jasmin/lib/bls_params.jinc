@@ -1,0 +1,22 @@
+// BLS12-381 shared parameters (Lux profile).
+
+// BLS12-381 scalar field byte length.
+param int BLS_SCALAR_BYTES = 32;
+
+// G1 compressed byte length (public-key group).
+param int BLS_G1_COMPRESSED_BYTES = 48;
+
+// G2 compressed byte length (signature group).
+param int BLS_G2_COMPRESSED_BYTES = 96;
+
+// Signature byte length (compressed G2 point).
+param int BLS_SIG_BYTES = 96;
+
+// Public-key byte length (compressed G1 point).
+param int BLS_PK_BYTES = 48;
+
+// Maximum supported quorum size for the threshold layer.
+param int BLS_MAX_QUORUM = 1024;
+
+// Maximum supported message length.
+param int BLS_MAX_MSG = 4096;
