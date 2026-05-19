@@ -98,7 +98,7 @@ h)` — byte-identical to standard single-party FIPS 204 ML-DSA-65.
 | `~/work/lux/proofs/lean/Crypto/Pulsar/` | Lean structural proofs (zero `sorry`) |
 | `~/work/lux/proofs/pulsar/*.tex` | Paper-level proof artifacts |
 | `~/work/lux/papers/lp-073-pulsar/` | LP-073 specification paper |
-| `~/work/lux/threshold/protocols/corona/` (sic) | The Lux internal threshold-protocol library currently houses the Pulsar-style ring-protocol under the `corona/` directory name. The naming here predates the Pulsar / Corona / Comet rename; the Module-LWE protocol skeleton lives there. |
+| `~/work/lux/threshold/protocols/corona/` (sic) | The Lux internal threshold-protocol library currently houses the Pulsar-style ring-protocol under the `corona/` directory name. The naming here predates the Pulsar / Corona / Magnetar rename; the Module-LWE protocol skeleton lives there. |
 
 ## Open items (from BLOCKERS.md submission-status table)
 
@@ -116,4 +116,4 @@ h)` — byte-identical to standard single-party FIPS 204 ML-DSA-65.
 
 - [README.md](README.md) — comparative index for the 3 PQ threshold tiers.
 - [corona.md](corona.md) — Ring-LWE sibling.
-- [comet.md](comet.md) — hash-based tier (structurally different).
+- [magnetar.md](magnetar.md) — hash-based tier: public-DKG + Pedersen VSS + MPC threshold SLH-DSA.
