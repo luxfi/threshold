@@ -1,0 +1,60 @@
+// CGGMP21 Presign Round 1 — per-party commit (Lux profile).
+//
+// Reference: CCS '21 §5.1 Round 1; mirrors Go reference at
+// `~/work/lux/threshold/protocols/cmp/presign/round1.go`.
+//
+// -----------------------------------------------------------------------------
+// Algorithm
+// -----------------------------------------------------------------------------
+//
+// Each party samples (k_i, gamma_i) uniformly from F_n*, encrypts both
+// under their own Paillier modulus N_i, and broadcasts ZK proofs of
+// log-knowledge.
+//
+// Inputs:
+//   share:       this party's secret share s_i (SECRET, 32 bytes)
+//   randomness:  64 bytes of fresh entropy (SECRET)
+//   aux:         auxiliary keygen output (paillier_pk_i, paillier_sk_i,
+//                pedersen_params_i, paillier_pk_j for all peers j)
+//   session_id:  16-byte session id (PUBLIC)
+//   my_idx:      party index (PUBLIC)
+//
+// Outputs:
+//   round1_msg:  K_i = enc_i(k_i, r_K), G_i = enc_i(gamma_i, r_G), ZK proofs
+//   nonce_state: (k_i, gamma_i) — SECRET, stored locally for R2/R3.
+//
+// Constant-time obligations:
+//   - Sampling: bytes_to_scalar_nonzero must be CT (sampling distribution
+//     independent of nothing — but the rejection-on-zero path must be CT).
+//   - Paillier encryption: CT in (k_i, gamma_i).
+//   - ZK provers: CT in (k_i, gamma_i, paillier_sk_i).
+
+require "../lib/cmp_params.jinc"
+require "../lib/paillier.jinc"
+
+inline
+fn cmp_presign_round1(
+    reg ptr u8[CMP_SCALAR_BYTES] share,
+    reg ptr u8[64] randomness,
+    reg ptr u8[16] session_id,
+    reg u32 my_idx,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] K_i_out,
+    reg ptr u8[CMP_PAILLIER_CT_BYTES] G_i_out,
+    reg ptr u8[64] nonce_state_out
+) -> reg ptr u8[CMP_PAILLIER_CT_BYTES], reg ptr u8[CMP_PAILLIER_CT_BYTES],
+     reg ptr u8[64]
+{
+    // TODO: jasmin implementation.
+    //
+    // Pseudocode:
+    //   k_i     <- bytes_to_scalar_nonzero(randomness[0..32])
+    //   gamma_i <- bytes_to_scalar_nonzero(randomness[32..64])
+    //   K_i     <- paillier_encrypt(N_i, k_i, fresh_r_K)
+    //   G_i     <- paillier_encrypt(N_i, gamma_i, fresh_r_G)
+    //   {ZK proofs of log_paillier knowledge for K_i and G_i go here}
+    //   nonce_state_out <- k_i || gamma_i
+    //
+    // CT: every Paillier operation + ZK prover must be CT in
+    // (k_i, gamma_i, paillier_sk_i).
+    return K_i_out, G_i_out, nonce_state_out;
+}
