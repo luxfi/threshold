@@ -74,5 +74,5 @@ require (
 
 require (
 	github.com/luxfi/corona v0.4.0
-	github.com/luxfi/lens v0.1.3
+	github.com/luxfi/lens v0.1.4
 )
