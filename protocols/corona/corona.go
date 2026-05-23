@@ -123,7 +123,8 @@ func Bootstrap(t int, validators []party.ID, groupID PulsarGroupID, eraID Pulsar
 	if entropy == nil {
 		entropy = rand.Reader
 	}
-	return keyera.Bootstrap(t, validatorIDs(validators), groupID, eraID, entropy)
+	era, _, err := keyera.Bootstrap(t, validatorIDs(validators), groupID, eraID, entropy)
+	return era, err
 }
 
 // Reshare evolves an existing key era to a new committee while
@@ -168,7 +169,8 @@ func Reanchor(prev *KeyEra, t int, validators []party.ID, groupID PulsarGroupID,
 	if entropy == nil {
 		entropy = rand.Reader
 	}
-	return keyera.Reanchor(prev, t, validatorIDs(validators), groupID, entropy)
+	era, _, err := keyera.Reanchor(prev, t, validatorIDs(validators), groupID, entropy)
+	return era, err
 }
 
 // NewSigner constructs a Pulsar signer for one party from the per-epoch
