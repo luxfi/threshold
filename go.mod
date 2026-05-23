@@ -42,6 +42,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20251213031049-b05bdaca462f // indirect
+	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/luxfi/accel v1.1.2 // indirect
@@ -75,4 +76,5 @@ require (
 require (
 	github.com/luxfi/corona v0.4.1
 	github.com/luxfi/lens v0.1.4
+	github.com/luxfi/metric v1.5.0
 )
