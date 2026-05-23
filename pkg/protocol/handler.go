@@ -15,7 +15,7 @@ import (
 	"github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 )
 
 // StartFunc creates the first round of a protocol
@@ -159,35 +159,35 @@ func DefaultConfig() *Config {
 // Metrics for Prometheus monitoring
 type Metrics struct {
 	// Counters
-	messagesReceived   prometheus.Counter
-	messagesSent       prometheus.Counter
-	messagesDropped    prometheus.Counter
-	roundsCompleted    prometheus.Counter
-	protocolsCompleted prometheus.Counter
-	protocolsFailed    prometheus.Counter
+	messagesReceived   metric.Counter
+	messagesSent       metric.Counter
+	messagesDropped    metric.Counter
+	roundsCompleted    metric.Counter
+	protocolsCompleted metric.Counter
+	protocolsFailed    metric.Counter
 
 	// Gauges
-	activeWorkers  prometheus.Gauge
-	queuedMessages prometheus.Gauge
-	currentRound   prometheus.Gauge
-	memoryUsage    prometheus.Gauge
+	activeWorkers  metric.Gauge
+	queuedMessages metric.Gauge
+	currentRound   metric.Gauge
+	memoryUsage    metric.Gauge
 
 	// Histograms
-	messageLatency   prometheus.Histogram
-	roundDuration    prometheus.Histogram
-	protocolDuration prometheus.Histogram
-	queueWaitTime    prometheus.Histogram
+	messageLatency   metric.Histogram
+	roundDuration    metric.Histogram
+	protocolDuration metric.Histogram
+	queueWaitTime    metric.Histogram
 
 	// Summaries
-	messageSize prometheus.Summary
-	batchSize   prometheus.Summary
+	messageSize metric.Summary
+	batchSize   metric.Summary
 }
 
 // NewHandler creates the perfect protocol handler
 func NewHandler(
 	ctx context.Context,
 	logger log.Logger,
-	registry prometheus.Registerer,
+	registry metric.Registerer,
 	create StartFunc,
 	sessionID []byte,
 	config *Config,
@@ -264,74 +264,74 @@ func NewHandler(
 	return h, nil
 }
 
-func createMetrics(protocolID string, registry prometheus.Registerer) *Metrics {
+func createMetrics(protocolID string, registry metric.Registerer) *Metrics {
 	m := &Metrics{
-		messagesReceived: prometheus.NewCounter(prometheus.CounterOpts{
+		messagesReceived: metric.NewCounter(metric.CounterOpts{
 			Name: fmt.Sprintf("threshold_%s_messages_received_total", protocolID),
 			Help: "Total messages received",
 		}),
-		messagesSent: prometheus.NewCounter(prometheus.CounterOpts{
+		messagesSent: metric.NewCounter(metric.CounterOpts{
 			Name: fmt.Sprintf("threshold_%s_messages_sent_total", protocolID),
 			Help: "Total messages sent",
 		}),
-		messagesDropped: prometheus.NewCounter(prometheus.CounterOpts{
+		messagesDropped: metric.NewCounter(metric.CounterOpts{
 			Name: fmt.Sprintf("threshold_%s_messages_dropped_total", protocolID),
 			Help: "Total messages dropped",
 		}),
-		roundsCompleted: prometheus.NewCounter(prometheus.CounterOpts{
+		roundsCompleted: metric.NewCounter(metric.CounterOpts{
 			Name: fmt.Sprintf("threshold_%s_rounds_completed_total", protocolID),
 			Help: "Total rounds completed",
 		}),
-		protocolsCompleted: prometheus.NewCounter(prometheus.CounterOpts{
+		protocolsCompleted: metric.NewCounter(metric.CounterOpts{
 			Name: fmt.Sprintf("threshold_%s_protocols_completed_total", protocolID),
 			Help: "Total protocols completed",
 		}),
-		protocolsFailed: prometheus.NewCounter(prometheus.CounterOpts{
+		protocolsFailed: metric.NewCounter(metric.CounterOpts{
 			Name: fmt.Sprintf("threshold_%s_protocols_failed_total", protocolID),
 			Help: "Total protocols failed",
 		}),
-		activeWorkers: prometheus.NewGauge(prometheus.GaugeOpts{
+		activeWorkers: metric.NewGauge(metric.GaugeOpts{
 			Name: fmt.Sprintf("threshold_%s_active_workers", protocolID),
 			Help: "Active worker goroutines",
 		}),
-		queuedMessages: prometheus.NewGauge(prometheus.GaugeOpts{
+		queuedMessages: metric.NewGauge(metric.GaugeOpts{
 			Name: fmt.Sprintf("threshold_%s_queued_messages", protocolID),
 			Help: "Messages in queue",
 		}),
-		currentRound: prometheus.NewGauge(prometheus.GaugeOpts{
+		currentRound: metric.NewGauge(metric.GaugeOpts{
 			Name: fmt.Sprintf("threshold_%s_current_round", protocolID),
 			Help: "Current protocol round",
 		}),
-		memoryUsage: prometheus.NewGauge(prometheus.GaugeOpts{
+		memoryUsage: metric.NewGauge(metric.GaugeOpts{
 			Name: fmt.Sprintf("threshold_%s_memory_usage_bytes", protocolID),
 			Help: "Memory usage in bytes",
 		}),
-		messageLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
+		messageLatency: metric.NewHistogram(metric.HistogramOpts{
 			Name:    fmt.Sprintf("threshold_%s_message_latency_seconds", protocolID),
 			Help:    "Message processing latency",
-			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
+			Buckets: metric.ExponentialBuckets(0.001, 2, 10),
 		}),
-		roundDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+		roundDuration: metric.NewHistogram(metric.HistogramOpts{
 			Name:    fmt.Sprintf("threshold_%s_round_duration_seconds", protocolID),
 			Help:    "Round completion duration",
-			Buckets: prometheus.ExponentialBuckets(0.01, 2, 10),
+			Buckets: metric.ExponentialBuckets(0.01, 2, 10),
 		}),
-		protocolDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+		protocolDuration: metric.NewHistogram(metric.HistogramOpts{
 			Name:    fmt.Sprintf("threshold_%s_protocol_duration_seconds", protocolID),
 			Help:    "Total protocol duration",
-			Buckets: prometheus.ExponentialBuckets(0.1, 2, 10),
+			Buckets: metric.ExponentialBuckets(0.1, 2, 10),
 		}),
-		queueWaitTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+		queueWaitTime: metric.NewHistogram(metric.HistogramOpts{
 			Name:    fmt.Sprintf("threshold_%s_queue_wait_seconds", protocolID),
 			Help:    "Queue wait time",
-			Buckets: prometheus.ExponentialBuckets(0.0001, 2, 10),
+			Buckets: metric.ExponentialBuckets(0.0001, 2, 10),
 		}),
-		messageSize: prometheus.NewSummary(prometheus.SummaryOpts{
+		messageSize: metric.NewSummary(metric.SummaryOpts{
 			Name:       fmt.Sprintf("threshold_%s_message_size_bytes", protocolID),
 			Help:       "Message size distribution",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		}),
-		batchSize: prometheus.NewSummary(prometheus.SummaryOpts{
+		batchSize: metric.NewSummary(metric.SummaryOpts{
 			Name:       fmt.Sprintf("threshold_%s_batch_size", protocolID),
 			Help:       "Batch processing size",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
