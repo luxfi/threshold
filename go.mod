@@ -76,5 +76,5 @@ require (
 require (
 	github.com/luxfi/corona v0.4.1
 	github.com/luxfi/lens v0.1.4
-	github.com/luxfi/metric v1.5.0
+	github.com/luxfi/metric v1.5.7
 )
