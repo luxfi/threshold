@@ -11,7 +11,7 @@ import (
 	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 )
 
 // AsyncRunner provides fully async, thread-safe protocol execution
@@ -87,7 +87,7 @@ func (r *AsyncRunner) SetupParty(id party.ID, startFunc protocol.StartFunc, sess
 	}
 
 	// Create handler with its own registry
-	registry := prometheus.NewRegistry()
+	registry := metric.NewRegistry()
 	handler, err := protocol.NewHandler(
 		r.ctx,
 		r.logger,

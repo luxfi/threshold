@@ -7,9 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	log "github.com/luxfi/log"
+	"github.com/luxfi/metric"
 	"github.com/luxfi/threshold/internal/test"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
@@ -53,7 +52,7 @@ func runMultiparty(
 		h, err := protocol.NewHandler(
 			context.Background(),
 			logger,
-			prometheus.NewRegistry(),
+			metric.NewRegistry(),
 			start(id),
 			sessionID,
 			cfg,
