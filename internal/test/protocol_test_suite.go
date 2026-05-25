@@ -11,7 +11,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +59,7 @@ func (s *ProtocolTestSuite) RunProtocol(
 		handler, err := protocol.NewHandler(
 			s.ctx,
 			s.logger,
-			prometheus.NewRegistry(),
+			metric.NewRegistry(),
 			startFunc(id),
 			sessionID,
 			protocol.DefaultConfig(),

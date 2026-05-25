@@ -11,7 +11,7 @@ import (
 	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 )
 
 // Harness provides a complete test environment for protocol testing
@@ -21,7 +21,7 @@ type Harness struct {
 	cancel   context.CancelFunc
 	network  *Network
 	logger   log.Logger
-	registry *prometheus.Registry
+	registry metric.Registry
 
 	mu       sync.RWMutex
 	handlers map[party.ID]*protocol.Handler
@@ -42,7 +42,7 @@ func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
 		cancel:   cancel,
 		network:  NewNetwork(partyIDs),
 		logger:   log.NewTestLogger(log.InfoLevel),
-		registry: prometheus.NewRegistry(),
+		registry: metric.NewRegistry(),
 		handlers: make(map[party.ID]*protocol.Handler),
 		results:  make(map[party.ID]interface{}),
 		errors:   make(map[party.ID]error),
@@ -76,7 +76,7 @@ func (h *Harness) CreateHandler(id party.ID, startFunc protocol.StartFunc, sessi
 	defer h.mu.Unlock()
 
 	// Create a new registry for each handler to avoid conflicts
-	registry := prometheus.NewRegistry()
+	registry := metric.NewRegistry()
 
 	// Create config with sensible defaults
 	config := &protocol.Config{

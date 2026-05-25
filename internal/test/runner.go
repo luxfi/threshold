@@ -10,7 +10,7 @@ import (
 	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 )
 
 // ProtocolRunner provides a reliable way to run protocol tests
@@ -19,7 +19,7 @@ type ProtocolRunner struct {
 	config   *TestConfig
 	network  *Network
 	logger   log.Logger
-	registry *prometheus.Registry
+	registry metric.Registry
 
 	mu       sync.RWMutex
 	handlers map[party.ID]*protocol.Handler
@@ -44,7 +44,7 @@ func NewRunner(t testing.TB, config *TestConfig) *ProtocolRunner {
 		t:        t,
 		config:   config,
 		logger:   logger,
-		registry: prometheus.NewRegistry(),
+		registry: metric.NewRegistry(),
 		handlers: make(map[party.ID]*protocol.Handler),
 		results:  make(map[party.ID]interface{}),
 		errors:   make(map[party.ID]error),
@@ -69,7 +69,7 @@ func (r *ProtocolRunner) SetupParties(partyIDs []party.ID, startFuncs map[party.
 	// Create handlers for each party
 	for id, startFunc := range startFuncs {
 		// Each handler needs its own registry to avoid duplicate registration
-		registry := prometheus.NewRegistry()
+		registry := metric.NewRegistry()
 
 		handler, err := protocol.NewHandler(
 			context.Background(), // Don't use timeout context here

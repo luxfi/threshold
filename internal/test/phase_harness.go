@@ -11,7 +11,7 @@ import (
 	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 )
 
 // PhaseHarness provides phase-gated test environment for protocol testing
@@ -59,7 +59,7 @@ func (h *PhaseHarness) RunPhase(timeout time.Duration, startFor func(id party.ID
 	handlers := make(map[party.ID]*protocol.Handler, len(h.ids))
 	for _, id := range h.ids {
 		start := startFor(id)
-		reg := prometheus.NewRegistry()
+		reg := metric.NewRegistry()
 		hd, err := protocol.NewHandler(ctx, h.logger, reg, start, sessionID, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create handler for party %s: %w", id, err)
