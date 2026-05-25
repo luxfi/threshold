@@ -14,7 +14,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -104,7 +104,7 @@ func (s *MPCTestSuite) RunInitTest(createStartFunc func(id party.ID, partyIDs []
 		defer cancel()
 
 		config := protocol.DefaultConfig()
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), startFunc, sessionID, config)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), startFunc, sessionID, config)
 		require.NoError(s.t, err,
 			"%s: Failed to create handler for party %s", s.protocolType, id)
 		require.NotNil(s.t, h,

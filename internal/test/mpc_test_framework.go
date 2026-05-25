@@ -13,7 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -119,7 +119,7 @@ func (env *MPCTestEnvironment) CreateHandler(
 	h, err := protocol.NewHandler(
 		env.ctx,
 		logger,
-		prometheus.NewRegistry(),
+		metric.NewRegistry(),
 		startFunc,
 		sessionID,
 		config,
