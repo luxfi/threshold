@@ -1,23 +1,4 @@
-// UNSAFE: This implementation is NOT a real threshold scheme.
-//   - Every party stores the full master key (tfhe.go ~line 374: UnderlyingKey: masterSK)
-//   - PartialDecrypt returns an HMAC tag, not a partial decryption
-//   - CombineShares ignores partials and runs single-party decryption
-//
-// DO NOT USE in production. Refused security review by Red 2026-04-28.
-//
-// Real threshold FHE requires:
-//  1. Shamir-split master secret key (each party gets a SHARE, not the full key)
-//  2. PartialDecrypt produces a partial decryption (lattice noise + share contribution)
-//  3. CombineShares Lagrange-interpolates partials to recover the cleartext
-//
-// Migration path: route through luxfi/lattice threshold protocol primitives
-// (which DO implement real Shamir share generation + partial-decrypt + combine).
-// See lps/LP-137-TFHE-REAL-THRESHOLD-SPEC.md.
-//
-// Test opt-in: set ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1 to bypass the
-// fail-loud panics at every entry point. Production must crash if reached.
-//
-// Committee surface for the threshold-FHE policy gate.
+// Package tfhe — committee surface for the threshold-FHE policy gate.
 //
 // This file defines the narrow "committee API" used by per-node policy
 // gates (e.g. luxfi/mpc/pkg/policy/fhe_threshold_decryptor) to:
@@ -30,18 +11,25 @@
 // scheme — luxfi/threshold/protocols/tfhe is the single canonical home
 // for these types so call sites do not invent parallel definitions.
 //
-// Combine path: there is one and only one combine routine — the lattice
-// combine implemented by Protocol.CombineShares (see tfhe.go). When a
-// Protocol is wired into ShareAggregator, the aggregator authenticates
-// each FHEThresholdShare at the committee boundary (MAC + session +
-// ciphertext-id + dedup) and dispatches the deduplicated share set
-// directly to Protocol.CombineShares — no parallel aggregator, no
-// HMAC-derived recovery mask, no XOR-shaped recovery. When no Protocol
-// is wired (the policy-1-bit-verdict envelope path used by FChain
-// policy gates), the aggregator certifies that ≥t parties witnessed the
-// same ciphertext and returns the verdict envelope unchanged; the
-// embedded plaintext is the 1-bit verdict produced by the FHE policy
-// circuit.
+// SECURITY: this layer is the wire-authentication layer. It authenticates
+// each FHEThresholdShare's MAC against the party's KeyShare, enforces
+// session binding (sessionID + ciphertextID), dedupes party IDs, then
+// dispatches the validated set to Protocol.CombineShares (the canonical
+// lattice combine — see tfhe.go). The committee KeyShare is symmetric
+// and only authenticates the wire — it is not part of the lattice
+// secret-sharing scheme; that lives in Protocol.SecretKeyShare.
+//
+// Two dispatch paths:
+//
+//   - Lattice path: when Protocol is set, the authenticated share set
+//     dispatches directly to Protocol.CombineShares. The partial bytes
+//     are interpreted as a serialized fhethreshold.LWEPartialDecryption
+//     and Lagrange-combined to yield the plaintext.
+//
+//   - Envelope path (default when Protocol is nil): the policy circuit
+//     emitted a 1-bit verdict in the clear inside the ciphertext envelope,
+//     and the committee's only job is to ratify "≥t parties saw the same
+//     ciphertext". This is the FChain policy gate path.
 //
 // Copyright (c) 2024-2026 Lux Industries Inc.
 // SPDX-License-Identifier: BSD-3-Clause
@@ -49,13 +37,17 @@
 package tfhe
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"fmt"
 
 	"github.com/luxfi/fhe"
+	fhethreshold "github.com/luxfi/fhe/pkg/threshold"
 	"github.com/luxfi/threshold/pkg/party"
 )
 
@@ -79,17 +71,25 @@ func NewFHECiphertext(b []byte) FHECiphertext {
 // KeyShare is one party's symmetric verification key. The committee
 // self-checks each FHEThresholdShare's MAC against the corresponding
 // KeyShare before counting it toward the quorum.
+//
+// SECURITY: KeyShare authenticates the WIRE — it is not a share of the
+// FHE secret. That lives in Protocol.SecretKeyShare.LWE.
 type KeyShare struct {
 	PartyID uint32
 	Bytes   []byte
 }
 
-// FHEThresholdShare is one party's partial-decrypt response. Partial
-// carries the per-party partial-decryption bytes consumed by
-// Protocol.CombineShares when a lattice combine is wired in. MAC binds
-// (PartyID, SessionID, CiphertextID, Partial) under the party's
-// KeyShare so a malicious peer cannot impersonate a different party or
-// rebind a fresh share to a different ciphertext / session.
+// FHEThresholdShare is one party's partial-decrypt response.
+//
+// Partial carries the per-party partial-decryption bytes consumed by the
+// lattice combine. The encoded form is a gob-serialized
+// fhethreshold.LWEPartialDecryption when dispatching to a Protocol; or
+// an HMAC tag of (party, session, ciphertext) when the policy-1-bit-
+// verdict envelope path is in use (Protocol nil).
+//
+// MAC binds (PartyID, SessionID, CiphertextID, Partial) under the
+// party's KeyShare so a malicious peer cannot impersonate a different
+// party or rebind a fresh share to a different ciphertext / session.
 type FHEThresholdShare struct {
 	PartyID      uint32
 	SessionID    [32]byte
@@ -135,13 +135,13 @@ type ShareAggregateService interface {
 // bootstrap before CDS noise proofs ship; production self-checks always
 // populate PartyKeys.
 //
-// Protocol: when set, after wire authentication passes the deduplicated
-// share set is dispatched to Protocol.CombineShares (the canonical
-// lattice combine — see tfhe.go). When nil, the aggregator returns the
-// ciphertext envelope unchanged: this is the FChain policy-verdict path
-// where the embedded plaintext is the 1-bit verdict produced by the
-// policy circuit and the committee's only job is to ratify that ≥t
-// parties saw the same ciphertext.
+// Protocol: when set, the authenticated share set is decoded into per-
+// bit LWEPartialDecryption values and dispatched to Protocol.CombineShares
+// (the canonical lattice combine — see tfhe.go). When nil, the
+// aggregator returns the ciphertext envelope unchanged: this is the
+// FChain policy-verdict path where the embedded plaintext is the 1-bit
+// verdict produced by the policy circuit and the committee's only job
+// is to ratify that ≥t parties saw the same ciphertext.
 type ShareAggregator struct {
 	PartyKeys map[uint32]KeyShare
 	Protocol  *Protocol
@@ -220,31 +220,37 @@ func (a *ShareAggregator) Aggregate(
 	return AggregateResult{Status: StatusOK, ShareCount: len(deduped)}, plaintext, nil
 }
 
-// dispatchCombine translates the committee-boundary share set onto
-// Protocol's per-party DecryptionShare and invokes the lattice combine.
-// The translation is mechanical: PartyID/SessionID/CiphertextID identify
-// the share, Partial carries the per-party partial-decryption bytes,
-// and CiphertextHash uses the Protocol's hash convention so
-// CombineShares' integrity check passes.
+// dispatchCombine decodes each share's Partial bytes into a per-bit
+// LWEPartialDecryption set and invokes the lattice combine via
+// Protocol.CombineShares. The ciphertext envelope bytes are unmarshaled
+// into a BitCiphertext to obtain the per-bit list.
 func (a *ShareAggregator) dispatchCombine(
 	ctx context.Context,
 	ct FHECiphertext,
 	shares []FHEThresholdShare,
 ) ([]byte, error) {
+	// Unmarshal the BitCiphertext from the envelope.
 	bc := &fhe.BitCiphertext{}
 	if err := bc.UnmarshalBinary(ct.Bytes); err != nil {
 		return nil, fmt.Errorf("tfhe: ciphertext unmarshal: %w", err)
 	}
-	ctHash := computeCiphertextHash(bc)
+	ctHash, err := bitCiphertextHash(bc)
+	if err != nil {
+		return nil, fmt.Errorf("tfhe: hash ciphertext: %w", err)
+	}
 
 	a.Protocol.ClearShares()
 	for _, s := range shares {
+		partials, err := decodePartialDecryptions(s.Partial)
+		if err != nil {
+			return nil, fmt.Errorf("tfhe: decode partial from party %d: %w", s.PartyID, err)
+		}
 		ds := &DecryptionShare{
 			PartyID:        party.ID(fmt.Sprintf("%d", s.PartyID)),
-			Index:          int(s.PartyID) - 1,
+			Index:          int(s.PartyID),
 			Generation:     a.Protocol.config.Generation,
 			CiphertextHash: ctHash,
-			PartialResult:  append([]byte(nil), s.Partial...),
+			PartialResult:  partials,
 		}
 		if err := a.Protocol.AddDecryptionShare(ds); err != nil {
 			return nil, fmt.Errorf("tfhe: add share party %d: %w", s.PartyID, err)
@@ -254,35 +260,118 @@ func (a *ShareAggregator) dispatchCombine(
 }
 
 // PartialDecrypter is the per-party partial-decrypt engine. Given a
-// KeyShare and an FHECiphertext, it produces a deterministic
-// FHEThresholdShare bound to (sessionID, ciphertext.ID, party.id) under
-// the party's symmetric key.
-type PartialDecrypter struct{}
+// (lattice) SecretKeyShare and an FHECiphertext, it produces a
+// FHEThresholdShare bound to (sessionID, ciphertext.ID, party.id) via a
+// MAC under the party's symmetric KeyShare.
+//
+// SECURITY: PartialDecrypter unwraps the envelope to call the lattice
+// partial-decrypt (fhethreshold.PartialDecryptLWE), then wraps the
+// result back up in the on-the-wire FHEThresholdShare. The lattice
+// share itself never leaves the party.
+type PartialDecrypter struct {
+	// SecretShare is this party's Shamir share of the FHE secret key.
+	// Required for the lattice partial-decrypt path.
+	SecretShare *SecretKeyShare
 
-// NewPartialDecrypter returns the in-tree partial-decrypter.
-func NewPartialDecrypter() *PartialDecrypter { return &PartialDecrypter{} }
+	// Params are the FHE parameters used to encode the ciphertext.
+	Params fhe.Parameters
+
+	// Threshold is t in t-of-n. Needed to calibrate smudging noise.
+	Threshold int
+}
+
+// NewPartialDecrypter returns a PartialDecrypter configured for a single
+// party. SecretShare and Params must be non-nil; Threshold must be ≥ 1.
+func NewPartialDecrypter(secretShare *SecretKeyShare, params fhe.Parameters, threshold int) *PartialDecrypter {
+	return &PartialDecrypter{
+		SecretShare: secretShare,
+		Params:      params,
+		Threshold:   threshold,
+	}
+}
 
 // PartialDecrypt computes the party's share for the given ciphertext.
 //
-// UNSAFE: this returns an HMAC tag bound to (party, session, ciphertext) —
-// it is NOT a partial decryption. The downstream combine ignores Partial and
-// runs single-party decrypt. Panics unless ALLOW_FAKE_TFHE_FOR_TESTING_ONLY=1.
-//
-// Partial is HMAC-SHA256(key, "LUX/FHE/THRESHOLD/PARTIAL/v1" || sessionID
-// || ciphertextID) — a deterministic, per-party byte sequence that
-// fingerprints the (party, session, ciphertext) tuple. MAC is
-// HMAC-SHA256(key, "LUX/FHE/THRESHOLD/MAC/v1" || partyID || sessionID
-// || ciphertextID || Partial), so a malicious peer cannot replay
-// another party's share or rebind a fresh share to a different
-// ciphertext / session.
+// The Partial field of the returned FHEThresholdShare carries the
+// gob-serialized []*fhethreshold.LWEPartialDecryption (one entry per
+// bit of the originating BitCiphertext). The MAC binds the entire
+// envelope under the party's KeyShare so a malicious peer cannot
+// impersonate or rebind.
 func (p *PartialDecrypter) PartialDecrypt(
-	_ context.Context,
+	ctx context.Context,
 	key KeyShare,
 	ct FHECiphertext,
 	sessionID [32]byte,
 ) (FHEThresholdShare, error) {
-	guardUnsafe()
-	partial := computePartial(key, sessionID, ct.ID)
+	if p.SecretShare == nil {
+		return FHEThresholdShare{}, fmt.Errorf("tfhe: PartialDecrypter not configured with SecretShare")
+	}
+	bc := &fhe.BitCiphertext{}
+	if err := bc.UnmarshalBinary(ct.Bytes); err != nil {
+		return FHEThresholdShare{}, fmt.Errorf("tfhe: ciphertext unmarshal: %w", err)
+	}
+
+	// Lattice partial decrypt per bit.
+	bits := bc.Bits()
+	partials := make([]*fhethreshold.LWEPartialDecryption, len(bits))
+	for i, bit := range bits {
+		partial, err := fhethreshold.PartialDecryptFHE(
+			&p.SecretShare.LWE,
+			bit,
+			p.Params,
+			p.Threshold,
+			nil, // fresh PRNG per bit; convenience layer constructs one.
+		)
+		if err != nil {
+			return FHEThresholdShare{}, fmt.Errorf("tfhe: partial decrypt bit %d: %w", i, err)
+		}
+		partials[i] = partial
+	}
+
+	partialBytes, err := encodePartialDecryptions(partials)
+	if err != nil {
+		return FHEThresholdShare{}, fmt.Errorf("tfhe: encode partials: %w", err)
+	}
+
+	mac := computeMAC(key, key.PartyID, sessionID, ct.ID, partialBytes)
+	return FHEThresholdShare{
+		PartyID:      key.PartyID,
+		SessionID:    sessionID,
+		CiphertextID: ct.ID,
+		Partial:      partialBytes,
+		MAC:          mac,
+	}, nil
+}
+
+// EnvelopePartialDecrypter is the envelope-mode partial decrypter used
+// by the FChain policy gate: the share's Partial field is an HMAC of
+// (party, session, ciphertext) — no lattice math. The committee's job
+// is to ratify "≥t parties saw the same ciphertext" rather than to
+// decrypt anything. Detection: ShareAggregator with Protocol == nil
+// routes to the envelope path.
+//
+// This is a discrete primitive from the lattice-domain PartialDecrypter:
+// the two solve different problems and are not interchangeable.
+type EnvelopePartialDecrypter struct{}
+
+// NewEnvelopePartialDecrypter returns the envelope-mode partial
+// decrypter. Stateless — safe to share across goroutines.
+func NewEnvelopePartialDecrypter() *EnvelopePartialDecrypter {
+	return &EnvelopePartialDecrypter{}
+}
+
+// PartialDecrypt produces an envelope-mode share bound to (sessionID,
+// ciphertext.ID, party.id) under the party's KeyShare. The Partial bytes
+// are an HMAC of (party, session, ciphertext) — they do NOT decrypt
+// anything. The MAC binds the entire envelope so a malicious peer
+// cannot impersonate or rebind.
+func (e *EnvelopePartialDecrypter) PartialDecrypt(
+	ctx context.Context,
+	key KeyShare,
+	ct FHECiphertext,
+	sessionID [32]byte,
+) (FHEThresholdShare, error) {
+	partial := computeEnvelopePartial(key, sessionID, ct.ID)
 	mac := computeMAC(key, key.PartyID, sessionID, ct.ID, partial)
 	return FHEThresholdShare{
 		PartyID:      key.PartyID,
@@ -293,9 +382,24 @@ func (p *PartialDecrypter) PartialDecrypt(
 	}, nil
 }
 
-func computePartial(key KeyShare, sessionID, ctID [32]byte) []byte {
+// PartialDecryptEnvelopeOnly is a thin function form of
+// EnvelopePartialDecrypter.PartialDecrypt for call sites that don't want
+// to hold the (stateless) struct. Returns no error — the operation
+// cannot fail (deterministic HMAC + MAC).
+func PartialDecryptEnvelopeOnly(
+	key KeyShare,
+	ct FHECiphertext,
+	sessionID [32]byte,
+) FHEThresholdShare {
+	s, _ := (&EnvelopePartialDecrypter{}).PartialDecrypt(context.Background(), key, ct, sessionID)
+	return s
+}
+
+// computeEnvelopePartial computes the envelope-mode partial: HMAC of
+// (party, session, ciphertext). Domain-separated from MAC.
+func computeEnvelopePartial(key KeyShare, sessionID, ctID [32]byte) []byte {
 	h := hmac.New(sha256.New, key.Bytes)
-	h.Write([]byte("LUX/FHE/THRESHOLD/PARTIAL/v1"))
+	h.Write([]byte("LUX/FHE/THRESHOLD/PARTIAL_ENVELOPE/v1"))
 	h.Write(sessionID[:])
 	h.Write(ctID[:])
 	return h.Sum(nil)
@@ -305,10 +409,7 @@ func computeMAC(key KeyShare, partyID uint32, sessionID, ctID [32]byte, partial 
 	h := hmac.New(sha256.New, key.Bytes)
 	h.Write([]byte("LUX/FHE/THRESHOLD/MAC/v1"))
 	var pid [4]byte
-	pid[0] = byte(partyID >> 24)
-	pid[1] = byte(partyID >> 16)
-	pid[2] = byte(partyID >> 8)
-	pid[3] = byte(partyID)
+	binary.BigEndian.PutUint32(pid[:], partyID)
 	h.Write(pid[:])
 	h.Write(sessionID[:])
 	h.Write(ctID[:])
@@ -321,4 +422,39 @@ func computeMAC(key KeyShare, partyID uint32, sessionID, ctID [32]byte, partial 
 func verifyShareMAC(key KeyShare, s FHEThresholdShare) bool {
 	want := computeMAC(key, s.PartyID, s.SessionID, s.CiphertextID, s.Partial)
 	return hmac.Equal(want[:], s.MAC[:])
+}
+
+// encodePartialDecryptions serializes a per-bit partial-decryption slice
+// for transport in FHEThresholdShare.Partial. Gob is used because the
+// type ships across version boundaries within the luxfi/threshold
+// module and we control both ends; switching to CBOR is a future option
+// once we standardize on a wire format for cross-module artifacts.
+func encodePartialDecryptions(partials []*fhethreshold.LWEPartialDecryption) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(partials); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// decodePartialDecryptions deserializes a per-bit partial-decryption
+// slice from FHEThresholdShare.Partial.
+func decodePartialDecryptions(data []byte) ([]*fhethreshold.LWEPartialDecryption, error) {
+	dec := gob.NewDecoder(bytes.NewReader(data))
+	var out []*fhethreshold.LWEPartialDecryption
+	if err := dec.Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// bitCiphertextHash computes a deterministic hash of a BitCiphertext for
+// use as a CiphertextID. Hashes the MarshalBinary serialization.
+func bitCiphertextHash(bc *fhe.BitCiphertext) ([32]byte, error) {
+	data, err := bc.MarshalBinary()
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return sha256.Sum256(data), nil
 }
