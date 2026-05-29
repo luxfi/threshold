@@ -16,7 +16,7 @@ import (
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss"
 	"github.com/luxfi/threshold/protocols/lss/config"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,7 +50,7 @@ func BenchmarkHandler(b *testing.B) {
 
 				handlers := make([]*protocol.Handler, tt.n)
 				for j, id := range partyIDs {
-					h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+					h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 						lss.Keygen(group, id, partyIDs, tt.threshold, pl), sessionID, cfg)
 					require.NoError(b, err)
 					handlers[j] = h
@@ -103,7 +103,7 @@ func BenchmarkConcurrentMessages(b *testing.B) {
 
 				handlers := make([]*protocol.Handler, tt.n)
 				for j, id := range partyIDs {
-					h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+					h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 						lss.Keygen(group, id, partyIDs, tt.threshold, pl), sessionID, cfg)
 					require.NoError(b, err)
 					handlers[j] = h
@@ -258,7 +258,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 
 				handlers := make([]*protocol.Handler, tt.n)
 				for j, id := range partyIDs {
-					h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+					h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 						lss.Keygen(group, id, partyIDs, tt.threshold, pl), sessionID, cfg)
 					require.NoError(b, err)
 					handlers[j] = h
@@ -299,7 +299,7 @@ func TestHandlerPerformance(t *testing.T) {
 	start := time.Now()
 	origHandlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
 		require.NoError(t, err)
 		origHandlers[i] = h
 	}
@@ -317,7 +317,7 @@ func TestHandlerPerformance(t *testing.T) {
 	start = time.Now()
 	optHandlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
 		require.NoError(t, err)
 		optHandlers[i] = h
 	}
@@ -344,7 +344,7 @@ func TestHandlerPerformance(t *testing.T) {
 	// Run protocol again to measure memory
 	handlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
 		require.NoError(t, err)
 		handlers[i] = h
 	}
