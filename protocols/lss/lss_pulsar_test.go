@@ -36,7 +36,7 @@ func bootstrapEra(t *testing.T, threshold int, validators []party.ID, seed strin
 	for i, v := range validators {
 		stringIDs[i] = string(v)
 	}
-	era, err := keyera.Bootstrap(threshold, stringIDs, 0, 1, deterministicRand(seed))
+	era, err := keyera.BootstrapTrustedDealer(threshold, stringIDs, 0, 1, deterministicRand(seed))
 	if err != nil {
 		t.Fatalf("Bootstrap: %v", err)
 	}
