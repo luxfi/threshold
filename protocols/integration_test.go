@@ -10,7 +10,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 
 	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"
@@ -278,7 +278,7 @@ func runLSSKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 
 	// Create handlers
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
 		Expect(err).NotTo(HaveOccurred())
 		handlers[i] = h
 	}
@@ -312,7 +312,7 @@ func runCMPKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *poo
 
 	// Create handlers
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), cmp.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), cmp.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
 		Expect(err).NotTo(HaveOccurred())
 		handlers[i] = h
 	}
@@ -367,7 +367,7 @@ func runCMPSign(configs []*cmpconfig.Config, partyIDs []party.ID, message []byte
 
 	// Create handlers for signers
 	for i, idx := range signerIndices {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 			cmp.Sign(configs[idx], signers, message, pl), sessionID, config)
 		if err != nil {
 			// Sign might not be implemented, return empty signatures
@@ -412,7 +412,7 @@ func runFROSTKeygen(partyIDs []party.ID, threshold int, group curve.Curve, pl *p
 
 	// Create handlers
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(), frost.Keygen(group, id, partyIDs, threshold), sessionID, config)
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(), frost.Keygen(group, id, partyIDs, threshold), sessionID, config)
 		Expect(err).NotTo(HaveOccurred())
 		handlers[i] = h
 	}

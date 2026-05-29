@@ -12,7 +12,7 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,7 +35,7 @@ func TestKeygenWithTimeout(t *testing.T) {
 
 	handlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 			lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
 		if err != nil {
 			t.Logf("Error creating handler for %s: %v", id, err)
@@ -135,7 +135,7 @@ func TestKeygenQuickTimeout(t *testing.T) {
 
 		// Try to create handlers
 		for _, id := range ids {
-			_, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+			_, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 				lss.Keygen(group, id, ids, threshold, pl), sessionID, cfg)
 			if err != nil {
 				// Error is ok with quick timeout

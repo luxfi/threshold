@@ -7,7 +7,7 @@ import (
 	log "github.com/luxfi/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 )
 
 func TestFrost(t *testing.T) {
@@ -18,7 +18,7 @@ func TestFrost(t *testing.T) {
 var (
 	ctx      context.Context
 	logger   log.Logger
-	registry prometheus.Registerer
+	registry metric.Registerer
 )
 
 var _ = BeforeSuite(func() {
@@ -31,5 +31,5 @@ var _ = BeforeSuite(func() {
 
 var _ = BeforeEach(func() {
 	// Create a new registry for each test to avoid conflicts
-	registry = prometheus.NewRegistry()
+	registry = metric.NewRegistry()
 })
