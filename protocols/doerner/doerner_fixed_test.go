@@ -11,7 +11,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,14 +32,14 @@ func TestDoernerKeygenWithTimeout(t *testing.T) {
 		config := protocol.DefaultConfig()
 
 		// Sender
-		h0, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+		h0, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 			Keygen(group, true, partyIDs[0], partyIDs[1], pl), sessionID, config)
 		if err == nil {
 			handlers[partyIDs[0]] = h0
 		}
 
 		// Receiver
-		h1, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+		h1, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 			Keygen(group, false, partyIDs[1], partyIDs[0], pl), sessionID, config)
 		if err == nil {
 			handlers[partyIDs[1]] = h1
