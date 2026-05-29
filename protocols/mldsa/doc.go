@@ -1,11 +1,29 @@
 // Copyright (C) 2026, Lux Industries Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package mldsa implements the threshold signature scheme of Celi, del Pino,
-// Espitau, Niot, Prest — Efficient Threshold ML-DSA (USENIX Security 2026).
+// Package mldsa is the RESEARCH-PREVIEW scaffold for the threshold
+// signature scheme of Celi, del Pino, Espitau, Niot, Prest — Efficient
+// Threshold ML-DSA (USENIX Security 2026).
 //
-// Output signatures are byte-compatible with standard FIPS 204 ML-DSA, so
-// existing verifiers accept threshold-produced signatures unchanged.
+// STATUS — research preview, NOT production. The current tree ships:
+//   - params.go    (T,N) × level parameter sets (Tables 3, 10, 11)
+//   - rss.go       replicated secret sharing, hardcoded optimal partitions
+//   - hrej.go      imbalanced hyperball rejection — STUB; HRej() returns
+//                  "not yet wired to CIRCL ring"
+//
+// The signer itself — keygen.go, sign.go, combine.go, a_posteriori.go —
+// does not exist yet. Importing this package and calling anything that
+// claims to produce a signature today will fail. Use luxfi/crypto/mldsa
+// for production ML-DSA — that is the per-validator FIPS 204 primitive
+// shipped through CIRCL, with KAT-pinned determinism. The two are
+// complementary: per-validator ML-DSA is the production identity-proof
+// lane (e.g. Warp 2.0 MLDSACertSet); threshold ML-DSA is the future
+// MPC-aggregated lane, paper-grade today.
+//
+// Once the signer lands, output signatures will be byte-compatible with
+// standard FIPS 204 ML-DSA, so existing verifiers accept threshold-
+// produced signatures unchanged. That property is the whole point of
+// the construction.
 //
 // Supported parameter sets:
 //   - ML-DSA-44 (NIST level I)
