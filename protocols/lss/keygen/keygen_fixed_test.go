@@ -12,7 +12,7 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +37,7 @@ func TestLSSKeygenSpecificWithTimeout(t *testing.T) {
 	// Create handlers for each party
 	handlers := make([]*protocol.Handler, n)
 	for i, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 			lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, config)
 		if err != nil {
 			t.Logf("Error creating handler for party %s: %v", id, err)
@@ -138,7 +138,7 @@ func TestLSSKeygenRoundProgression(t *testing.T) {
 	sessionID := []byte("test-round-progression")
 	config := protocol.DefaultConfig()
 
-	h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+	h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 		lss.Keygen(group, partyIDs[0], partyIDs, threshold, pl), sessionID, config)
 
 	require.NoError(t, err, "Handler should be created")

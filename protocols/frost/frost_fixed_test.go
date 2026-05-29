@@ -12,7 +12,7 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/frost"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,7 @@ func TestFROSTKeygenSimple(t *testing.T) {
 	}
 
 	for _, id := range partyIDs {
-		h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+		h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 			frost.Keygen(group, id, partyIDs, threshold), sessionID, config)
 		require.NoError(t, err)
 		handlers[id] = h
@@ -136,7 +136,7 @@ func TestFROSTKeygenWithTimeout(t *testing.T) {
 		config := protocol.DefaultConfig()
 
 		for _, id := range partyIDs {
-			h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+			h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 				frost.Keygen(group, id, partyIDs, threshold), sessionID, config)
 			if err != nil {
 				t.Logf("Error creating handler for %s: %v", id, err)
