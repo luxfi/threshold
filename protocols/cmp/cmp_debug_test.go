@@ -13,7 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/cmp"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,7 +57,7 @@ func TestCMPDebugKeygen(t *testing.T) {
 			protocolConfig := protocol.DefaultConfig()
 
 			// Create handler
-			h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+			h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 				cmp.Keygen(curve.Secp256k1{}, id, partyIDs, T, pools[id]),
 				sessionID, protocolConfig)
 

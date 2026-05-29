@@ -13,7 +13,7 @@ import (
 	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss"
 	"github.com/luxfi/threshold/protocols/lss/config"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/luxfi/metric"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +36,7 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 		cfg := protocol.DefaultConfig()
 
 		for _, id := range partyIDs {
-			h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+			h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 				lss.Keygen(group, id, partyIDs, threshold, pl), sessionID, cfg)
 			if err != nil {
 				t.Logf("Error creating handler for %s: %v", id, err)
@@ -123,7 +123,7 @@ func TestLSSSignWithTimeout(t *testing.T) {
 
 		for i, id := range signers {
 			if i < len(configs) && configs[i] != nil {
-				h, err := protocol.NewHandler(ctx, logger, prometheus.NewRegistry(),
+				h, err := protocol.NewHandler(ctx, logger, metric.NewRegistry(),
 					lss.Sign(configs[i], signers, message, pl), sessionID, cfg)
 				if err != nil {
 					t.Logf("Error creating sign handler for %s: %v", id, err)
