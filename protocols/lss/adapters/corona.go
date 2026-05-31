@@ -1,4 +1,50 @@
-// Package adapters - Corona post-quantum threshold signature implementation
+// SPDX-License-Identifier: BSD-3-Clause
+//go:build researchpreview
+
+// Package adapters — LSS Corona adapter (RESEARCH PREVIEW, NOT PRODUCTION).
+//
+// This file builds ONLY under -tags=researchpreview. Production builds
+// must NOT compile it; LSS production callers that need post-quantum
+// threshold signatures must route through luxfi/threshold/protocols/corona
+// → luxfi/corona (Ring-LWE production primitive with Pedersen-DKG,
+// canonical wire codec, dudect-validated CT hot paths).
+//
+// What this file IS:
+//
+//   - A textbook-LWE "DKG" that has every party sample its own (s_i,
+//     e_i) and SUM them into a combined master secret at the
+//     aggregator. That is additive sharing — no party holds the secret
+//     AND no party holds a Lagrange share either. The "threshold"
+//     parameter is decorative.
+//
+//   - A "signature share" arithmetic computed mod Q with Q = 12289 (a
+//     TINY modulus far below the security threshold of any real LWE
+//     construction). No matching verifier.
+//
+//   - A Box-Muller-from-uniform-mod-Q Gaussian sampler that is NOT
+//     constant-time and uses floating-point math on secret-dependent
+//     inputs.
+//
+// What this file IS NOT:
+//
+//   - A wrapper for luxfi/corona. The naming collision is unfortunate;
+//     "Corona" in luxfi/threshold/protocols/lss/* names a CHAIN (Lux's
+//     PQ test chain) for the LSS adapter directory, NOT the actual
+//     Corona Ring-LWE primitive at luxfi/corona/threshold.
+//
+//   - Constant-time.
+//
+//   - Secure under any standard cryptographic assumption.
+//
+// History: this adapter was written as a paper-grade demonstrator for
+// the LSS multi-chain adapter pattern before the luxfi/corona primitive
+// shipped. The pulsar/corona audit (2026-05-31) flagged the name
+// collision as a HIGH-severity production-routing risk: a caller
+// invoking `lss.NewLSS(lss.Corona, ...)` would get this toy adapter,
+// not the real primitive. The build-tag gate removes the file from
+// production builds entirely; production callers get the rejecting
+// `createCoronaAdapter` in factory_corona_prod.go which points them at
+// luxfi/threshold/protocols/corona.
 package adapters
 
 import (

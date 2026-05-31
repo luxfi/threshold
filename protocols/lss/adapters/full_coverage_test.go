@@ -396,59 +396,11 @@ func TestCardanoAdapter(t *testing.T) {
 	})
 }
 
-// TestCoronaAdapter tests post-quantum Corona features
-func TestCoronaAdapter(t *testing.T) {
-	t.Run("SecurityLevels", func(t *testing.T) {
-		levels := []int{128, 192, 256}
-
-		for _, level := range levels {
-			adapter := NewCoronaAdapter(level, 5)
-			require.NotNil(t, adapter)
-
-			config := &UnifiedConfig{
-				SignatureScheme: SignatureCorona,
-				Threshold:       3,
-				PartyIDs:        []party.ID{"alice", "bob", "charlie", "dave", "eve"},
-				CoronaConfig: &CoronaExtensions{
-					SecurityLevel: level,
-				},
-			}
-
-			err := adapter.ValidateConfig(config)
-			assert.NoError(t, err)
-		}
-	})
-
-	t.Run("PreprocessingGeneration", func(t *testing.T) {
-		adapter := NewCoronaAdapter(128, 5)
-
-		parties := []party.ID{"alice", "bob", "charlie", "dave", "eve"}
-		// GeneratePreprocessing would be called here if it existed
-		_ = adapter
-		_ = parties
-
-		// Verify adapter was created successfully
-		assert.NotNil(t, adapter)
-		assert.Len(t, parties, 5)
-	})
-
-	t.Run("SignatureSize", func(t *testing.T) {
-		testCases := []struct {
-			securityLevel int
-			expectedSize  int
-		}{
-			{128, 13400},
-			{192, 28600},
-			{256, 53200},
-		}
-
-		for _, tc := range testCases {
-			_ = NewCoronaAdapter(tc.securityLevel, 5)
-			params := GetRecommendedParams(tc.securityLevel, 5)
-			assert.Equal(t, tc.expectedSize, params.SignatureSize)
-		}
-	})
-}
+// TestCoronaAdapter (research preview only) lives in corona_test.go
+// behind -tags=researchpreview, mirroring the LSS-side adapter gate.
+// Production builds: route post-quantum threshold through
+// luxfi/threshold/protocols/corona → luxfi/corona instead. See the
+// disclosure block at the top of adapters/corona.go.
 
 // TestChainRequirements verifies chain-specific requirements
 func TestChainRequirements(t *testing.T) {
