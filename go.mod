@@ -10,7 +10,7 @@ require (
 	// that consumes primitives from these packages (LP-5703, LP-5704)
 	github.com/luxfi/crypto v1.19.10 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.8.2 // FHE primitives for TFHE protocol
-	github.com/luxfi/lattice/v7 v7.1.0 // Lattice ops for Corona (post-quantum) + GPU acceleration
+	github.com/luxfi/lattice/v7 v7.1.4 // Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/zeebo/blake3 v0.2.4
@@ -69,5 +69,5 @@ require (
 	github.com/luxfi/corona v0.7.5
 	github.com/luxfi/lens v0.1.4
 	github.com/luxfi/metric v1.5.7
-	github.com/luxfi/pulsar v1.0.12
+	github.com/luxfi/pulsar v1.0.23
 )
