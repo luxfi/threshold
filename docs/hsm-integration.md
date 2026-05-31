@@ -17,7 +17,7 @@ party's secret share plus associated public material. The `Config` types
 expose `MarshalBinary()` / `UnmarshalBinary()` (see
 `protocols/cmp/config/marshal.go`, and the equivalents under
 `protocols/frost/`, `protocols/lss/`, `protocols/doerner/`,
-`protocols/ringtail/`).
+`protocols/corona/`).
 
 From the HSM's perspective, a `Config` is **opaque bytes**. You can:
 
