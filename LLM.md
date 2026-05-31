@@ -35,7 +35,7 @@ threshold/
 │   ├── frost/            # FROST Schnorr/EdDSA (2-round signing)
 │   ├── lss/              # LSS dynamic resharing
 │   ├── doerner/          # 2-of-2 optimized ECDSA
-│   ├── corona/         # Post-quantum lattice-based
+│   ├── corona/           # Post-quantum lattice-based (R-LWE)
 │   └── bls/              # BLS aggregate signatures
 └── docs/                  # Documentation
 ```
@@ -48,7 +48,7 @@ threshold/
 | **FROST** | Schnorr/EdDSA | 2 | ~8ms | BIP-340 Taproot |
 | **LSS** | ECDSA | Variable | ~35ms reshare | Dynamic resharing |
 | **Doerner** | ECDSA | 2-party | ~5ms | Constant-time |
-| **Corona** | Lattice | Variable | - | Post-quantum |
+| **Corona** | Lattice (R-LWE) | Variable | - | Post-quantum |
 
 ## Important Conventions
 
@@ -119,7 +119,7 @@ Status per scheme:
 - `cggmp21` — full keygen + sign via `protocols/cmp` (CGGMP21 fork)
 - `frost` — full RFC 9591 secp256k1 via `protocols/frost`
 - `pulsar` — full Pulsar M-LWE via `luxfi/corona/threshold`
-- `corona` — full Corona R-LWE via `luxfi/corona/threshold`
+- `corona` — full Corona R-LWE via `luxfi/threshold/protocols/corona`
 - `bls` — full Shamir/Lagrange via `protocols/bls.TrustedDealer`
 - `doerner` — round-protocol non-functional upstream; surface reserved,
   every op returns an explicit error. Fix upstream and remove the guard.
