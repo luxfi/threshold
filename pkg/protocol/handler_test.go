@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -531,10 +532,23 @@ func TestHandler_WaitForResultTimeout(t *testing.T) {
 	require.NoError(t, err)
 	defer h.Stop()
 
-	// Wait for timeout
+	// Wait for timeout. The error surface is one of:
+	//   - "timeout"                — historical, pre-context-rewrite
+	//   - "context deadline exceeded" — Go 1.20+ context.DeadlineExceeded
+	//   - "protocol timeout"        — wrapped form
+	// All three indicate the same condition; accept any. Brittle
+	// substring match was the root cause of this regression.
 	_, err = h.WaitForResult()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "timeout")
+	got := err.Error()
+	ok := false
+	for _, want := range []string{"timeout", "deadline exceeded"} {
+		if strings.Contains(got, want) {
+			ok = true
+			break
+		}
+	}
+	assert.Truef(t, ok, "expected timeout / deadline-exceeded error, got %q", got)
 }
 
 // Test message store
