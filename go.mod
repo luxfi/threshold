@@ -10,8 +10,7 @@ require (
 	// that consumes primitives from these packages (LP-5703, LP-5704)
 	github.com/luxfi/crypto v1.19.10 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/fhe v1.8.2 // FHE primitives for TFHE protocol
-	github.com/luxfi/lattice/v7 v7.1.0 // indirect; Lattice ops for Corona (post-quantum) + GPU acceleration
-	github.com/prometheus/client_golang v1.23.2
+	github.com/luxfi/lattice/v7 v7.1.4 // Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/zeebo/blake3 v0.2.4
@@ -34,8 +33,6 @@ require (
 require (
 	github.com/ALTree/bigfloat v0.2.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -52,15 +49,10 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.67.5 // indirect
-	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
 	golang.org/x/mod v0.34.0 // indirect
@@ -74,7 +66,8 @@ require (
 )
 
 require (
-	github.com/luxfi/corona v0.4.1
+	github.com/luxfi/corona v0.7.5
 	github.com/luxfi/lens v0.1.4
 	github.com/luxfi/metric v1.5.7
+	github.com/luxfi/pulsar v1.0.23
 )
