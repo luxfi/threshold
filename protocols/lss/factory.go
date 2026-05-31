@@ -343,9 +343,18 @@ func createAdapter(chain Chain, info *ChainInfo) (adapters.SignerAdapter, error)
 		}
 
 	case TypePostQuantum:
-		// Post-quantum chains
+		// Post-quantum chains.
+		//
+		// The lattice-based "Corona" LSS adapter (protocols/lss/adapters/
+		// corona.go) is RESEARCH-PREVIEW only and lives behind
+		// -tags=researchpreview. createCoronaAdapter is a tag-split
+		// indirection: under researchpreview it returns the LSS adapter
+		// for paper-grade demonstrators; under production builds it
+		// refuses with a routing-correction error pointing callers at
+		// luxfi/threshold/protocols/corona → luxfi/corona (production
+		// Ring-LWE primitive).
 		if chain == Corona {
-			return adapters.NewCoronaAdapter(128, 100), nil
+			return createCoronaAdapter()
 		}
 		return nil, fmt.Errorf("unsupported post-quantum chain: %s", chain)
 
