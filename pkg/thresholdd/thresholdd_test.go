@@ -159,6 +159,30 @@ func TestCoronaExplicitlyNotImplemented(t *testing.T) {
 	assertSchemeReturnsTypedError(t, "corona", "not yet implemented")
 }
 
+// TestMagnetarRoundTrip exercises the magnetar dispatcher end-to-
+// end: keygen generates `participants` per-validator-standalone
+// SLH-DSA keypairs via the v0.5 PerValidatorKeypair primary
+// primitive; sign emits the canonical (first) validator's
+// MAGS-framed signature; verify is stateless over the published
+// MAGG-framed group public key. Forgery is rejected.
+//
+// The signature emitted on the wire is byte-identical to a single-
+// party FIPS 205 SLH-DSA signature on the same (message, validator
+// public key) — pinned upstream by TestMagnetar_Wire_FIPS205Verifiable.
+//
+// We use 1-of-1 because the v0.5 magnetar primary primitive IS
+// per-validator standalone (no MPC aggregation into a single σ).
+// The thresholdd JSON-RPC surface returns one (publicKey,
+// signatureHex) tuple per call; the magnetar dispatcher uses the
+// FIRST validator's keypair as the canonical signer regardless of
+// the participants count. (Embedders that want N-of-N collected
+// signatures call magnetar.BuildAggregateCert /
+// VerifyAggregateCert directly.)
+func TestMagnetarRoundTrip(t *testing.T) {
+	t.Parallel()
+	roundtrip(t, "magnetar", 1, 1)
+}
+
 // assertSchemeReturnsTypedError posts every op on `scheme` and verifies
 // the daemon surfaces an explicit error message containing `wantSub`
 // rather than silently returning bad data.
