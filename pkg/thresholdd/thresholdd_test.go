@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 package thresholdd
 
 import (
@@ -151,12 +152,23 @@ func TestPulsarRoundTrip(t *testing.T) {
 	roundtrip(t, "pulsar", 2, 3)
 }
 
-// TestCoronaExplicitlyNotImplemented mirrors TestDoernerExplicitlyBroken.
-// Corona's dispatcher wire-up lives on a parallel branch; on this
-// branch corona is the stub and the test pins that contract.
-func TestCoronaExplicitlyNotImplemented(t *testing.T) {
-	t.Parallel()
-	assertSchemeReturnsTypedError(t, "corona", "not yet implemented")
+// TestCoronaRoundTrip exercises the Corona Ring-LWE threshold scheme
+// end-to-end through the JSON-RPC dispatcher: keygen → 2-round sign →
+// stateless verify, plus forgery rejection on a tampered message.
+//
+// Wire encodings (Signature.MarshalBinary / GroupKey.MarshalBinary /
+// VerifyBytes) landed in luxfi/corona threshold/wire.go on 2026-05-31,
+// which is what unblocks this test from the previous
+// "explicitly-not-implemented" stub.
+//
+// Cannot t.Parallel: corona kernel mutates sign.K / sign.Threshold
+// globals on every GenerateKeys call (luxfi/corona threshold/threshold.go:
+// 123-124). Sibling agents own pulsar/; we accept the kernel-side
+// limitation rather than refactor underneath them.
+func TestCoronaRoundTrip(t *testing.T) {
+	// Corona kernel requires t < n strictly. Smallest committee that
+	// exercises the protocol is 1-of-2.
+	roundtrip(t, "corona", 1, 2)
 }
 
 // TestMagnetarRoundTrip exercises the magnetar dispatcher end-to-
