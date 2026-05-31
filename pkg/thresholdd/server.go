@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
 package thresholdd
 
 import (
@@ -91,14 +92,23 @@ type Server struct {
 	authToken string
 }
 
-// NewServer builds the dispatcher with the five wired schemes
-// (cggmp21, frost, bls + the reserved-error doerner slot). Pulsar and
-// Corona are NOT wired here: their Signature / GroupKey types lack
-// stable wire encodings, so the previous "in-memory token" surface was
-// unverifiable by any second party (Red HIGH B2). The wire surface for
-// pulsar/corona is reserved by `newNotYetImplementedScheme` until the
-// underlying primitives ship `MarshalBinary` / `UnmarshalBinary` that
-// any independent verifier can consume. See pulsar.go / corona.go.
+// NewServer builds the dispatcher with the wired schemes.
+//
+//	cggmp21 — Canetti-Gennaro-Goldfeder-Makriyannis-Peled 2021 ECDSA.
+//	frost   — Komlo-Goldberg FROST Schnorr.
+//	bls     — BLS12-381 t-of-n via Shamir + Lagrange.
+//	corona  — Ring-LWE post-quantum threshold (luxfi/corona). Wired
+//	          2026-05-31 once corona threshold/wire.go shipped canonical
+//	          Signature.MarshalBinary / GroupKey.MarshalBinary /
+//	          VerifyBytes. Trust-model disclosure on the dispatcher's
+//	          keygen is in corona.go.
+//	pulsar  — M-LWE post-quantum threshold. NOT wired here yet: pulsar/
+//	          owners have not yet shipped Signature/GroupKey
+//	          MarshalBinary / UnmarshalBinary / VerifyBytes (the gap
+//	          corona/wire.go closed on its side). Reserved namespace
+//	          returns typed errors; see pulsar.go.
+//	doerner — Doerner-Kondi-Lee-Shelat 2018 2-of-n ECDSA. Reserved
+//	          namespace; upstream impl is non-functional. See doerner.go.
 func NewServer() (*Server, error) {
 	s := &Server{schemes: make(map[string]scheme)}
 
