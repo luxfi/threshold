@@ -106,6 +106,7 @@ func NewServer() (*Server, error) {
 	s.schemes["frost"] = newFrostScheme()
 	s.schemes["pulsar"] = newPulsarScheme()
 	s.schemes["corona"] = newCoronaScheme()
+	s.schemes["magnetar"] = newMagnetarScheme()
 	s.schemes["bls"] = newBLSScheme()
 	s.schemes["doerner"] = newDoernerScheme()
 
