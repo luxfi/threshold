@@ -332,90 +332,11 @@ func TestSolanaFeatures(t *testing.T) {
 	})
 }
 
-// TestCoronaPQAdapter tests post-quantum Corona adapter
-func TestCoronaPQAdapter(t *testing.T) {
-	t.Run("SecurityLevels", func(t *testing.T) {
-		levels := []int{128, 192, 256}
-
-		for _, level := range levels {
-			corona := adapters.NewCoronaAdapter(level, 100)
-
-			// Test DKG
-			parties := []party.ID{"alice", "bob", "charlie"}
-			pubKey, shares, err := corona.CoronaDKG(parties, 2)
-			require.NoError(t, err)
-			assert.NotNil(t, pubKey)
-			assert.Len(t, shares, 3)
-		}
-	})
-
-	t.Run("OfflinePreprocessing", func(t *testing.T) {
-		corona := adapters.NewCoronaAdapter(128, 10)
-
-		// Setup
-		parties := []party.ID{"alice", "bob", "charlie"}
-		_, _, err := corona.CoronaDKG(parties, 2)
-		require.NoError(t, err)
-		// Note: shares would be used for actual signing, using mock values for test
-
-		// Generate offline preprocessing
-		err = corona.PreprocessOffline(5)
-		require.NoError(t, err)
-
-		// Use preprocessing for signing
-		message := []byte("test message")
-		digest, _ := corona.Digest(message)
-
-		// Note: shares[parties[0]] is CoronaSecretShare, not curve.Scalar
-		// For testing, create a mock scalar value
-		mockScalar := curve.Secp256k1{}.NewScalar()
-		share := adapters.Share{
-			ID:    parties[0],
-			Value: mockScalar,
-		}
-
-		partial, err := corona.SignEC(digest, share)
-		require.NoError(t, err)
-		assert.NotNil(t, partial)
-	})
-
-	t.Run("LargeScale", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("Skipping large scale test in short mode")
-		}
-
-		// Test with 100 parties as mentioned in paper
-		corona := adapters.NewCoronaAdapter(128, 100)
-
-		parties := make([]party.ID, 100)
-		for i := 0; i < 100; i++ {
-			parties[i] = party.ID(fmt.Sprintf("party_%d", i))
-		}
-
-		// 67-of-100 threshold
-		_, shares, err := corona.CoronaDKG(parties, 67)
-		require.NoError(t, err)
-		assert.Len(t, shares, 100)
-	})
-
-	t.Run("SignatureSize", func(t *testing.T) {
-		corona := adapters.NewCoronaAdapter(128, 10)
-
-		// Expected ~13.4KB for 128-bit security
-		params := adapters.GetRecommendedParams(128, 10)
-		assert.Equal(t, 13400, params.SignatureSize)
-
-		// Create mock signature
-		fullSig := &adapters.CoronaFullSig{
-			Signature: make([]int64, params.N),
-			Size:      params.SignatureSize,
-		}
-
-		encoded, err := corona.Encode(fullSig)
-		require.NoError(t, err)
-		assert.LessOrEqual(t, len(encoded), params.SignatureSize)
-	})
-}
+// TestCoronaPQAdapter (research preview only) lives in
+// corona_external_test.go behind -tags=researchpreview, mirroring the
+// LSS-side adapter gate. Production builds: route post-quantum
+// threshold through luxfi/threshold/protocols/corona instead. See the
+// disclosure block at the top of adapters/corona.go.
 
 // Benchmark tests
 func BenchmarkAdapters(b *testing.B) {
@@ -438,7 +359,8 @@ func BenchmarkAdapters(b *testing.B) {
 		{"Bitcoin_ECDSA", adapters.NewBitcoinAdapter(adapters.SignatureECDSA), adapters.SignatureECDSA},
 		{"Bitcoin_Schnorr", adapters.NewBitcoinAdapter(adapters.SignatureSchnorr), adapters.SignatureSchnorr},
 		{"Solana", adapters.NewSolanaAdapter(), adapters.SignatureEdDSA},
-		{"Corona_128", adapters.NewCoronaAdapter(128, 10), adapters.SignatureCorona},
+		// Corona_128 benchmark moved to corona_external_test.go (under
+		// -tags=researchpreview) — see TestCoronaPQAdapter disclosure.
 	}
 
 	for _, bench := range benchmarks {
