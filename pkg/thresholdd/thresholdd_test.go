@@ -133,15 +133,27 @@ func TestFrostRoundTrip(t *testing.T) {
 	roundtrip(t, "frost", 2, 3)
 }
 
-// TestPulsarExplicitlyNotImplemented asserts the dispatcher refuses to
-// mint in-process tokens for the Pulsar namespace until upstream ships
-// stable wire encodings. See pulsar.go header (Red HIGH B2).
-func TestPulsarExplicitlyNotImplemented(t *testing.T) {
+// TestPulsarRoundTrip exercises the pulsar dispatcher end-to-end:
+// keygen runs DealAlgebraicV03Shares + per-party identity setup;
+// sign drives the v0.3 algebraic-aggregate protocol with FIPS 204
+// rejection-restart; verify is stateless over the published PULG-
+// framed group public key. Forgery is rejected.
+//
+// 2-of-3 keeps the test fast — the v0.3 protocol's wall-clock cost
+// is dominated by the per-party ML-KEM-768 + ML-DSA-65 identity
+// exchanges (O(t²)) and the FIPS 204 rejection-restart loop
+// (~5 attempts on average). The signature emitted on the wire is
+// bit-identical to a single-party FIPS 204 ML-DSA-65 signature on
+// the same (message, group public key) — pinned upstream by
+// TestPulsar_Wire_FIPS204Verifiable.
+func TestPulsarRoundTrip(t *testing.T) {
 	t.Parallel()
-	assertSchemeReturnsTypedError(t, "pulsar", "not yet implemented")
+	roundtrip(t, "pulsar", 2, 3)
 }
 
-// TestCoronaExplicitlyNotImplemented mirrors TestPulsarExplicitlyNotImplemented.
+// TestCoronaExplicitlyNotImplemented mirrors TestDoernerExplicitlyBroken.
+// Corona's dispatcher wire-up lives on a parallel branch; on this
+// branch corona is the stub and the test pins that contract.
 func TestCoronaExplicitlyNotImplemented(t *testing.T) {
 	t.Parallel()
 	assertSchemeReturnsTypedError(t, "corona", "not yet implemented")
