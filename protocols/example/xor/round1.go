@@ -39,7 +39,7 @@ func (r *Round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // MessageContent returns an empty message.First as a placeholder indicating that no message is expected.
-func (Round1) MessageContent() round.Content { return nil }
+func (*Round1) MessageContent() round.Content { return nil }
 
 // Number implements round.Round.
-func (Round1) Number() round.Number { return 1 }
+func (*Round1) Number() round.Number { return 1 }

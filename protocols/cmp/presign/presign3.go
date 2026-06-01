@@ -110,7 +110,7 @@ func (r *presign3) VerifyMessage(msg round.Message) error {
 }
 
 // StoreMessage implements round.Round.
-func (presign3) StoreMessage(round.Message) error { return nil }
+func (*presign3) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -198,10 +198,10 @@ func (r *presign3) MessageContent() round.Content {
 func (broadcast3) RoundNumber() round.Number { return 3 }
 
 // BroadcastContent implements round.BroadcastRound.
-func (presign3) BroadcastContent() round.BroadcastContent { return &broadcast3{} }
+func (*presign3) BroadcastContent() round.BroadcastContent { return &broadcast3{} }
 
 // Number implements round.Round.
-func (presign3) Number() round.Number { return 3 }
+func (*presign3) Number() round.Number { return 3 }
 
 // BroadcastData implements broadcast.Broadcaster.
 func (m broadcast3) BroadcastData() []byte {
