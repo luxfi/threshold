@@ -22,7 +22,7 @@ import (
 // There are also differences corresponding to the lack of a signing authority,
 // namely that these commitments are broadcast, instead of stored with the authority.
 type round1 struct {
-	*round.Helper
+	*round.Base
 	// taproot indicates whether or not we need to generate Taproot / BIP-340 signatures.
 	//
 	// If so, we have a few slight tweaks to make around the evenness of points,

@@ -54,7 +54,7 @@ func StartSignSR25519Common(taproot, sr25519 bool, signingContext []byte, result
 			return nil, fmt.Errorf("sign.StartSign: %w", err)
 		}
 		return &round1{
-			Helper:         helper,
+			Base:         helper,
 			taproot:        taproot,
 			sr25519:        sr25519,
 			signingContext: signingContext,

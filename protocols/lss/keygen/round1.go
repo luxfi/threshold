@@ -15,7 +15,7 @@ import (
 
 // round1 generates polynomial and broadcasts commitments
 type round1 struct {
-	*round.Helper
+	*round.Base
 
 	// Our polynomial for secret sharing
 	poly *polynomial.Polynomial
@@ -175,7 +175,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// Create round2 with complete data
 	return &round2{
-		Helper:      r.Helper,
+		Base:      r.Base,
 		poly:        r.poly,
 		commitments: commitments,
 		chainKeys:   chainKeys,

@@ -10,7 +10,7 @@ import (
 var _ round.Round = (*sign1)(nil)
 
 type sign1 struct {
-	*round.Helper
+	*round.Base
 	// PublicKey = X
 	PublicKey curve.Point
 	// Message = m
