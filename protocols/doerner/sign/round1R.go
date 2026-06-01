@@ -62,6 +62,6 @@ func (r *round1R) Finalize(out chan<- *round.Message) (round.Session, error) {
 	return &round2R{round1R: r, kBInv: kB, D: D, multiply0: multiply0, multiply1: multiply1, multiply2: multiply2}, nil
 }
 
-func (round1R) MessageContent() round.Content { return nil }
+func (*round1R) MessageContent() round.Content { return nil }
 
-func (round1R) Number() round.Number { return 1 }
+func (*round1R) Number() round.Number { return 1 }

@@ -54,10 +54,10 @@ func (r *round5) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round.
-func (round5) VerifyMessage(round.Message) error { return nil }
+func (*round5) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
-func (round5) StoreMessage(round.Message) error { return nil }
+func (*round5) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -96,4 +96,4 @@ func (r *round5) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (round5) Number() round.Number { return 5 }
+func (*round5) Number() round.Number { return 5 }
