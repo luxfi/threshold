@@ -49,8 +49,14 @@ func ValidateParameters(n *saferith.Modulus, s, t *saferith.Nat) error {
 	if !arith.IsValidNatModN(n, s, t) {
 		return ErrNotValidModN
 	}
-	// s ≡ t
-	if _, eq, _ := s.Cmp(t); eq == 1 {
+	// s ≡ t — Cmp mutates limb storage on both sides via resizedLimbs even
+	// on the equality path, so when ValidateParameters is invoked
+	// concurrently across parties (e.g. from CMP keygen round3 +
+	// pkg/zk/prm proof verify on the same shared aux), we MUST compare
+	// against private scratch copies. Two clones is the cheap fix.
+	sScratch := new(saferith.Nat).SetNat(s)
+	tScratch := new(saferith.Nat).SetNat(t)
+	if _, eq, _ := sScratch.Cmp(tScratch); eq == 1 {
 		return ErrSEqualT
 	}
 	return nil
