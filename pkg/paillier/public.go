@@ -92,7 +92,14 @@ func (pk PublicKey) EncWithNonce(m *saferith.Int, nonce *saferith.Nat) *Cipherte
 	mAbs := m.Abs()
 	nHalf := new(saferith.Nat).SetNat(pk.nNat)
 	nHalf.Rsh(nHalf, 1, -1)
-	if gt, _, _ := mAbs.Cmp(nHalf); gt == 1 {
+	// Cmp mutates limb storage on both sides (resizedLimbs zero-fills the
+	// expanded slice and writes a mask), so we MUST compare against private
+	// scratch copies — never the shared pk.nNat-derived nHalf — when this
+	// runs concurrently across parties. mAbs is fresh per call, nHalf is
+	// already a private clone of pk.nNat, but mAbs aliases m's internals
+	// for small enough m so we clone defensively.
+	mAbsScratch := new(saferith.Nat).SetNat(mAbs)
+	if gt, _, _ := mAbsScratch.Cmp(nHalf); gt == 1 {
 		panic("paillier.Encrypt: tried to encrypt message outside of range [-(N-1)/2, …, (N-1)/2]")
 	}
 
