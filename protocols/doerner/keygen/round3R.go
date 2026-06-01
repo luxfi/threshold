@@ -47,6 +47,6 @@ func (r *round3R) MessageContent() round.Content {
 	return &message2S{}
 }
 
-func (round3R) Number() round.Number {
+func (*round3R) Number() round.Number {
 	return 3
 }

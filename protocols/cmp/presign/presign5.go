@@ -65,7 +65,7 @@ func (r *presign5) VerifyMessage(msg round.Message) error {
 }
 
 // StoreMessage implements round.Round.
-func (presign5) StoreMessage(round.Message) error { return nil }
+func (*presign5) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -128,4 +128,4 @@ func (r *presign5) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (presign5) Number() round.Number { return 5 }
+func (*presign5) Number() round.Number { return 5 }

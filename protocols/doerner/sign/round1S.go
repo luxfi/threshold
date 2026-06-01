@@ -134,4 +134,4 @@ func (r *round1S) MessageContent() round.Content {
 	return &message1R{D: group.NewPoint()}
 }
 
-func (round1S) Number() round.Number { return 1 }
+func (*round1S) Number() round.Number { return 1 }
