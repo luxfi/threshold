@@ -27,7 +27,7 @@ func (message1S) RoundNumber() round.Number { return 2 }
 
 // round1S is the first round from the Sender's perspective.
 type round1S struct {
-	*round.Helper
+	*round.Base
 	config *keygen.ConfigSender
 	// The message hash to be signed.
 	hash []byte

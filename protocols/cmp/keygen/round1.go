@@ -18,7 +18,7 @@ import (
 var _ round.Round = (*round1)(nil)
 
 type round1 struct {
-	*round.Helper
+	*round.Base
 
 	// PreviousSecretECDSA = sk'ᵢ
 	// Contains the previous secret ECDSA key share which is being refreshed

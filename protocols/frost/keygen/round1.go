@@ -19,7 +19,7 @@ import (
 //
 //	https://eprint.iacr.org/2020/852.pdf
 type round1 struct {
-	*round.Helper
+	*round.Base
 	// taproot indicates whether or not to make taproot compatible keys.
 	//
 	// This means taking the necessary steps to ensure that the shared secret generates
@@ -98,7 +98,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// Refresh: Don't create a proof.
 	var SigmaI *zksch.Proof
 	if !r.refresh {
-		SigmaI = zksch.NewProof(r.Helper.HashForID(r.SelfID()), aI0TimesG, aI0, nil)
+		SigmaI = zksch.NewProof(r.Base.HashForID(r.SelfID()), aI0TimesG, aI0, nil)
 	}
 
 	// 3. "Every participant Pᵢ computes a public comment Φᵢ = <ϕᵢ₀, ..., ϕᵢₜ>
@@ -125,7 +125,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 			return r, fmt.Errorf("failed to sample ChainKey")
 		}
 		// Use session-based hash for commitments - with OUR ID
-		commitment, decommitment, err = r.Helper.HashForID(r.SelfID()).Commit(cI)
+		commitment, decommitment, err = r.Base.HashForID(r.SelfID()).Commit(cI)
 		if err != nil {
 			return r, fmt.Errorf("failed to commit to chain key")
 		}

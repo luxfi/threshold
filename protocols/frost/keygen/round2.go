@@ -100,7 +100,7 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 			return fmt.Errorf("party %s sent a non-zero constant while refreshing", from)
 		}
 	} else {
-		if !body.SigmaI.Verify(r.Helper.HashForID(from), body.PhiI.Constant(), nil) {
+		if !body.SigmaI.Verify(r.Base.HashForID(from), body.PhiI.Constant(), nil) {
 			return fmt.Errorf("failed to verify Schnorr proof for party %s", from)
 		}
 	}

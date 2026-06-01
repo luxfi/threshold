@@ -8,9 +8,9 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 )
 
-// Round1 can embed round.Helper which provides useful methods handling messages.
+// Round1 can embed round.Base which provides useful methods handling messages.
 type Round1 struct {
-	*round.Helper
+	*round.Base
 }
 
 // VerifyMessage in the first round does nothing since no messages are expected.
