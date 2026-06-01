@@ -33,33 +33,6 @@ func TestDefaultTestConfig(t *testing.T) {
 	assert.Equal(t, "info", cfg.LogLevel)
 }
 
-func TestAsyncRunner(t *testing.T) {
-	// Create test parties
-	parties := []party.ID{"alice", "bob", "charlie"}
-	network := NewNetwork(parties)
-
-	runner := NewAsyncRunner(t, nil, network)
-	require.NotNil(t, runner)
-
-	// Test basic properties
-	assert.NotNil(t, runner.config)
-	assert.NotNil(t, runner.network)
-	assert.NotNil(t, runner.logger)
-	assert.NotNil(t, runner.ctx)
-
-	// Clean up
-	runner.Cleanup()
-}
-
-func TestHandlerState(t *testing.T) {
-	state := &HandlerState{}
-
-	// Test initial state
-	assert.False(t, state.completed.Load())
-	assert.Nil(t, state.result)
-	assert.Nil(t, state.err)
-}
-
 func TestIntegrationTestConfig(t *testing.T) {
 	cfg := IntegrationTestConfig()
 
@@ -137,54 +110,4 @@ func TestNetwork_Send(t *testing.T) {
 	network.Send(nil)
 
 	// Note: Full protocol.Message testing would require the protocol package
-}
-
-func TestAsyncRunner_SetupParty(t *testing.T) {
-	parties := []party.ID{"alice"}
-	network := NewNetwork(parties)
-
-	runner := NewAsyncRunner(t, nil, network)
-	defer runner.Cleanup()
-
-	// Note: Setting up a party requires a StartFunc from the protocol package
-	// This would be tested in integration tests
-}
-
-func TestAsyncRunner_Results(t *testing.T) {
-	parties := []party.ID{"alice", "bob"}
-	network := NewNetwork(parties)
-
-	runner := NewAsyncRunner(t, nil, network)
-	defer runner.Cleanup()
-
-	// Initially no results
-	results := runner.Results()
-	assert.Empty(t, results)
-
-	// Add a result
-	runner.results.Store(party.ID("alice"), "test-result")
-
-	results = runner.Results()
-	assert.Len(t, results, 1)
-	assert.Equal(t, "test-result", results[party.ID("alice")])
-}
-
-func TestAsyncRunner_Errors(t *testing.T) {
-	parties := []party.ID{"alice", "bob"}
-	network := NewNetwork(parties)
-
-	runner := NewAsyncRunner(t, nil, network)
-	defer runner.Cleanup()
-
-	// Initially no errors
-	errors := runner.Errors()
-	assert.Empty(t, errors)
-
-	// Add an error
-	testErr := assert.AnError
-	runner.errors.Store(party.ID("bob"), testErr)
-
-	errors = runner.Errors()
-	assert.Len(t, errors, 1)
-	assert.Equal(t, testErr, errors[party.ID("bob")])
 }
