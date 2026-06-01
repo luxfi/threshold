@@ -7,7 +7,7 @@ import (
 	"github.com/luxfi/threshold/pkg/protocol"
 )
 
-// Network is a local in-memory network for testing (default implementation).
+// Network is the in-memory message bus used by every protocol test.
 //
 // Close discipline: Send takes inFlight.RLock for the duration of the
 // publish; Close takes inFlight.Lock so all in-flight publishes drain
@@ -24,7 +24,7 @@ type Network struct {
 	closed   bool
 }
 
-// NewNetwork creates a simple test network
+// NewNetwork creates an in-memory test network with buffered per-party queues.
 func NewNetwork(parties []party.ID) *Network {
 	n := &Network{
 		messages: make(map[party.ID]chan *protocol.Message),
@@ -102,7 +102,7 @@ func (n *Network) Done(id party.ID) <-chan struct{} {
 	return nil
 }
 
-// SetSession is a no-op for simple network
+// SetSession is a no-op for the in-memory network.
 func (n *Network) SetSession([]byte) {}
 
 // Close closes all channels.
