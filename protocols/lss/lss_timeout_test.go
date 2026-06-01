@@ -2,6 +2,7 @@ package lss_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"testing"
 	"time"
 
@@ -96,7 +97,9 @@ func TestLSSSignWithTimeout(t *testing.T) {
 	threshold := 3
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	message := []byte("test message for LSS")
+	// LSS sign requires a 32-byte hash; mirror real-world usage with SHA-256.
+	digest := sha256.Sum256([]byte("test message for LSS"))
+	message := digest[:]
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
@@ -203,7 +206,8 @@ func TestLSSProtocolCreation(t *testing.T) {
 	threshold := 3
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	message := []byte("test")
+	digest := sha256.Sum256([]byte("test"))
+	message := digest[:]
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 
