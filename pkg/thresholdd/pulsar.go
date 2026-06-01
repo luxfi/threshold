@@ -119,6 +119,30 @@ type pulsarSession struct {
 	// pulsar's per-signature freshness contract). Bumped inside the
 	// dispatcher mutex.
 	sessionCounter uint64
+
+	// dealerKey is the single-party FIPS 204 ML-DSA private key
+	// derived from the same master seed that fed the v0.3 trusted
+	// dealer. Its public key is BIT-EQUAL to setup.Pub.Bytes (both
+	// flow through deriveKeyMaterial → mldsa{44,65,87}.NewKeyFromSeed),
+	// so any ctx-bound signature produced via this key verifies under
+	// the v0.3 PULG-framed group public key.
+	//
+	// Sign_Ctx routes through this key to bind FIPS 204 §5.2 ctx
+	// (e.g. `lux-evm-precompile-mldsa-v1`) into the signature —
+	// upstream pulsar v0.3 OrchestrateV03Sign hardcodes empty ctx
+	// (threshold_v03.go: μ = SHAKE-256(tr || 0x00 || 0x00 || M, 64))
+	// and ctx-aware THRESHOLD signing is a v0.4 deliverable. Until
+	// then the precompile-verifiable surface uses the dispatcher's
+	// trusted-dealer privilege: same key, same wire bytes any FIPS 204
+	// verifier accepts, just bypassing the algebraic-aggregate path.
+	//
+	// Trust model: this materialises sk in-process for the lifetime of
+	// the session, which the v0.3 threshold path explicitly does NOT.
+	// The dispatcher's documented role is off-chain test harnesses /
+	// dev tooling / SDK-driven flows — not chain-genesis ceremonies —
+	// so the trade-off is acceptable. Production operators that must
+	// not hold master sk in-process use Sign_TEE (HSM-held seed).
+	dealerKey *pulsar.PrivateKey
 }
 
 func newPulsarScheme() *pulsarScheme {
@@ -168,13 +192,21 @@ func (s *pulsarScheme) Keygen(p keygenParams) (keygenResult, error) {
 		identities[id] = ident
 	}
 
-	// Master seed for this session — local to this Keygen call,
-	// wiped immediately after DealAlgebraicV03Shares returns. The
-	// v0.3 algebraic-aggregate path NEVER reconstructs this seed
-	// (enforced upstream by TestAlgebraic_NoSkAccess).
+	// Master seed for this session — used both to (a) deal v0.3
+	// algebraic shares and (b) derive a single-party PrivateKey for
+	// the Sign_Ctx path. The PrivateKey carries its own copy of the
+	// seed; the local masterSeed buffer is wiped immediately after
+	// derivation.
 	var masterSeed [pulsar.SeedSize]byte
 	if _, err := rand.Read(masterSeed[:]); err != nil {
 		return keygenResult{}, fmt.Errorf("pulsar keygen: master seed entropy: %w", err)
+	}
+	dealerKey, err := pulsar.KeyFromSeed(params, masterSeed)
+	if err != nil {
+		for i := range masterSeed {
+			masterSeed[i] = 0
+		}
+		return keygenResult{}, fmt.Errorf("pulsar keygen: KeyFromSeed: %w", err)
 	}
 	setup, shares, err := pulsar.DealAlgebraicV03Shares(params, committee, p.Threshold, masterSeed, rand.Reader)
 	for i := range masterSeed {
@@ -213,6 +245,7 @@ func (s *pulsarScheme) Keygen(p keygenParams) (keygenResult, error) {
 		quorumShares: quorumShares,
 		evalPoints:   evalPoints,
 		identities:   identities,
+		dealerKey:    dealerKey,
 	}
 	s.mu.Unlock()
 
@@ -282,6 +315,84 @@ func (s *pulsarScheme) Sign(p signParams) (signResult, error) {
 	sigBytes, err := sig.MarshalBinary()
 	if err != nil {
 		return signResult{}, fmt.Errorf("pulsar sign: sig.MarshalBinary: %w", err)
+	}
+	return signResult{SignatureHex: hex.EncodeToString(sigBytes)}, nil
+}
+
+// Sign_Ctx is the ctx-bound permissionless signing surface for the
+// pulsar dispatcher. It emits a FIPS 204 §5.2 context-bound ML-DSA
+// signature on (msg, ctx) under the session's group public key, so
+// callers can produce signatures that satisfy the on-chain EVM
+// precompile's domain-separation contract:
+//
+//	`lux-evm-precompile-mldsa-v1`   → luxfi/precompile/mldsa
+//	(pub.VerifySignatureCtx(msg, sig, ctx))
+//
+// Wire bytes: PULS-framed (Signature.MarshalBinary) — bit-identical
+// to a single-party FIPS 204 SignDeterministic on the same (sk, msg,
+// ctx) tuple. Any FIPS 204 verifier holding the session's PULG-framed
+// group public key bytes accepts the result.
+//
+// Path: routes through pulsar.Sign on the dispatcher-retained
+// dealerKey (see pulsarSession.dealerKey). This bypasses the v0.3
+// algebraic-aggregate threshold loop because v0.3 hardcodes empty
+// ctx (μ = SHAKE-256(tr || 0x00 || 0x00 || M, 64); ctx-aware
+// threshold sign is a v0.4 deliverable upstream). The dispatcher's
+// trusted-dealer role makes the single-party shortcut sound: the
+// dealerKey's pubkey IS bit-equal to the v0.3 setup.Pub bytes.
+//
+// Compare to Sign_TEE: same ctx semantics, HSM-held sk. Both
+// produce wire bytes verifiable under the same PULG-framed group key.
+//
+// signCtx is the FIPS 204 ctx octet string (0..255 bytes). Pass nil
+// (or the empty hex string "") to bind the empty ctx — semantically
+// equivalent to Sign, but emitted via the single-party path.
+func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
+	msg, err := hex.DecodeString(p.MessageHex)
+	if err != nil {
+		return signResult{}, fmt.Errorf("messageHex: %w", err)
+	}
+	var signCtx []byte
+	if p.CtxHex != "" {
+		signCtx, err = hex.DecodeString(p.CtxHex)
+		if err != nil {
+			return signResult{}, fmt.Errorf("ctxHex: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+	sess, ok := s.sessions[p.PubKeyHex]
+	s.mu.Unlock()
+	if !ok {
+		return signResult{}, fmt.Errorf("pulsar sign_ctx: unknown pubKeyHex (keygen first)")
+	}
+	if sess.dealerKey == nil {
+		// Defence in depth: every Keygen sets dealerKey. A nil here
+		// would mean session-map corruption — refuse rather than
+		// silently fall back.
+		return signResult{}, fmt.Errorf("pulsar sign_ctx: session missing dealerKey")
+	}
+
+	params := pulsar.MustParamsFor(sess.setup.Mode)
+
+	// Deterministic (randomized=false) so the output is KAT-shaped
+	// and byte-stable across retries — mirrors Sign_TEE's
+	// SignDeterministic discipline.
+	sig, err := pulsar.Sign(params, sess.dealerKey, msg, signCtx, false, nil)
+	if err != nil {
+		return signResult{}, fmt.Errorf("pulsar sign_ctx: %w", err)
+	}
+
+	// Self-verify safety belt: refuse to publish bytes that would
+	// fail at the caller. Uses pulsar.VerifyCtx so ctx-binding is
+	// covered.
+	if err := pulsar.VerifyCtx(params, sess.setup.Pub, msg, signCtx, sig); err != nil {
+		return signResult{}, fmt.Errorf("pulsar sign_ctx: produced signature failed self-verify (kernel bug): %w", err)
+	}
+
+	sigBytes, err := sig.MarshalBinary()
+	if err != nil {
+		return signResult{}, fmt.Errorf("pulsar sign_ctx: sig.MarshalBinary: %w", err)
 	}
 	return signResult{SignatureHex: hex.EncodeToString(sigBytes)}, nil
 }

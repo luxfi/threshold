@@ -250,6 +250,77 @@ func (s *magnetarScheme) Sign(p signParams) (signResult, error) {
 	return signResult{SignatureHex: hex.EncodeToString(wireBytes)}, nil
 }
 
+// Sign_Ctx is the ctx-bound permissionless signing surface for the
+// magnetar dispatcher. It emits a FIPS 205 §10.2 context-bound
+// SLH-DSA signature on (msg, ctx) under the session's canonical
+// per-validator keypair (keys[0]), so callers can produce signatures
+// that satisfy the on-chain EVM precompile's domain-separation
+// contract:
+//
+//	`lux-evm-precompile-slhdsa-v1`   → luxfi/precompile/slhdsa
+//	(pub.VerifySignatureCtx(msg, sig, ctx))
+//
+// Wire bytes: MAGS-framed (Signature.MarshalBinary) — byte-identical
+// to a single-party FIPS 205 SignDeterministic on the same (sk, msg,
+// ctx) tuple. Any FIPS 205 verifier holding the session's MAGG-framed
+// group public key bytes accepts the result.
+//
+// Path: routes through magnetar.SignCtx on the dispatcher-retained
+// per-validator standalone keypair (sess.keys[0].sk). The magnetar
+// v0.5 primary primitive is already single-party-per-validator (no
+// MPC aggregation), so the ctx binding flows straight through circl
+// slhdsa.SignDeterministic with no kernel extension required.
+//
+// signCtx is the FIPS 205 ctx octet string (0..255 bytes). Pass nil
+// (or the empty hex string "") to bind the empty ctx — semantically
+// equivalent to Sign.
+func (s *magnetarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
+	msg, err := hex.DecodeString(p.MessageHex)
+	if err != nil {
+		return signResult{}, fmt.Errorf("messageHex: %w", err)
+	}
+	var signCtx []byte
+	if p.CtxHex != "" {
+		signCtx, err = hex.DecodeString(p.CtxHex)
+		if err != nil {
+			return signResult{}, fmt.Errorf("ctxHex: %w", err)
+		}
+	}
+
+	s.mu.Lock()
+	sess, ok := s.sessions[p.PubKeyHex]
+	s.mu.Unlock()
+	if !ok {
+		return signResult{}, errMagnetarUnknownSession
+	}
+	if len(sess.keys) == 0 {
+		return signResult{}, fmt.Errorf("magnetar sign_ctx: empty session")
+	}
+
+	params := magnetar.MustParamsFor(sess.mode)
+
+	// Deterministic (randomized=false, rng=nil) so the output is
+	// KAT-shaped and byte-stable across retries — mirrors Sign and
+	// Sign_TEE's SignDeterministic discipline.
+	sig, err := magnetar.SignCtx(params, sess.keys[0].sk, msg, signCtx, false, nil)
+	if err != nil {
+		return signResult{}, fmt.Errorf("magnetar sign_ctx: %w", err)
+	}
+
+	// Self-verify safety belt against kernel bugs, using the
+	// ctx-aware verifier so any future ctx-propagation regression
+	// fails here, not at the caller.
+	if err := magnetar.VerifyCtx(params, sess.keys[0].pk, msg, signCtx, sig); err != nil {
+		return signResult{}, fmt.Errorf("magnetar sign_ctx: produced signature failed self-verify (kernel bug): %w", err)
+	}
+
+	wireBytes, err := sig.MarshalBinary()
+	if err != nil {
+		return signResult{}, fmt.Errorf("magnetar sign_ctx: sig.MarshalBinary: %w", err)
+	}
+	return signResult{SignatureHex: hex.EncodeToString(wireBytes)}, nil
+}
+
 // Verify is stateless: it decodes the supplied MAGG-framed group
 // public key + MAGS-framed signature wire bytes and runs the
 // magnetar kernel's stateless VerifyBytes.
