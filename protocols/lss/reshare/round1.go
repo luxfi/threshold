@@ -14,7 +14,7 @@ import (
 
 // round1 initiates resharing by generating new polynomial shares
 type round1 struct {
-	*round.Helper
+	*round.Base
 
 	oldConfig       *config.Config
 	newParticipants []party.ID

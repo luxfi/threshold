@@ -28,7 +28,7 @@ func (message1R) RoundNumber() round.Number { return 1 }
 
 // round1R corresponds to the first round from the Receiver's perspective.
 type round1R struct {
-	*round.Helper
+	*round.Base
 	// refresh indicates whether or not we should refresh
 	refresh bool
 	// public is an existing public key, if we're refresing

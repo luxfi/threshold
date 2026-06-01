@@ -14,7 +14,7 @@ import (
 
 // round2 receives commitments and sends shares
 type round2 struct {
-	*round.Helper
+	*round.Base
 
 	// Our polynomial from round 1
 	poly *polynomial.Polynomial
@@ -166,7 +166,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// We have all shares, advance to round3
 	return &round3{
-		Helper:      r.Helper,
+		Base:      r.Base,
 		commitments: r.commitments,
 		chainKeys:   r.chainKeys,
 		shares:      shares,

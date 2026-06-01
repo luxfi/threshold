@@ -18,7 +18,7 @@ const Rounds round.Number = 5
 
 func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc {
 	return func(sessionID []byte) (_ round.Session, err error) {
-		var helper *round.Helper
+		var helper *round.Base
 		if c == nil {
 			helper, err = round.NewSession(info, sessionID, pl)
 		} else {
@@ -41,7 +41,7 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 				PublicSharesECDSA[id] = public.ECDSA
 			}
 			return &round1{
-				Helper:                    helper,
+				Base:                    helper,
 				PreviousSecretECDSA:       c.ECDSA,
 				PreviousPublicSharesECDSA: PublicSharesECDSA,
 				PreviousChainKey:          c.ChainKey,
@@ -54,7 +54,7 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 		VSSConstant := sample.Scalar(rand.Reader, group)
 		VSSSecret := polynomial.NewPolynomial(group, helper.Threshold(), VSSConstant)
 		return &round1{
-			Helper:    helper,
+			Base:    helper,
 			VSSSecret: VSSSecret,
 			keyID:     keyID,
 		}, nil

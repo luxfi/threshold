@@ -13,9 +13,12 @@ import (
 	"github.com/luxfi/threshold/pkg/pool"
 )
 
-// Helper implements Session without Round, and can therefore be embedded in the first round of a protocol
-// in order to satisfy the Session interface.
-type Helper struct {
+// Base is the round-package's implementation of Session minus the per-round
+// Round methods (Finalize, VerifyMessage, StoreMessage, ...). Every protocol
+// round embeds *Base as its first field so the round struct trivially
+// satisfies Session through method promotion. The protocol-specific Round
+// methods are then defined on the embedding round struct.
+type Base struct {
 	info Info
 
 	// Pool allows us to parallelize certain operations
@@ -34,13 +37,13 @@ type Helper struct {
 	mtx sync.Mutex
 }
 
-// NewSession creates a new *Helper which can be embedded in the first Round,
+// NewSession creates a new *Base which can be embedded in the first Round,
 // so that the full struct implements Session.
 // `sessionID` is an optional byte slice that can be provided by the user.
 // When used, it should be unique for each execution of the protocol.
-// It could be a simple counter which is incremented after execution,  or a common random string.
+// It could be a counter incremented after execution, or a common random string.
 // `auxInfo` is a variable list of objects which should be included in the session's hash state.
-func NewSession(info Info, sessionID []byte, pl *pool.Pool, auxInfo ...hash.WriterToWithDomain) (*Helper, error) {
+func NewSession(info Info, sessionID []byte, pl *pool.Pool, auxInfo ...hash.WriterToWithDomain) (*Base, error) {
 	partyIDs := party.NewIDSlice(info.PartyIDs)
 	if !partyIDs.Valid() {
 		return nil, errors.New("session: partyIDs invalid")
@@ -106,7 +109,7 @@ func NewSession(info Info, sessionID []byte, pl *pool.Pool, auxInfo ...hash.Writ
 		}
 	}
 
-	return &Helper{
+	return &Base{
 		info:          info,
 		Pool:          pl,
 		partyIDs:      partyIDs,
@@ -117,7 +120,7 @@ func NewSession(info Info, sessionID []byte, pl *pool.Pool, auxInfo ...hash.Writ
 }
 
 // HashForID returns a clone of the hash.Hash for this session, initialized with the given id.
-func (h *Helper) HashForID(id party.ID) *hash.Hash {
+func (h *Base) HashForID(id party.ID) *hash.Hash {
 	h.mtx.Lock()
 	defer h.mtx.Unlock()
 
@@ -130,7 +133,7 @@ func (h *Helper) HashForID(id party.ID) *hash.Hash {
 }
 
 // UpdateHashState writes additional data to the hash state.
-func (h *Helper) UpdateHashState(value hash.WriterToWithDomain) {
+func (h *Base) UpdateHashState(value hash.WriterToWithDomain) {
 	h.mtx.Lock()
 	defer h.mtx.Unlock()
 	_ = h.hash.WriteAny(value)
@@ -138,7 +141,7 @@ func (h *Helper) UpdateHashState(value hash.WriterToWithDomain) {
 
 // BroadcastMessage constructs a Message from the broadcast Content, and sets the header correctly.
 // An error is returned if the message cannot be sent to the out channel.
-func (h *Helper) BroadcastMessage(out chan<- *Message, broadcastContent Content) error {
+func (h *Base) BroadcastMessage(out chan<- *Message, broadcastContent Content) error {
 	msg := &Message{
 		From:      h.info.SelfID,
 		Broadcast: true,
@@ -156,7 +159,7 @@ func (h *Helper) BroadcastMessage(out chan<- *Message, broadcastContent Content)
 // intended for all participants (but does not require reliable broadcast), the `to` field may be empty ("").
 // Returns an error if the message failed to send over out channel.
 // `out` is expected to be a buffered channel with enough capacity to store all messages.
-func (h *Helper) SendMessage(out chan<- *Message, content Content, to party.ID) error {
+func (h *Base) SendMessage(out chan<- *Message, content Content, to party.ID) error {
 	msg := &Message{
 		From:    h.info.SelfID,
 		To:      to,
@@ -171,7 +174,7 @@ func (h *Helper) SendMessage(out chan<- *Message, content Content, to party.ID) 
 }
 
 // Hash returns copy of the hash function of this protocol execution.
-func (h *Helper) Hash() *hash.Hash {
+func (h *Base) Hash() *hash.Hash {
 	h.mtx.Lock()
 	defer h.mtx.Unlock()
 	return h.hash.Clone()
@@ -179,46 +182,46 @@ func (h *Helper) Hash() *hash.Hash {
 
 // ResultRound returns a round that contains only the result of the protocol.
 // This indicates to the used that the protocol is finished.
-func (h *Helper) ResultRound(result interface{}) Session {
+func (h *Base) ResultRound(result interface{}) Session {
 	return &Output{
-		Helper: h,
+		Base:   h,
 		Result: result,
 	}
 }
 
 // AbortRound returns a round that contains only the culprits that were able to be identified during
 // a faulty execution of the protocol. The error returned by Round.Finalize() in this case should still be nil.
-func (h *Helper) AbortRound(err error, culprits ...party.ID) Session {
+func (h *Base) AbortRound(err error, culprits ...party.ID) Session {
 	return &Abort{
-		Helper:   h,
+		Base:     h,
 		Culprits: culprits,
 		Err:      err,
 	}
 }
 
 // ProtocolID is an identifier for this protocol.
-func (h *Helper) ProtocolID() string { return h.info.ProtocolID }
+func (h *Base) ProtocolID() string { return h.info.ProtocolID }
 
 // FinalRoundNumber is the number of rounds before the output round.
-func (h *Helper) FinalRoundNumber() Number { return h.info.FinalRoundNumber }
+func (h *Base) FinalRoundNumber() Number { return h.info.FinalRoundNumber }
 
 // SSID the unique identifier for this protocol execution.
-func (h *Helper) SSID() []byte { return h.ssid }
+func (h *Base) SSID() []byte { return h.ssid }
 
 // SelfID is this party's ID.
-func (h *Helper) SelfID() party.ID { return h.info.SelfID }
+func (h *Base) SelfID() party.ID { return h.info.SelfID }
 
 // PartyIDs is a sorted slice of participating parties in this protocol.
-func (h *Helper) PartyIDs() party.IDSlice { return h.partyIDs }
+func (h *Base) PartyIDs() party.IDSlice { return h.partyIDs }
 
 // OtherPartyIDs returns a sorted list of parties that does not contain SelfID.
-func (h *Helper) OtherPartyIDs() party.IDSlice { return h.otherPartyIDs }
+func (h *Base) OtherPartyIDs() party.IDSlice { return h.otherPartyIDs }
 
 // Threshold is the maximum number of parties that are assumed to be corrupted during the execution of this protocol.
-func (h *Helper) Threshold() int { return h.info.Threshold }
+func (h *Base) Threshold() int { return h.info.Threshold }
 
 // N returns the number of participants.
-func (h *Helper) N() int { return len(h.info.PartyIDs) }
+func (h *Base) N() int { return len(h.info.PartyIDs) }
 
 // Group returns the curve used for this protocol.
-func (h *Helper) Group() curve.Curve { return h.info.Group }
+func (h *Base) Group() curve.Curve { return h.info.Group }
