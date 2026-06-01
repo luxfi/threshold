@@ -120,7 +120,7 @@ func TestKeygenQuickTimeout(t *testing.T) {
 	n := 3
 	threshold := 2
 
-	test.SimpleProtocolTest(t, "Keygen-Quick", n, threshold, func(ids []party.ID) bool {
+	test.RunInitCheck(t, "Keygen-Quick", n, threshold, func(ids []party.ID) bool {
 		group := curve.Secp256k1{}
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
