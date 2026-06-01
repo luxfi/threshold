@@ -24,7 +24,7 @@ type message1R struct {
 func (message1R) RoundNumber() round.Number { return 1 }
 
 type round1R struct {
-	*round.Helper
+	*round.Base
 	hash   []byte
 	config *keygen.ConfigReceiver
 }

@@ -29,7 +29,7 @@ func StartXOR(selfID party.ID, partyIDs party.IDSlice) protocol.StartFunc {
 			return nil, fmt.Errorf("xor: %w", err)
 		}
 		r := &xor.Round1{
-			Helper: helper,
+			Base: helper,
 		}
 		return r, nil
 	}
