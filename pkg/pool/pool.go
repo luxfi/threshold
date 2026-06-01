@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -53,18 +52,11 @@ type command struct {
 // We need to keep searching for successful queries of f while *ctr > 0.
 // When we find a successful result, we decrement *ctr.
 func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int) interface{}, ctr *int64, mu *sync.Mutex) {
-	fmt.Printf("[WORKER] Starting search loop, ctr=%d\n", atomic.LoadInt64(ctr))
-	iterations := 0
 	for atomic.LoadInt64(ctr) > 0 {
-		iterations++
-		if iterations == 1 || iterations%1000 == 0 {
-			fmt.Printf("[WORKER] Iteration %d, calling f(0), ctr=%d\n", iterations, atomic.LoadInt64(ctr))
-		}
 		res := f(0)
 		if res == nil {
 			continue
 		}
-		fmt.Printf("[WORKER] Found result at iteration %d\n", iterations)
 		i := atomic.AddInt64(ctr, -1)
 		if i >= 0 {
 			mu.Lock()
@@ -73,7 +65,6 @@ func workerSearch(results []interface{}, ctrChanged chan<- struct{}, f func(int)
 		}
 		ctrChanged <- struct{}{}
 	}
-	fmt.Printf("[WORKER] Search loop done after %d iterations\n", iterations)
 }
 
 // worker starts up a new worker, listening to commands, and producing results.
@@ -97,8 +88,10 @@ func worker(commands <-chan command) {
 // By creating a pool, you avoid the overhead of spinning up goroutines for
 // each new operation.
 //
-// A Pool is only ever intended to be used from a single goroutine, and might cause deadlocks
-// if used by multiple goroutines concurrently.
+// A Pool is safe for concurrent use. Search and Parallelize may be called from
+// multiple goroutines. TearDown blocks until every in-flight Search/Parallelize
+// has returned, then closes the worker command channel; after TearDown returns,
+// subsequent Search/Parallelize calls fall back to serial execution.
 type Pool struct {
 	// The common channel used to send commands to the workers.
 	//
@@ -106,9 +99,13 @@ type Pool struct {
 	commands chan command
 	// This holds the number of workers we've created
 	workerCount int
-	// closed indicates if the pool has been torn down
+	// inFlight gates send-vs-close races. Held read-locked for the duration
+	// of every Search/Parallelize call so that TearDown — which takes the
+	// write lock — cannot close p.commands while a sender is mid-send.
+	inFlight sync.RWMutex
+	// closed indicates if the pool has been torn down. Read under inFlight.RLock,
+	// written under inFlight.Lock by TearDown.
 	closed bool
-	mu     sync.Mutex
 }
 
 // NewPool creates a new pool, with a certain number of workers.
@@ -132,15 +129,24 @@ func NewPool(count int) *Pool {
 }
 
 // TearDown cleanly tears down a pool, closing channels, etc.
+//
+// Blocks until every in-flight Search/Parallelize call has returned, so
+// callers may safely defer it from the goroutine that owns the pool even
+// when other goroutines are still using it.
 func (p *Pool) TearDown() {
-	if p != nil {
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		if !p.closed {
-			p.closed = true
-			close(p.commands)
-		}
+	if p == nil {
+		return
 	}
+	// Acquire the write lock — this waits for every active Search/Parallelize
+	// (each held with RLock) to drain, and prevents new ones from entering
+	// the send loop while we close.
+	p.inFlight.Lock()
+	defer p.inFlight.Unlock()
+	if p.closed {
+		return
+	}
+	p.closed = true
+	close(p.commands)
 }
 
 // Search queries the function f, until count successes are found.
@@ -149,33 +155,27 @@ func (p *Pool) TearDown() {
 // successful.
 //
 // The result will be an array containing the first count successes.
-func (p *Pool) Search(count int, f func() interface{}) (results []interface{}) {
+func (p *Pool) Search(count int, f func() interface{}) []interface{} {
 	if p == nil {
 		return searchAlone(f, count)
 	}
 
-	// Check if pool is closed
-	p.mu.Lock()
+	p.inFlight.RLock()
+	defer p.inFlight.RUnlock()
 	if p.closed {
-		p.mu.Unlock()
 		// Fall back to serial execution if pool is closed
 		return searchAlone(f, count)
 	}
-	p.mu.Unlock()
 
-	// Recover from panic if channel is closed during execution
-	defer func() {
-		if r := recover(); r != nil {
-			// If we panic due to closed channel, execute remaining work serially
-			results = searchAlone(f, count)
-		}
-	}()
-
-	results = make([]interface{}, count)
+	results := make([]interface{}, count)
 
 	ctr := int64(count)
-	// Buffer the channel with count size since each result sends a signal
-	ctrChanged := make(chan struct{}, count)
+	// Buffer is sized for workerCount because, after ctr decrements to zero,
+	// any worker still mid-iteration will still push one trailing signal
+	// (for an i<0 attempt) before the next atomic.LoadInt64 lets it exit.
+	// Sizing the buffer for workerCount means those trailing sends never block
+	// the worker shutdown.
+	ctrChanged := make(chan struct{}, p.workerCount)
 	mu := &sync.Mutex{}
 	cmd := command{
 		search:     true,
@@ -186,18 +186,15 @@ func (p *Pool) Search(count int, f func() interface{}) (results []interface{}) {
 		mu:         mu,
 	}
 	// Send command to all workers
-	fmt.Printf("[POOL] Sending %d commands to workers\n", p.workerCount)
 	for i := 0; i < p.workerCount; i++ {
-		fmt.Printf("[POOL] Sending command %d\n", i)
 		p.commands <- cmd
-		fmt.Printf("[POOL] Sent command %d\n", i)
 	}
-	fmt.Printf("[POOL] All commands sent, waiting for %d results\n", count)
-	for atomic.LoadInt64(&ctr) > 0 {
+	// Receive exactly count signals — every successful results[i] = res write
+	// is followed by a send to ctrChanged, so receiving `count` of them gives
+	// us a happens-before edge with every result write before we return.
+	for i := 0; i < count; i++ {
 		<-ctrChanged
-		fmt.Printf("[POOL] Got signal, remaining: %d\n", atomic.LoadInt64(&ctr))
 	}
-	fmt.Printf("[POOL] Done\n")
 
 	return results
 }
@@ -205,41 +202,25 @@ func (p *Pool) Search(count int, f func() interface{}) (results []interface{}) {
 // Parallelize calls a function count times, passing in indices from 0..count-1.
 //
 // The result will be a slice containing [f(0), f(1), ..., f(count - 1)].
-func (p *Pool) Parallelize(count int, f func(int) interface{}) (results []interface{}) {
+func (p *Pool) Parallelize(count int, f func(int) interface{}) []interface{} {
 	if p == nil {
 		return parallelizeAlone(f, count)
 	}
 
-	// Check if pool is closed
-	p.mu.Lock()
+	p.inFlight.RLock()
+	defer p.inFlight.RUnlock()
 	if p.closed {
-		p.mu.Unlock()
 		// Fall back to serial execution if pool is closed
 		return parallelizeAlone(f, count)
 	}
-	p.mu.Unlock()
 
-	// Recover from panic if channel is closed during execution
-	defer func() {
-		if r := recover(); r != nil {
-			// If we panic due to closed channel, execute remaining work serially
-			if results == nil {
-				results = make([]interface{}, count)
-			}
-			for i := 0; i < count; i++ {
-				if results[i] == nil {
-					results[i] = f(i)
-				}
-			}
-		}
-	}()
-
-	results = make([]interface{}, count)
+	results := make([]interface{}, count)
 
 	ctr := int64(count)
-	// Buffer the channel with count size since each task sends a signal
+	// Each completed task pushes exactly one signal.
 	ctrChanged := make(chan struct{}, count)
 	cmdI := 0
+	received := 0
 	for cmdI < count {
 		cmd := command{
 			search:     false,
@@ -256,10 +237,14 @@ func (p *Pool) Parallelize(count int, f func(int) interface{}) (results []interf
 		case p.commands <- cmd:
 			cmdI++
 		case <-ctrChanged:
+			received++
 		}
 	}
-	for atomic.LoadInt64(&ctr) > 0 {
+	// Drain the remaining signals so every results[i] = f(i) write has a
+	// happens-before edge with our return.
+	for received < count {
 		<-ctrChanged
+		received++
 	}
 
 	return results
