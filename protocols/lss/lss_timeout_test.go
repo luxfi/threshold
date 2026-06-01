@@ -49,7 +49,7 @@ func TestLSSKeygenWithTimeout(t *testing.T) {
 	}
 
 	// Run with timeout
-	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 3*time.Second, createHandlers)
+	results, err := test.RunProtocolHandlers(t, partyIDs, 3*time.Second, createHandlers)
 
 	// Don't fail on timeout
 	if err != nil {
@@ -75,7 +75,7 @@ func TestLSSSimpleInit(t *testing.T) {
 	n := 5
 	threshold := 3
 
-	test.SimpleProtocolTest(t, "LSS-Init", n, threshold, func(ids []party.ID) bool {
+	test.RunInitCheck(t, "LSS-Init", n, threshold, func(ids []party.ID) bool {
 		group := curve.Secp256k1{}
 		pl := pool.NewPool(0)
 		defer pl.TearDown()
@@ -139,7 +139,7 @@ func TestLSSSignWithTimeout(t *testing.T) {
 	}
 
 	// Run with timeout
-	results, err := test.RunProtocolWithTimeoutNew(t, signers, 2*time.Second, createHandlers)
+	results, err := test.RunProtocolHandlers(t, signers, 2*time.Second, createHandlers)
 
 	if err != nil {
 		t.Logf("LSS sign timed out (expected): %v", err)
