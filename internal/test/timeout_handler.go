@@ -66,8 +66,12 @@ func HandlerLoopWithTimeout(t testing.TB, id party.ID, h *protocol.Handler, netw
 	}
 }
 
-// RunProtocolWithTimeoutNew runs a protocol with better timeout handling
-func RunProtocolWithTimeoutNew(t testing.TB, partyIDs []party.ID, timeout time.Duration, createHandlers func() map[party.ID]*protocol.Handler) (map[party.ID]interface{}, error) {
+// RunProtocolHandlers drives pre-built handlers under a deadline and returns
+// whatever results landed before the deadline. Use this when the caller
+// already owns Handler construction (e.g. Doerner's sender/receiver split);
+// otherwise RunProtocolWithTimeout (which constructs handlers from a StartFunc
+// factory) is the simpler entry point.
+func RunProtocolHandlers(t testing.TB, partyIDs []party.ID, timeout time.Duration, createHandlers func() map[party.ID]*protocol.Handler) (map[party.ID]interface{}, error) {
 	network := NewNetwork(partyIDs)
 	handlers := createHandlers()
 	results := make(map[party.ID]interface{})
@@ -139,8 +143,11 @@ func RunProtocolWithTimeoutNew(t testing.TB, partyIDs []party.ID, timeout time.D
 	return results, nil
 }
 
-// SimpleProtocolTest provides a simple way to test protocols without complex synchronization
-func SimpleProtocolTest(t *testing.T, name string, n int, threshold int, testFunc func(partyIDs []party.ID) bool) {
+// RunInitCheck runs a boolean init/smoke callback under a 5s deadline as a
+// named sub-test. A `false` return fails the test; a deadline expiry is
+// logged but does not fail (init checks are tolerant of slow setups). For
+// full-protocol round-trips use the PhaseHarness directly.
+func RunInitCheck(t *testing.T, name string, n int, threshold int, testFunc func(partyIDs []party.ID) bool) {
 	t.Run(name, func(t *testing.T) {
 		partyIDs := PartyIDs(n)
 
@@ -153,11 +160,11 @@ func SimpleProtocolTest(t *testing.T, name string, n int, threshold int, testFun
 		select {
 		case success := <-done:
 			if !success {
-				t.Error("Protocol test failed")
+				t.Error("init check returned false")
 			}
 		case <-time.After(5 * time.Second):
 			// Don't fail on timeout, just log it
-			t.Log("Protocol test timed out (expected for complex protocols)")
+			t.Log("init check deadline reached without callback completing")
 		}
 	})
 }
