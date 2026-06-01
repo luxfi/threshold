@@ -5,16 +5,19 @@ import (
 	"testing"
 
 	"github.com/cronokirby/saferith"
-	"github.com/luxfi/threshold/pkg/ecdsa"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/math/sample"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/threshold/pkg/protocol"
 	"github.com/luxfi/threshold/protocols/lss/config"
 	"github.com/stretchr/testify/require"
 )
 
-// RunKeygen runs a complete keygen protocol for testing
+// RunKeygen materializes per-party Configs that are mathematically equivalent
+// to a successful LSS keygen round-trip, but synthesized directly via Shamir
+// secret sharing — it does NOT run the keygen protocol. Tests use it when they
+// need a valid post-keygen state but want to skip the keygen runtime cost.
+// Never call this from production: the master secret is reconstructed in
+// memory on this node, which the real protocol explicitly never does.
 func RunKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold int) map[party.ID]*config.Config {
 	n := len(partyIDs)
 	require.True(t, threshold <= n, "threshold must not exceed number of parties")
@@ -82,57 +85,10 @@ func RunKeygen(t *testing.T, group curve.Curve, partyIDs []party.ID, threshold i
 	return configs
 }
 
-// RunSign executes a signing protocol for testing
-func RunSign(t *testing.T, configs map[party.ID]*config.Config, signers []party.ID, messageHash []byte) *ecdsa.Signature {
-	require.True(t, len(messageHash) == 32, "message hash must be 32 bytes")
-
-	// Get first config to extract group and threshold
-	var group curve.Curve
-	var threshold int
-	for _, cfg := range configs {
-		group = cfg.Group
-		threshold = cfg.Threshold
-		break
-	}
-
-	require.True(t, len(signers) >= threshold, "insufficient signers")
-
-	// Generate nonce k
-	k := sample.Scalar(rand.Reader, group)
-	R := k.ActOnBase()
-
-	// Get r from R using XScalar() - this is the x-coordinate as a scalar
-	r := R.XScalar()
-
-	// Convert message hash using curve.FromHash (same as Verify does)
-	m := curve.FromHash(group, messageHash)
-
-	// Compute s using threshold signatures
-	// s = k^{-1} * (m + r * x)
-	// where x is reconstructed from shares
-
-	// First, reconstruct the private key using Lagrange interpolation
-	// (only for testing - in real protocol this never happens)
-	signerConfigs := make([]*config.Config, 0, threshold)
-	for _, id := range signers[:threshold] {
-		signerConfigs = append(signerConfigs, configs[id])
-	}
-
-	privateKey := reconstructPrivateKey(group, signerConfigs)
-
-	// Compute s = k^{-1} * (m + r * privateKey)
-	rx := group.NewScalar().Set(r).Mul(privateKey)
-	s := group.NewScalar().Set(m).Add(rx)
-	kInv := group.NewScalar().Set(k).Invert()
-	s = s.Mul(kInv)
-
-	return &ecdsa.Signature{
-		R: R,
-		S: s,
-	}
-}
-
-// RunReshare performs a resharing operation for testing
+// RunReshare synthesizes new-committee Configs that match what a successful
+// LSS reshare round-trip would produce, by reconstructing the master secret
+// and re-sharing it under the new threshold. Same caveat as RunKeygen — for
+// tests only; the real protocol never materializes the master.
 func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyIDs []party.ID, newThreshold int) map[party.ID]*config.Config {
 	// Get reference config
 	var refConfig *config.Config
@@ -215,41 +171,10 @@ func RunReshare(t *testing.T, oldConfigs map[party.ID]*config.Config, newPartyID
 	return newConfigs
 }
 
-// RunProtocols executes protocol instances and collects results
-func RunProtocols(t *testing.T, protocols map[party.ID]protocol.StartFunc, sessionID []byte) (map[party.ID]interface{}, error) {
-	_ = sessionID // sessionID is used for protocol identification
-
-	// For testing, we just return mock configs
-	// In a real implementation, we'd run the full protocol
-	results := make(map[party.ID]interface{})
-
-	for id := range protocols {
-		results[id] = &config.Config{
-			ID:        id,
-			Threshold: 3,
-			Group:     curve.Secp256k1{},
-			ECDSA:     sample.Scalar(rand.Reader, curve.Secp256k1{}),
-			Public:    make(map[party.ID]*config.Public),
-			ChainKey:  generateRandomBytes(32),
-			RID:       generateRandomBytes(32),
-		}
-	}
-
-	return results, nil
-}
-
-// VerifySignature checks if a signature is valid
-func VerifySignature(sig *ecdsa.Signature, publicKey curve.Point, messageHash []byte) bool {
-	if sig == nil || publicKey == nil {
-		return false
-	}
-	// The Verify method expects the message hash directly
-	// It will convert the hash to a scalar internally using curve.FromHash
-	return sig.Verify(publicKey, messageHash)
-}
-
-// Helper functions
-
+// reconstructPrivateKey reverses a t-of-n Shamir share into the master scalar
+// via Lagrange interpolation. Only used by the resharing simulator (RunReshare);
+// never invoked from production paths because the real protocol never
+// materializes the master secret on a single node.
 func reconstructPrivateKey(group curve.Curve, configs []*config.Config) curve.Scalar {
 	// Use Lagrange interpolation to reconstruct the secret
 	// This is only for testing - never done in production
