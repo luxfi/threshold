@@ -50,6 +50,19 @@ type signParams struct {
 	PubKeyHex  string `json:"pubKeyHex"`
 }
 
+// signCtxParams is the shape for ctx-bound sign methods (pulsar and
+// magnetar). CtxHex is hex-encoded ctx bytes (max 255 bytes after
+// decode per FIPS 204 §5.2 / FIPS 205 §10.2); empty string binds the
+// empty ctx. Use the precompile constants
+// `lux-evm-precompile-mldsa-v1` / `lux-evm-precompile-slhdsa-v1` to
+// produce signatures that satisfy the on-chain EVM precompile's
+// domain-separation contract.
+type signCtxParams struct {
+	MessageHex string `json:"messageHex"`
+	PubKeyHex  string `json:"pubKeyHex"`
+	CtxHex     string `json:"ctxHex"`
+}
+
 // signResult is the common shape for every <scheme>.sign response.
 type signResult struct {
 	SignatureHex string `json:"signatureHex"`
@@ -72,6 +85,15 @@ type scheme interface {
 	Keygen(p keygenParams) (keygenResult, error)
 	Sign(p signParams) (signResult, error)
 	Verify(p verifyParams) (verifyResult, error)
+}
+
+// ctxSigner is the optional ctx-bound signing surface. Schemes that
+// implement it expose `<scheme>.sign_ctx` for FIPS-204/205 §5.2/§10.2
+// context-bound signatures (used by the on-chain EVM precompile
+// domain-separation contract). Pulsar and magnetar implement it;
+// other schemes return -32601 (method-not-found) on `<scheme>.sign_ctx`.
+type ctxSigner interface {
+	Sign_Ctx(p signCtxParams) (signResult, error)
 }
 
 // Server is the JSON-RPC dispatcher.
@@ -203,6 +225,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		res, err := sc.Sign(p)
+		if err != nil {
+			writeError(w, req.ID, -32000, err.Error())
+			return
+		}
+		writeResult(w, req.ID, res)
+	case "sign_ctx":
+		cs, ok := sc.(ctxSigner)
+		if !ok {
+			writeError(w, req.ID, -32601, "scheme does not support sign_ctx: "+schemeName)
+			return
+		}
+		var p signCtxParams
+		if err := json.Unmarshal(req.Params, &p); err != nil {
+			writeError(w, req.ID, -32602, "invalid params: "+err.Error())
+			return
+		}
+		res, err := cs.Sign_Ctx(p)
 		if err != nil {
 			writeError(w, req.ID, -32000, err.Error())
 			return
