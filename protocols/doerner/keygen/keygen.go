@@ -125,7 +125,7 @@ func StartKeygen(group curve.Curve, receiver bool, selfID, otherID party.ID, sec
 
 		if receiver {
 			return &round1R{
-				Helper:      helper,
+				Base:      helper,
 				refresh:     refresh,
 				secretShare: secretShare,
 				publicShare: publicShare,
@@ -134,7 +134,7 @@ func StartKeygen(group curve.Curve, receiver bool, selfID, otherID party.ID, sec
 			}, nil
 		}
 		return &round1S{
-			Helper:      helper,
+			Base:      helper,
 			refresh:     refresh,
 			secretShare: secretShare,
 			publicShare: publicShare,

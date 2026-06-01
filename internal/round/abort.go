@@ -4,7 +4,7 @@ import "github.com/luxfi/threshold/pkg/party"
 
 // Abort is an empty round containing a list of parties who misbehaved.
 type Abort struct {
-	*Helper
+	*Base
 	Culprits []party.ID
 	Err      error
 }

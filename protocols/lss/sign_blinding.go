@@ -56,7 +56,7 @@ func SignWithBlinding(c *config.Config, signers []party.ID, messageHash []byte, 
 
 // blindingRoundI implements Protocol I from the LSS paper
 type blindingRoundI struct {
-	*round.Helper
+	*round.Base
 
 	config      *config.Config
 	signers     []party.ID
@@ -105,7 +105,7 @@ func startBlindingProtocolI(c *config.Config, signers []party.ID, messageHash []
 		return nil, err
 	}
 
-	r.Helper = helper
+	r.Base = helper
 	return r, nil
 }
 

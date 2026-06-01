@@ -32,7 +32,7 @@ func StartSignReceiver(config *keygen.ConfigReceiver, selfID, otherID party.ID, 
 			return nil, fmt.Errorf("keygen.StartKeygen: %w", err)
 		}
 
-		return &round1R{Helper: helper, config: config, hash: hash}, nil
+		return &round1R{Base: helper, config: config, hash: hash}, nil
 	}
 }
 
@@ -58,6 +58,6 @@ func StartSignSender(config *keygen.ConfigSender, selfID, otherID party.ID, hash
 			return nil, fmt.Errorf("keygen.StartKeygen: %w", err)
 		}
 
-		return &round1S{Helper: helper, config: config, hash: hash}, nil
+		return &round1S{Base: helper, config: config, hash: hash}, nil
 	}
 }

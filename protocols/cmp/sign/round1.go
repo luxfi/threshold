@@ -15,7 +15,7 @@ import (
 var _ round.Round = (*round1)(nil)
 
 type round1 struct {
-	*round.Helper
+	*round.Base
 
 	PublicKey curve.Point
 

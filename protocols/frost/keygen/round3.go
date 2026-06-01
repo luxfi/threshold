@@ -62,7 +62,7 @@ func (r *round3) StoreBroadcastMessage(msg round.Message) error {
 
 		// Use session-based hash for verification - using the SENDER's ID
 		// The Helper should be the same as the one used in round1 for commitment creation
-		if !r.Helper.HashForID(from).Decommit(commitment, body.Decommitment, body.CL) {
+		if !r.Base.HashForID(from).Decommit(commitment, body.Decommitment, body.CL) {
 			return fmt.Errorf("failed to verify chain key commitment from party %s (hash mismatch)", from)
 		}
 		r.ChainKeys.Store(from, body.CL)
