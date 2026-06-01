@@ -2,6 +2,7 @@
 package thresholdd
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
@@ -11,6 +12,8 @@ import (
 	"sync"
 
 	magnetar "github.com/luxfi/magnetar/ref/go/pkg/magnetar"
+
+	slhdsatee "github.com/luxfi/threshold/protocols/slhdsa-tee"
 )
 
 // magnetarScheme wires luxfi/magnetar (FIPS 205 SLH-DSA, hash-based
@@ -76,7 +79,17 @@ import (
 type magnetarScheme struct {
 	mu       sync.Mutex
 	sessions map[string]*magnetarSession
+
+	// teeBackend is the optional institutional-custody SLH-DSA
+	// signer wired via SetTEEBackend. When nil, Sign_TEE refuses
+	// with errMagnetarTEEUnwired. The default permissionless path
+	// (Sign) is unaffected by the TEE backend's presence.
+	teeBackend *slhdsatee.Signer
 }
+
+// errMagnetarTEEUnwired is returned by Sign_TEE when no TEE backend
+// has been registered via SetTEEBackend.
+var errMagnetarTEEUnwired = errors.New("magnetar tee sign: no TEE backend wired (call SetTEEBackend first)")
 
 // magnetarSession holds the in-process per-validator keypairs for
 // one Keygen output. The canonical PublicKey for the session is the
@@ -259,6 +272,82 @@ func (s *magnetarScheme) Verify(p verifyParams) (verifyResult, error) {
 		return verifyResult{}, fmt.Errorf("pubKeyHex: %w", err)
 	}
 	return verifyResult{OK: magnetar.VerifyBytes(gkBytes, msg, sigBytes)}, nil
+}
+
+// SetTEEBackend wires a slhdsatee.Signer as the institutional-custody
+// TEE-gated signing path. The default JSON-RPC `magnetar.sign` method
+// is UNAFFECTED — it remains the permissionless per-validator
+// standalone path. Operators that need attested release must call
+// SetTEEBackend at boot and use Sign_TEE.
+//
+// Passing nil clears the backend (subsequent Sign_TEE calls return
+// errMagnetarTEEUnwired).
+func (s *magnetarScheme) SetTEEBackend(b *slhdsatee.Signer) {
+	s.mu.Lock()
+	s.teeBackend = b
+	s.mu.Unlock()
+}
+
+// Sign_TEE is the institutional-custody opt-in signing path. It
+// chains the supplied attestation evidence + RIM + hardware
+// fingerprint + TEE pubkey through the slhdsatee.Signer and emits
+// the MAGS-framed FIPS 205 wire bytes on success.
+//
+// Wire payload:
+//
+//   - kind          : attest.Kind ("sev_snp", "tdx", "nras")
+//   - evidenceBytes : the vendor-framed quote / report
+//   - rim           : 32-byte operator-asserted RIM digest
+//   - hardware      : 32-byte hardware fingerprint
+//   - teePub        : 32-byte X25519 TEE public key
+//   - jobID         : 32-byte audit-binding identifier
+//   - msg           : message bytes
+//   - signCtx       : FIPS 205 §10.2 context (nil for empty)
+//
+// All inputs are required. The TEE backend (set via SetTEEBackend)
+// internally calls approval.ApproveIntent, kms.ReleaseGate.Issue /
+// Release, hsm.Provider.GetKey, and magnetar.Sign. Output bytes are
+// byte-identical to single-party FIPS 205 SignDeterministic on the
+// HSM-stored master seed.
+//
+// Returns the MAGS-framed wire signature + the SignReceipt's audit
+// signature bytes for the embedder's audit log; the receipt itself
+// (epoch, ephemeralPub, etc.) is intentionally not surfaced here —
+// this dispatcher returns only bytes that participate in verification.
+func (s *magnetarScheme) Sign_TEE(
+	ctx context.Context,
+	kind string,
+	evidenceBytes []byte,
+	rim, hardware, teePub [32]byte,
+	verifyOpts []slhdsateeVerifyOpt,
+	jobID [32]byte,
+	msg []byte,
+	signCtx []byte,
+) ([]byte, []byte, error) {
+	s.mu.Lock()
+	b := s.teeBackend
+	s.mu.Unlock()
+	if b == nil {
+		return nil, nil, errMagnetarTEEUnwired
+	}
+
+	env := &slhdsatee.Envelope{
+		Kind:          attestKindFromString(kind),
+		EvidenceBytes: append([]byte(nil), evidenceBytes...),
+		RIM:           rim,
+		Hardware:      hardware,
+		TEEPub:        teePub,
+		VerifyOpts:    teeVerifyOptionsToAttest(verifyOpts),
+	}
+
+	wire, receipt, err := b.Sign(ctx, env, jobID, msg, signCtx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("magnetar tee sign: %w", err)
+	}
+	if receipt == nil {
+		return nil, nil, fmt.Errorf("magnetar tee sign: nil receipt")
+	}
+	return wire, receipt.AuditSignature, nil
 }
 
 // magnetarSeededReader is a tiny SHA-256-counter deterministic byte

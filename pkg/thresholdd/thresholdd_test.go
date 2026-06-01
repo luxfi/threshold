@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -421,6 +422,12 @@ func TestAuthTokenEmptyAllowsAnonymous(t *testing.T) {
 
 // guard against pkg-level deadlocks in CI runners.
 func TestMain(m *testing.M) {
+	// MPC_LOCAL_APPROVAL=true is set for the test binary so that
+	// approval.LocalDevProvider — used by the TEE dispatcher tests —
+	// does not refuse construction. The same env-var gate refuses in
+	// any non-test build (approval/local-dev's localDevAllowed).
+	_ = os.Setenv("MPC_LOCAL_APPROVAL", "true")
+
 	// Each subtest also enforces protocol-level timeouts via runner.go.
 	go func() {
 		time.Sleep(10 * time.Minute)
