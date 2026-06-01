@@ -148,7 +148,7 @@ func TestFROSTKeygenWithTimeout(t *testing.T) {
 	}
 
 	// Run with timeout
-	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 180*time.Second, createHandlers)
+	results, err := test.RunProtocolHandlers(t, partyIDs, 180*time.Second, createHandlers)
 
 	// Don't fail on timeout
 	if err != nil {
@@ -174,7 +174,7 @@ func TestFROSTSimpleInit(t *testing.T) {
 	n := 5
 	threshold := 3
 
-	test.SimpleProtocolTest(t, "FROST-Init", n, threshold, func(ids []party.ID) bool {
+	test.RunInitCheck(t, "FROST-Init", n, threshold, func(ids []party.ID) bool {
 		group := curve.Secp256k1{}
 
 		// Test that we can create keygen for all parties
