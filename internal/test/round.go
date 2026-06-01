@@ -31,6 +31,12 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 		out       = make(chan *round.Message, N*(N+1))
 		mu        sync.Mutex
 	)
+	// roundMu serializes VerifyMessage / StoreMessage / StoreBroadcastMessage
+	// calls so concurrent goroutines verifying messages for different parties
+	// don't race on shared cryptographic state (configs share a common Public
+	// map whose Pedersen parameters use saferith.Nat.Cmp — and Cmp mutates
+	// limb storage even on equal values).
+	var roundMu sync.Mutex
 
 	if _, err = checkAllRoundsSame(rounds); err != nil {
 		return err, false
@@ -42,6 +48,7 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 		errGroup.Go(func() error {
 			var rNew, rNewReal round.Session
 			var finalizeErr error
+			roundMu.Lock()
 			if rule != nil {
 				rReal := getRound(r)
 				rule.ModifyBefore(rReal)
@@ -57,6 +64,7 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 			} else {
 				rNew, finalizeErr = r.Finalize(out)
 			}
+			roundMu.Unlock()
 
 			if finalizeErr != nil {
 				return finalizeErr
@@ -100,6 +108,8 @@ func Rounds(rounds []round.Session, rule Rule) (error, bool) {
 			msgBytesCopy := make([]byte, len(msgBytes))
 			copy(msgBytesCopy, msgBytes)
 			errGroup.Go(func() error {
+				roundMu.Lock()
+				defer roundMu.Unlock()
 				if m.Broadcast {
 					b, ok := r.(round.BroadcastRound)
 					if !ok {

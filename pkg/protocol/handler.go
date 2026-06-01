@@ -61,8 +61,23 @@ type Handler struct {
 	incoming chan *Message
 	priority chan *Message // High-priority messages
 
-	// Output channel protection - must set outClosed BEFORE closing out channel
+	// Output channel protection.
+	//
+	// outMu serializes "check outClosed then send to h.out" against "set outClosed
+	// then close(h.out)". Senders hold RLock for the duration of the check+send
+	// critical section; Stop / protocol-complete paths take the write lock around
+	// the close. This is the only way to make the check-then-send race-free —
+	// atomic.Bool alone can flip between the load and the chan op.
+	outMu     sync.RWMutex
 	outClosed atomic.Bool
+
+	// roundMu serializes VerifyMessage / StoreMessage / StoreBroadcastMessage
+	// calls against the live round.Session. Each party has its own Handler,
+	// so this only orders state mutations within a single party — concurrent
+	// VerifyMessage calls would race on shared round state (e.g. Pedersen
+	// parameters whose saferith.Nat.Cmp mutates limb storage even on equal
+	// values).
+	roundMu sync.Mutex
 
 	// Lifecycle management
 	ctx           context.Context
@@ -949,12 +964,14 @@ func (h *Handler) Stop() {
 		// Wait for workers to finish
 		h.workerGroup.Wait()
 
-		// Close channels safely (out may already be closed by protocol completion)
-		// Set outClosed BEFORE closing to prevent sends on closed channel
+		// Close channels safely (out may already be closed by protocol completion).
+		// Take outMu so any in-flight sendRoundMessage drains before we close.
+		h.outMu.Lock()
 		h.outClosed.Store(true)
 		h.closeOnce.Do(func() {
 			close(h.out)
 		})
+		h.outMu.Unlock()
 
 		// Close other channels
 		close(h.incoming)
@@ -1165,6 +1182,10 @@ func (h *Handler) initializeRound(r round.Session) {
 	go func() {
 		defer close(out)
 		defer close(done)
+		// Hold roundMu so concurrent VerifyMessage / StoreMessage on the same
+		// round (or its shared state) does not race with Finalize's reads.
+		h.roundMu.Lock()
+		defer h.roundMu.Unlock()
 		nextRound, finalizeErr = r.Finalize(out)
 	}()
 
@@ -1207,9 +1228,12 @@ func (h *Handler) initializeRound(r round.Session) {
 			// Close output channel asynchronously to allow final message delivery
 			go func() {
 				time.Sleep(10 * time.Millisecond)
+				h.outMu.Lock()
+				h.outClosed.Store(true)
 				h.closeOnce.Do(func() {
 					close(h.out)
 				})
+				h.outMu.Unlock()
 			}()
 			return
 		}
@@ -1263,17 +1287,15 @@ func (h *Handler) initializeRound(r round.Session) {
 	}
 }
 
-// safeSend sends a message to the output channel, recovering from panic if the channel is closed.
-// This handles the race condition between checking outClosed and the actual send.
+// safeSend sends a message to the output channel without blocking.
+// Takes outMu to serialize with concurrent close paths (Stop, protocol-complete).
+// Returns false if the channel is full, closed, or the handler has stopped.
 func (h *Handler) safeSend(msg *Message) (sent bool) {
-	defer func() {
-		if r := recover(); r != nil {
-			h.log.Debug("safeSend recovered from panic - channel closed",
-				log.String("panic", fmt.Sprintf("%v", r)))
-			sent = false
-		}
-	}()
-
+	h.outMu.RLock()
+	defer h.outMu.RUnlock()
+	if h.outClosed.Load() {
+		return false
+	}
 	select {
 	case h.out <- msg:
 		sent = true
@@ -1318,7 +1340,10 @@ func (h *Handler) sendRoundMessage(msg *round.Message, r round.Session) {
 		h.storeMessage(protocolMsg)
 	}
 
-	// Check if handler is stopped or output channel is closed before sending
+	// Take the read lock so Stop / protocol-complete close paths cannot close
+	// h.out between the outClosed check and the chan send below.
+	h.outMu.RLock()
+	defer h.outMu.RUnlock()
 	if h.stopped.Load() || h.outClosed.Load() {
 		h.log.Debug("skipping send - handler stopped or channel closed")
 		return
@@ -1378,11 +1403,12 @@ func (h *Handler) handleError(err error, culprits ...party.ID) {
 		// Close output channel after delay to signal protocol end
 		go func() {
 			time.Sleep(50 * time.Millisecond)
-			// Set outClosed BEFORE closing to prevent sends on closed channel
+			h.outMu.Lock()
 			h.outClosed.Store(true)
 			h.closeOnce.Do(func() {
 				close(h.out)
 			})
+			h.outMu.Unlock()
 		}()
 	}
 }
@@ -1408,6 +1434,11 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 	go func() {
 		defer close(out)
 		defer close(done)
+		// Hold roundMu so concurrent VerifyMessage / StoreMessage on the same
+		// round (or its shared state — Pedersen params, etc.) does not race
+		// with Finalize's read of those values.
+		h.roundMu.Lock()
+		defer h.roundMu.Unlock()
 		nextRound, err = r.Finalize(out)
 	}()
 
@@ -1468,10 +1499,12 @@ func (h *Handler) finalizeRound(r round.Session) round.Session {
 		go func() {
 			// Give a small delay to allow any final messages to be sent
 			time.Sleep(10 * time.Millisecond)
-			// Use sync.Once to ensure we only close once
+			h.outMu.Lock()
+			h.outClosed.Store(true)
 			h.closeOnce.Do(func() {
 				close(h.out)
 			})
+			h.outMu.Unlock()
 			// Clean up all goroutines after closing the output channel
 			time.Sleep(10 * time.Millisecond)
 			h.cancel() // Cancel context to stop all workers
@@ -1534,6 +1567,9 @@ func (h *Handler) verifyBroadcastForRound(msg *Message, roundNum round.Number) {
 		Content:   content,
 		Broadcast: true,
 	}
+
+	h.roundMu.Lock()
+	defer h.roundMu.Unlock()
 
 	if err := broadcastRound.StoreBroadcastMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - message remains queued
@@ -1605,13 +1641,16 @@ func (h *Handler) verifyNormalForRound(msg *Message, roundNum round.Number) {
 		Content: content,
 	}
 
-	// Verify first
+	// Verify + Store under roundMu so concurrent verifications for different
+	// (from) pairs in the same round don't race on shared round state.
+	h.roundMu.Lock()
+	defer h.roundMu.Unlock()
+
 	if err := r.VerifyMessage(roundMsg); err != nil {
 		h.handleError(err, msg.From)
 		return
 	}
 
-	// Then store
 	if err := r.StoreMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - message remains queued
 		if err == round.ErrNotReady {
@@ -1666,6 +1705,9 @@ func (h *Handler) verifyBroadcast(msg *Message) {
 		Content:   content,
 		Broadcast: true,
 	}
+
+	h.roundMu.Lock()
+	defer h.roundMu.Unlock()
 
 	if err := broadcastRound.StoreBroadcastMessage(roundMsg); err != nil {
 		// If the round is not ready, don't treat as error - just skip for now
@@ -1732,6 +1774,9 @@ func (h *Handler) verifyNormal(msg *Message) {
 		To:      msg.To,
 		Content: content,
 	}
+
+	h.roundMu.Lock()
+	defer h.roundMu.Unlock()
 
 	if err := r.VerifyMessage(roundMsg); err != nil {
 		h.handleError(err, msg.From)
