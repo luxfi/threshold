@@ -30,7 +30,7 @@ func (message1S) RoundNumber() round.Number { return 2 }
 
 // round1S corresponds to the second round from the Sender's perspective.
 type round1S struct {
-	*round.Helper
+	*round.Base
 	// refresh indicates if we're refreshing, instead of generating a new key.
 	refresh bool
 	// public is an existing public key, when refreshing

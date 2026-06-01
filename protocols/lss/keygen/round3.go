@@ -13,7 +13,7 @@ import (
 
 // round3 finalizes the keygen protocol
 type round3 struct {
-	*round.Helper
+	*round.Base
 
 	// Data from previous rounds
 	commitments map[party.ID]map[party.ID]curve.Point

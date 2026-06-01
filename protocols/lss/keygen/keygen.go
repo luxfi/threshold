@@ -28,7 +28,7 @@ func Start(selfID party.ID, participants []party.ID, threshold int, group curve.
 		}
 
 		return &round1{
-			Helper: helper,
+			Base: helper,
 			// sync.Map fields are zero-initialized and don't need explicit initialization
 		}, nil
 	}

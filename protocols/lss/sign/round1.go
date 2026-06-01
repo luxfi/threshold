@@ -14,7 +14,7 @@ import (
 
 // round1 generates nonces for signing
 type round1 struct {
-	*round.Helper
+	*round.Base
 
 	config      *config.Config
 	signers     []party.ID

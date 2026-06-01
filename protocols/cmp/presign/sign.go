@@ -77,7 +77,7 @@ func StartPresign(c *config.Config, signers []party.ID, message []byte, pl *pool
 		}
 
 		return &presign1{
-			Helper:         helper,
+			Base:         helper,
 			Pool:           pl,
 			SecretECDSA:    SecretECDSA,
 			SecretElGamal:  c.ElGamal,
@@ -137,7 +137,7 @@ func StartPresignOnline(c *config.Config, preSignature *ecdsa.PreSignature, mess
 		}
 
 		return &sign1{
-			Helper:       helper,
+			Base:       helper,
 			PublicKey:    c.PublicPoint(),
 			Message:      message,
 			PreSignature: preSignature,

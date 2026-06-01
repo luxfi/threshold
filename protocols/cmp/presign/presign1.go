@@ -19,7 +19,7 @@ import (
 var _ round.Round = (*presign1)(nil)
 
 type presign1 struct {
-	*round.Helper
+	*round.Base
 
 	// Pool allows us to parallelize certain operations
 	Pool *pool.Pool

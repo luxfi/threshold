@@ -2,7 +2,7 @@ package round
 
 // Output is an empty round containing the output of the protocol.
 type Output struct {
-	*Helper
+	*Base
 	Result interface{}
 }
 
