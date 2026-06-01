@@ -17,12 +17,25 @@
 //
 // Methods (per scheme):
 //
-//	<scheme>.keygen { threshold, participants }
-//	                -> { publicKey: hex, shares: [hex, ...] }
-//	<scheme>.sign   { messageHex, pubKeyHex }
-//	                -> { signatureHex }
-//	<scheme>.verify { messageHex, signatureHex, pubKeyHex }
-//	                -> { ok: bool }
+//	<scheme>.keygen   { threshold, participants }
+//	                  -> { publicKey: hex, shares: [hex, ...] }
+//	<scheme>.sign     { messageHex, pubKeyHex }
+//	                  -> { signatureHex }
+//	<scheme>.verify   { messageHex, signatureHex, pubKeyHex }
+//	                  -> { ok: bool }
+//
+// Pulsar and magnetar additionally expose:
+//
+//	<scheme>.sign_ctx { messageHex, pubKeyHex, ctxHex }
+//	                  -> { signatureHex }
+//
+// where ctxHex is the FIPS-204 §5.2 / FIPS-205 §10.2 context octet
+// string (hex-encoded; empty string binds the empty ctx). Signatures
+// emitted via sign_ctx satisfy the on-chain EVM precompile's
+// domain-separation contract (`lux-evm-precompile-mldsa-v1` /
+// `lux-evm-precompile-slhdsa-v1`) — verifiable by passing the same
+// ctx to luxfi/precompile/{mldsa,slhdsa}.VerifySignatureCtx, or by
+// any FIPS-204/205 verifier with ctx-binding support.
 //
 // Decomplecting note: this package contains zero policy. Profile
 // gating, auth, audit, and any per-scheme admission rules belong on
