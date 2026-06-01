@@ -79,7 +79,7 @@ func (r *round4) VerifyMessage(msg round.Message) error {
 }
 
 // StoreMessage implements round.Round.
-func (round4) StoreMessage(round.Message) error {
+func (*round4) StoreMessage(round.Message) error {
 	return nil
 }
 
@@ -153,4 +153,4 @@ func (r *round4) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (round4) Number() round.Number { return 4 }
+func (*round4) Number() round.Number { return 4 }

@@ -57,10 +57,10 @@ func (r *presign4) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round.
-func (presign4) VerifyMessage(round.Message) error { return nil }
+func (*presign4) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
-func (presign4) StoreMessage(round.Message) error { return nil }
+func (*presign4) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -126,4 +126,4 @@ func (r *presign4) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (presign4) Number() round.Number { return 4 }
+func (*presign4) Number() round.Number { return 4 }

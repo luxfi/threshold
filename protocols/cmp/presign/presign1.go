@@ -47,10 +47,10 @@ type presign1 struct {
 }
 
 // VerifyMessage implements round.Round.
-func (presign1) VerifyMessage(round.Message) error { return nil }
+func (*presign1) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
-func (presign1) StoreMessage(round.Message) error { return nil }
+func (*presign1) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -141,16 +141,16 @@ func (r *presign1) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // MessageContent implements round.Round.
-func (presign1) MessageContent() round.Content { return nil }
+func (*presign1) MessageContent() round.Content { return nil }
 
 // Number implements round.Round.
-func (presign1) Number() round.Number { return 1 }
+func (*presign1) Number() round.Number { return 1 }
 
 // BroadcastContent implements round.BroadcastRound.
 // Note: presign1 sends broadcast2 messages in Finalize but must implement
 // BroadcastContent to avoid the handler thinking no broadcasts are expected
 // and finalizing immediately (handler.go line 364-365).
-func (presign1) BroadcastContent() round.BroadcastContent { return &broadcast2{} }
+func (*presign1) BroadcastContent() round.BroadcastContent { return &broadcast2{} }
 
 // StoreBroadcastMessage implements round.BroadcastRound.
 // presign1 doesn't receive broadcasts, but must implement this to satisfy the interface.
