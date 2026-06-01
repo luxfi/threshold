@@ -2,14 +2,18 @@
 package thresholdd
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 
 	pulsar "github.com/luxfi/pulsar/ref/go/pkg/pulsar"
+
+	mldsatee "github.com/luxfi/threshold/protocols/mldsa-tee"
 )
 
 // pulsarScheme wires luxfi/pulsar (Module-LWE FIPS 204 ML-DSA-65
@@ -67,7 +71,14 @@ import (
 type pulsarScheme struct {
 	mu       sync.Mutex
 	sessions map[string]*pulsarSession
+
+	// teeBackend is the optional institutional-custody ML-DSA signer
+	// wired via SetTEEBackend. nil → Sign_TEE refuses.
+	teeBackend *mldsatee.Signer
 }
+
+// errPulsarTEEUnwired is returned by Sign_TEE when no TEE backend is registered.
+var errPulsarTEEUnwired = errors.New("pulsar tee sign: no TEE backend wired (call SetTEEBackend first)")
 
 // pulsarSession holds the in-process per-party state for a single
 // v0.3 algebraic-aggregate keygen output.
@@ -297,4 +308,59 @@ func (s *pulsarScheme) Verify(p verifyParams) (verifyResult, error) {
 		return verifyResult{}, fmt.Errorf("pubKeyHex: %w", err)
 	}
 	return verifyResult{OK: pulsar.VerifyBytes(gkBytes, msg, sigBytes)}, nil
+}
+
+// SetTEEBackend wires a mldsatee.Signer as the institutional-custody
+// TEE-gated signing path. The default JSON-RPC `pulsar.sign` method
+// is UNAFFECTED — it remains the permissionless v0.3 algebraic-
+// aggregate path.
+//
+// Passing nil clears the backend (subsequent Sign_TEE calls return
+// errPulsarTEEUnwired).
+func (s *pulsarScheme) SetTEEBackend(b *mldsatee.Signer) {
+	s.mu.Lock()
+	s.teeBackend = b
+	s.mu.Unlock()
+}
+
+// Sign_TEE is the institutional-custody opt-in signing path. Mirrors
+// magnetarScheme.Sign_TEE; the inner primitive is FIPS 204 ML-DSA via
+// the mldsatee.Signer.
+//
+// Returns the PULS-framed wire signature + the SignReceipt audit
+// signature bytes.
+func (s *pulsarScheme) Sign_TEE(
+	ctx context.Context,
+	kind string,
+	evidenceBytes []byte,
+	rim, hardware, teePub [32]byte,
+	verifyOpts []TEEVerifyOption,
+	jobID [32]byte,
+	msg []byte,
+	signCtx []byte,
+) ([]byte, []byte, error) {
+	s.mu.Lock()
+	b := s.teeBackend
+	s.mu.Unlock()
+	if b == nil {
+		return nil, nil, errPulsarTEEUnwired
+	}
+
+	env := &mldsatee.Envelope{
+		Kind:          attestKindFromString(kind),
+		EvidenceBytes: append([]byte(nil), evidenceBytes...),
+		RIM:           rim,
+		Hardware:      hardware,
+		TEEPub:        teePub,
+		VerifyOpts:    teeVerifyOptionsToAttest(verifyOpts),
+	}
+
+	wire, receipt, err := b.Sign(ctx, env, jobID, msg, signCtx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("pulsar tee sign: %w", err)
+	}
+	if receipt == nil {
+		return nil, nil, fmt.Errorf("pulsar tee sign: nil receipt")
+	}
+	return wire, receipt.AuditSignature, nil
 }

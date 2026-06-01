@@ -2,13 +2,17 @@
 package thresholdd
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 
 	coronaThreshold "github.com/luxfi/corona/threshold"
+
+	rlwetee "github.com/luxfi/threshold/protocols/rlwe-tee"
 )
 
 // coronaScheme wires luxfi/corona/threshold (Ring-LWE post-quantum
@@ -46,7 +50,14 @@ import (
 type coronaScheme struct {
 	mu       sync.Mutex
 	sessions map[string]*coronaSession
+
+	// teeBackend is the optional institutional-custody R-LWE signer
+	// wired via SetTEEBackend. nil → Sign_TEE refuses.
+	teeBackend *rlwetee.Signer
 }
+
+// errCoronaTEEUnwired is returned by Sign_TEE when no TEE backend is registered.
+var errCoronaTEEUnwired = errors.New("corona tee sign: no TEE backend wired (call SetTEEBackend first)")
 
 // coronaSession holds the in-process per-party key shares + group key
 // for a single (pubKeyHex) keygen output.
@@ -233,4 +244,58 @@ func (s *coronaScheme) Verify(p verifyParams) (verifyResult, error) {
 		return verifyResult{}, fmt.Errorf("pubKeyHex: %w", err)
 	}
 	return verifyResult{OK: coronaThreshold.VerifyBytes(gkBytes, string(msg), sigBytes)}, nil
+}
+
+// SetTEEBackend wires a rlwetee.Signer as the institutional-custody
+// TEE-gated signing path. The default JSON-RPC `corona.sign` method
+// is UNAFFECTED — it remains the permissionless trusted-dealer
+// 2-round threshold path.
+//
+// Passing nil clears the backend (subsequent Sign_TEE calls return
+// errCoronaTEEUnwired).
+func (s *coronaScheme) SetTEEBackend(b *rlwetee.Signer) {
+	s.mu.Lock()
+	s.teeBackend = b
+	s.mu.Unlock()
+}
+
+// Sign_TEE is the institutional-custody opt-in signing path. Mirrors
+// magnetarScheme.Sign_TEE; the inner primitive is corona Ring-LWE
+// via the rlwetee.Signer.
+//
+// Returns the corona-threshold-framed wire signature + the
+// SignReceipt audit signature bytes.
+func (s *coronaScheme) Sign_TEE(
+	ctx context.Context,
+	kind string,
+	evidenceBytes []byte,
+	rim, hardware, teePub [32]byte,
+	verifyOpts []TEEVerifyOption,
+	jobID [32]byte,
+	msg []byte,
+) ([]byte, []byte, error) {
+	s.mu.Lock()
+	b := s.teeBackend
+	s.mu.Unlock()
+	if b == nil {
+		return nil, nil, errCoronaTEEUnwired
+	}
+
+	env := &rlwetee.Envelope{
+		Kind:          attestKindFromString(kind),
+		EvidenceBytes: append([]byte(nil), evidenceBytes...),
+		RIM:           rim,
+		Hardware:      hardware,
+		TEEPub:        teePub,
+		VerifyOpts:    teeVerifyOptionsToAttest(verifyOpts),
+	}
+
+	wire, receipt, err := b.Sign(ctx, env, jobID, msg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("corona tee sign: %w", err)
+	}
+	if receipt == nil {
+		return nil, nil, fmt.Errorf("corona tee sign: nil receipt")
+	}
+	return wire, receipt.AuditSignature, nil
 }
