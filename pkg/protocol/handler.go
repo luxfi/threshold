@@ -2008,9 +2008,15 @@ func (h *Handler) compressData(data []byte) []byte {
 }
 
 func (h *Handler) decompressMessage(msg *Message) *Message {
-	// Simple decompression placeholder - would use gzip/zstd in production
-	msg.Compressed = false
-	return msg
+	// Return a shallow copy with Compressed cleared. The same *Message can be
+	// observed by multiple parties' handlers in the test harness (broadcast
+	// sends share the slice element), so we must never mutate the input.
+	if msg == nil {
+		return nil
+	}
+	out := *msg
+	out.Compressed = false
+	return &out
 }
 
 // MessageStore provides zero-contention sharded message storage
