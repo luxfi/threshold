@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFrostKeygenOnly(t *testing.T) {
+func TestFrostKeygenRoundTrip(t *testing.T) {
 	N := 5
 	T := N - 1
 
@@ -51,7 +51,7 @@ func TestFrostKeygenOnly(t *testing.T) {
 	}
 }
 
-func TestFrostRefreshOnly(t *testing.T) {
+func TestFrostKeygenRefreshRoundTrip(t *testing.T) {
 	N := 3
 	T := 2
 
