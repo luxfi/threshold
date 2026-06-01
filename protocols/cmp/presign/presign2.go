@@ -118,7 +118,7 @@ func (r *presign2) VerifyMessage(msg round.Message) error {
 }
 
 // StoreMessage implements round.Round.
-func (presign2) StoreMessage(round.Message) error { return nil }
+func (*presign2) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round
 //
@@ -225,4 +225,4 @@ func (r *presign2) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (presign2) Number() round.Number { return 2 }
+func (*presign2) Number() round.Number { return 2 }

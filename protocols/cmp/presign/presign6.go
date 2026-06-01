@@ -57,7 +57,7 @@ func (r *presign6) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round.
-func (presign6) VerifyMessage(round.Message) error { return nil }
+func (*presign6) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
 func (r *presign6) StoreMessage(_ round.Message) error { return nil }
@@ -152,7 +152,7 @@ func (r *presign6) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // MessageContent implements round.Round.
-func (presign6) MessageContent() round.Content { return nil }
+func (*presign6) MessageContent() round.Content { return nil }
 
 // RoundNumber implements round.Content.
 func (broadcast6) RoundNumber() round.Number { return 6 }
@@ -166,4 +166,4 @@ func (r *presign6) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (presign6) Number() round.Number { return 6 }
+func (*presign6) Number() round.Number { return 6 }

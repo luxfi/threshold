@@ -232,4 +232,4 @@ func (r *round3) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (round3) Number() round.Number { return 3 }
+func (*round3) Number() round.Number { return 3 }

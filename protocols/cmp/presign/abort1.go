@@ -65,10 +65,10 @@ func (r *abort1) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round.
-func (abort1) VerifyMessage(round.Message) error { return nil }
+func (*abort1) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
-func (abort1) StoreMessage(round.Message) error { return nil }
+func (*abort1) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round.
 func (r *abort1) Finalize(chan<- *round.Message) (round.Session, error) {
@@ -97,7 +97,7 @@ func (r *abort1) Finalize(chan<- *round.Message) (round.Session, error) {
 }
 
 // MessageContent implements round.Round.
-func (abort1) MessageContent() round.Content { return nil }
+func (*abort1) MessageContent() round.Content { return nil }
 
 // RoundNumber implements round.Content.
 func (broadcastAbort1) RoundNumber() round.Number { return 7 }
@@ -106,7 +106,7 @@ func (broadcastAbort1) RoundNumber() round.Number { return 7 }
 func (r *abort1) BroadcastContent() round.BroadcastContent { return &broadcastAbort1{} }
 
 // Number implements round.Round.
-func (abort1) Number() round.Number { return 7 }
+func (*abort1) Number() round.Number { return 7 }
 
 // abortNth for a given ciphertext c = end(m,r) contains:
 // - the message m,

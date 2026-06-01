@@ -103,4 +103,4 @@ func (r *round1S) MessageContent() round.Content {
 	return &message1R{OtMsg: ot.EmptyCorreOTSetupReceiveRound1Message(r.Group())}
 }
 
-func (round1S) Number() round.Number { return 1 }
+func (*round1S) Number() round.Number { return 1 }

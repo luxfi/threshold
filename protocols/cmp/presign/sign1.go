@@ -43,7 +43,7 @@ func (r *sign1) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // MessageContent implements round.Round.
-func (sign1) MessageContent() round.Content { return nil }
+func (*sign1) MessageContent() round.Content { return nil }
 
 // Number implements round.Round.
-func (sign1) Number() round.Number { return 1 }
+func (*sign1) Number() round.Number { return 1 }

@@ -38,4 +38,4 @@ func (r *round2S) MessageContent() round.Content {
 	return &message2R{Sig: ecdsa.EmptySignature(r.Group())}
 }
 
-func (round2S) Number() round.Number { return 2 }
+func (*round2S) Number() round.Number { return 2 }

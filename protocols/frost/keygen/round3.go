@@ -280,4 +280,4 @@ func (broadcast3) RoundNumber() round.Number { return 3 }
 func (r *round3) BroadcastContent() round.BroadcastContent { return &broadcast3{} }
 
 // Number implements round.Round.
-func (round3) Number() round.Number { return 3 }
+func (*round3) Number() round.Number { return 3 }
