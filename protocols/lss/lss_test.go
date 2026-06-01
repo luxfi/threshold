@@ -1,6 +1,7 @@
 package lss_test
 
 import (
+	"crypto/sha256"
 	"testing"
 
 	"github.com/luxfi/threshold/internal/test"
@@ -53,7 +54,8 @@ func TestLSSSignInitialization(t *testing.T) {
 	threshold := 3
 	partyIDs := test.PartyIDs(n)
 	group := curve.Secp256k1{}
-	message := []byte("test message")
+	digest := sha256.Sum256([]byte("test message"))
+	message := digest[:]
 
 	// Create mock configs
 	configs := make([]*config.Config, n)
