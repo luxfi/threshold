@@ -49,7 +49,7 @@ func TestDoernerKeygenWithTimeout(t *testing.T) {
 	}
 
 	// Run with timeout
-	results, err := test.RunProtocolWithTimeoutNew(t, partyIDs, 2*time.Second, createHandlers)
+	results, err := test.RunProtocolHandlers(t, partyIDs, 2*time.Second, createHandlers)
 
 	// Don't fail on timeout - it's expected for protocol tests
 	if err != nil {
@@ -74,7 +74,7 @@ func TestDoernerSimpleInit(t *testing.T) {
 	// Simple initialization test
 	group := curve.Secp256k1{}
 
-	test.SimpleProtocolTest(t, "Doerner-Init", 2, 0, func(ids []party.ID) bool {
+	test.RunInitCheck(t, "Doerner-Init", 2, 0, func(ids []party.ID) bool {
 		// Test sender initialization
 		senderKeygen := Keygen(group, true, ids[0], ids[1], nil)
 		if senderKeygen == nil {
