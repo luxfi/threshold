@@ -104,10 +104,10 @@ func (r *round2) StoreBroadcastMessage(msg round.Message) error {
 }
 
 // VerifyMessage implements round.Round.
-func (round2) VerifyMessage(round.Message) error { return nil }
+func (*round2) VerifyMessage(round.Message) error { return nil }
 
 // StoreMessage implements round.Round.
-func (round2) StoreMessage(round.Message) error { return nil }
+func (*round2) StoreMessage(round.Message) error { return nil }
 
 // Finalize implements round.Round.
 func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
@@ -329,7 +329,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 }
 
 // MessageContent implements round.Round.
-func (round2) MessageContent() round.Content { return nil }
+func (*round2) MessageContent() round.Content { return nil }
 
 // RoundNumber implements round.Content.
 func (broadcast2) RoundNumber() round.Number { return 2 }
@@ -343,4 +343,4 @@ func (r *round2) BroadcastContent() round.BroadcastContent {
 }
 
 // Number implements round.Round.
-func (round2) Number() round.Number { return 2 }
+func (*round2) Number() round.Number { return 2 }

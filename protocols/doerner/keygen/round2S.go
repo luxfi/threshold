@@ -85,6 +85,6 @@ func (r *round2S) MessageContent() round.Content {
 	}
 }
 
-func (round2S) Number() round.Number {
+func (*round2S) Number() round.Number {
 	return 2
 }

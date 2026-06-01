@@ -101,6 +101,6 @@ func (r *round2R) MessageContent() round.Content {
 	}
 }
 
-func (round2R) Number() round.Number {
+func (*round2R) Number() round.Number {
 	return 2
 }
