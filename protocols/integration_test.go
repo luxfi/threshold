@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/luxfi/metric"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/luxfi/metric"
 
 	log "github.com/luxfi/log"
 	"github.com/luxfi/threshold/internal/test"

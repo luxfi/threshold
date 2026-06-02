@@ -17,11 +17,12 @@ var ErrReject = errors.New("mldsa: rejection")
 // HRej implements the imbalanced hyperball rejection of Fig. 4 of the paper.
 //
 // Inputs:
-//   v   - the secret-dependent vector c·s^part split into (v1, v2) with
-//         v1 ∈ R^ℓ and v2 ∈ R^k.
-//   r   - target ball radius.
-//   rP  - randomness ball radius r' (rP ≥ r).
-//   nu  - expansion factor ν for the first ℓ coordinates.
+//
+//	v   - the secret-dependent vector c·s^part split into (v1, v2) with
+//	      v1 ∈ R^ℓ and v2 ∈ R^k.
+//	r   - target ball radius.
+//	rP  - randomness ball radius r' (rP ≥ r).
+//	nu  - expansion factor ν for the first ℓ coordinates.
 //
 // Output: z = (z1, z2) rounded back to integers, or ErrReject.
 //

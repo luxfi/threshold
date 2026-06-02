@@ -6,15 +6,17 @@
 // described in LP-045.
 //
 // Modes:
-//   individual   — each validator signs individually, verify all sigs
-//   committee    — committee of k validators signs, verify aggregate
-//   hierarchical — N validators partitioned into clusters, each cluster
-//                  produces one cert, clusters combine into root QC
+//
+//	individual   — each validator signs individually, verify all sigs
+//	committee    — committee of k validators signs, verify aggregate
+//	hierarchical — N validators partitioned into clusters, each cluster
+//	               produces one cert, clusters combine into root QC
 //
 // Usage:
-//   mldsa-bench -mode=individual -n=100 -level=44
-//   mldsa-bench -mode=committee -n=100 -k=32 -level=44
-//   mldsa-bench -mode=hierarchical -n=100 -clusters=4 -level=65
+//
+//	mldsa-bench -mode=individual -n=100 -level=44
+//	mldsa-bench -mode=committee -n=100 -k=32 -level=44
+//	mldsa-bench -mode=hierarchical -n=100 -clusters=4 -level=65
 //
 // Light mnemonic: the harness seeds ML-DSA key generation from a single
 // 32-byte secret so 100+ validators can be spun up on a local machine
@@ -41,6 +43,7 @@ import (
 var (
 	_ = crypto.Hash(0)
 )
+
 type mldsaMode = luxmldsa.Mode
 type mldsaPrivateKey = luxmldsa.PrivateKey
 type mldsaPublicKey = luxmldsa.PublicKey
@@ -122,9 +125,9 @@ func genValidators(n int, level mldsaMode, masterSeed [32]byte) []Validator {
 }
 
 type Timings struct {
-	Keygen  time.Duration
-	Sign    time.Duration
-	Verify  time.Duration
+	Keygen   time.Duration
+	Sign     time.Duration
+	Verify   time.Duration
 	SigBytes int
 }
 
