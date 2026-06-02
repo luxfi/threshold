@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-sev-guest/verify/trust"
 	sevtest "github.com/google/go-sev-guest/testing"
+	"github.com/google/go-sev-guest/verify/trust"
 
 	magnetar "github.com/luxfi/magnetar/ref/go/pkg/magnetar"
 	"github.com/luxfi/mpc/cc/attest"
@@ -463,11 +463,12 @@ func TestSigner_Sign_RejectsExpiredNonce(t *testing.T) {
 // infra not available, but document the skip with rationale").
 //
 // To exercise locally:  AWS_ENDPOINT_URL_KMS=http://localhost:4566
-//                       AWS_ACCESS_KEY_ID=test
-//                       AWS_SECRET_ACCESS_KEY=test
-//                       AWS_REGION=us-east-1
-//                       AWS_KMS_TEST_KEY_ARN=alias/test
-//                       go test -run TestSigner_Sign_HSMSign_AWS_KMS
+//
+//	AWS_ACCESS_KEY_ID=test
+//	AWS_SECRET_ACCESS_KEY=test
+//	AWS_REGION=us-east-1
+//	AWS_KMS_TEST_KEY_ARN=alias/test
+//	go test -run TestSigner_Sign_HSMSign_AWS_KMS
 func TestSigner_Sign_HSMSign_AWS_KMS(t *testing.T) {
 	endpoint := os.Getenv("AWS_ENDPOINT_URL_KMS")
 	keyARN := os.Getenv("AWS_KMS_TEST_KEY_ARN")

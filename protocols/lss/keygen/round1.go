@@ -175,7 +175,7 @@ func (r *round1) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// Create round2 with complete data
 	return &round2{
-		Base:      r.Base,
+		Base:        r.Base,
 		poly:        r.poly,
 		commitments: commitments,
 		chainKeys:   chainKeys,

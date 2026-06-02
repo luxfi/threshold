@@ -149,7 +149,7 @@ func (r *presign7) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	rSign1 := &sign1{
-		Base:       r.Base,
+		Base:         r.Base,
 		PublicKey:    r.PublicKey,
 		Message:      r.Message,
 		PreSignature: preSignature,

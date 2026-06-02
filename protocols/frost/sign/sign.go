@@ -11,9 +11,9 @@ import (
 
 const (
 	// Frost Sign with Threshold.
-	protocolID         = "frost/sign-threshold"
-	protocolIDTaproot  = "frost/sign-threshold-taproot"
-	protocolIDSR25519  = "frost/sign-threshold-sr25519"
+	protocolID        = "frost/sign-threshold"
+	protocolIDTaproot = "frost/sign-threshold-taproot"
+	protocolIDSR25519 = "frost/sign-threshold-sr25519"
 	// This protocol has 3 concrete rounds.
 	protocolRounds round.Number = 3
 )
@@ -54,7 +54,7 @@ func StartSignSR25519Common(taproot, sr25519 bool, signingContext []byte, result
 			return nil, fmt.Errorf("sign.StartSign: %w", err)
 		}
 		return &round1{
-			Base:         helper,
+			Base:           helper,
 			taproot:        taproot,
 			sr25519:        sr25519,
 			signingContext: signingContext,
