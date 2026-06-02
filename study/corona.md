@@ -39,7 +39,7 @@ Z, Δ)` — a 33,052-byte triple of ring polynomials.
 | `~/work/lux/corona/dkg/`, `dkg2/` | DKG protocols |
 | `~/work/lux/precompile/corona/` | EVM precompile at 0x012206 |
 | `~/work/lux/proofs/lean/Crypto/Corona.lean` | Lean structural proof |
-| `~/work/lux/papers/lux-corona-pq/lux-corona-pq.tex` | Paper (filename retains pre-rename `corona` qualifier; content describes Corona) |
+| `~/work/lux/papers/lux-corona-pq/lux-corona-pq.tex` | Paper |
 | `~/work/lux/threshold/protocols/corona/` | Threshold-protocol library entry point |
 
 ## Parameter set
@@ -68,9 +68,6 @@ defense-in-depth lattice-diversity layer, not a security-tier upgrade.
   from Magnetar (hash) in the Nova cert profile.
 - No EasyCrypt / Jasmin high-assurance track for Corona yet (Pulsar
   has both at theory-shell level).
-- Paper file at `papers/lux-corona-pq/lux-corona-pq.tex` retains
-  the old `corona` filename; rename to `lux-corona-pq.tex` is a
-  pending tidy-up.
 
 ## See also
 
