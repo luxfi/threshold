@@ -4,6 +4,7 @@ package thresholdd
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -57,10 +58,22 @@ type signParams struct {
 // `lux-evm-precompile-mldsa-v1` / `lux-evm-precompile-slhdsa-v1` to
 // produce signatures that satisfy the on-chain EVM precompile's
 // domain-separation contract.
+//
+// ChainID, when set, asserts the chain context the caller intends
+// this signature to land on. The dispatcher consults the wired
+// ChainProfileResolver to map ChainID → Profile; on a strict-PQ
+// chain, the single-party dealer / single-validator shortcut path
+// is refused (HTTP 503 + the documented body) until sister
+// agents land pulsar v0.4's threshold ctx-bound path. Empty
+// ChainID means "no chain context asserted"; the gate fails open
+// (see profile.go::RefuseUnderStrictPQ). ChainID may also be
+// supplied via the X-Chain-ID HTTP header; the JSON body field
+// wins when both are set.
 type signCtxParams struct {
 	MessageHex string `json:"messageHex"`
 	PubKeyHex  string `json:"pubKeyHex"`
 	CtxHex     string `json:"ctxHex"`
+	ChainID    string `json:"chainID,omitempty"`
 }
 
 // signResult is the common shape for every <scheme>.sign response.
@@ -96,6 +109,18 @@ type ctxSigner interface {
 	Sign_Ctx(p signCtxParams) (signResult, error)
 }
 
+// profileAwareCtxSigner is the strict-PQ-aware variant of ctxSigner.
+// Schemes that implement it run the strict-PQ gate
+// (RefuseUnderStrictPQ) at entry against the supplied chainID and
+// resolver before producing a signature. Pulsar and magnetar
+// implement this; other schemes fall back to plain ctxSigner. The
+// resolver is supplied by the dispatcher (see Server) so call sites
+// never reach across the lock to read it. A nil resolver bypasses
+// the gate (documented fail-OPEN — see profile.go).
+type profileAwareCtxSigner interface {
+	Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileResolver) (signResult, error)
+}
+
 // Server is the JSON-RPC dispatcher.
 //
 // Auth: a non-empty `authToken` gates every JSON-RPC request behind a
@@ -112,6 +137,13 @@ type Server struct {
 	mu        sync.RWMutex
 	schemes   map[string]scheme
 	authToken string
+
+	// chainProfileResolver is the optional chain-profile lookup the
+	// strict-PQ gate consults on Sign_Ctx. nil → gate fails open
+	// (documented in profile.go::RefuseUnderStrictPQ); production
+	// embedders SetChainProfileResolver at boot with an adapter
+	// over luxfi/consensus/config.
+	chainProfileResolver ChainProfileResolver
 }
 
 // NewServer builds the dispatcher with the wired schemes.
@@ -150,6 +182,17 @@ func NewServer() (*Server, error) {
 func (s *Server) SetAuthToken(token string) {
 	s.mu.Lock()
 	s.authToken = token
+	s.mu.Unlock()
+}
+
+// SetChainProfileResolver installs the chain-profile resolver the
+// strict-PQ gate consults on Sign_Ctx. Passing nil clears the
+// resolver (the gate then fails open). Production embedders wire an
+// adapter over luxfi/consensus/config; the standalone thresholdd
+// CLI leaves it nil for dev tooling.
+func (s *Server) SetChainProfileResolver(r ChainProfileResolver) {
+	s.mu.Lock()
+	s.chainProfileResolver = r
 	s.mu.Unlock()
 }
 
@@ -241,8 +284,43 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, req.ID, -32602, "invalid params: "+err.Error())
 			return
 		}
-		res, err := cs.Sign_Ctx(p)
+		// Plumb chain ID: JSON body wins; X-Chain-ID header
+		// supplies it when the body omits it. Empty means "no
+		// chain asserted" → gate falls through (see profile.go).
+		if p.ChainID == "" {
+			p.ChainID = r.Header.Get("X-Chain-ID")
+		}
+		// Profile-aware path: schemes that implement
+		// profileAwareCtxSigner consult the strict-PQ gate
+		// themselves at entry. Plain ctxSigner is the legacy path
+		// (gate not consulted). Snapshot the resolver under RLock
+		// so SetChainProfileResolver can swap atomically.
+		s.mu.RLock()
+		resolver := s.chainProfileResolver
+		s.mu.RUnlock()
+		var (
+			res signResult
+			err error
+		)
+		if pas, ok := sc.(profileAwareCtxSigner); ok {
+			res, err = pas.Sign_Ctx_Profile(p, resolver)
+		} else {
+			res, err = cs.Sign_Ctx(p)
+		}
 		if err != nil {
+			// Strict-PQ refusal: HTTP 503 + the documented body
+			// (see profile.go::strictPQRefusalBody). NOT a
+			// JSON-RPC error envelope — the documented contract
+			// says HTTP 503 because the dispatcher temporarily
+			// cannot produce a strict-PQ-compliant Sign_Ctx
+			// signature, which is a service-unavailable
+			// condition, not a request error.
+			if errors.Is(err, ErrRefusedUnderStrictPQ) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte(strictPQRefusalBody))
+				return
+			}
 			writeError(w, req.ID, -32000, err.Error())
 			return
 		}

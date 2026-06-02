@@ -429,8 +429,14 @@ func TestMain(m *testing.M) {
 	_ = os.Setenv("MPC_LOCAL_APPROVAL", "true")
 
 	// Each subtest also enforces protocol-level timeouts via runner.go.
+	// 30 minutes accommodates `-race -count=N` under the v1.1.0
+	// algebraic-aggregate Sign_Ctx path (which runs the full quorum
+	// FIPS 204 rejection-restart loop where the v1.0.x dealer-shortcut
+	// ran a single-party SignTo). Race instrumentation adds ~3-5x to
+	// per-test cost; the rejection-restart loop can stack on top.
+	// Beyond 30m something IS stuck.
 	go func() {
-		time.Sleep(10 * time.Minute)
+		time.Sleep(30 * time.Minute)
 		panic("thresholdd_test: global timeout — protocol stuck")
 	}()
 	m.Run()
