@@ -60,7 +60,7 @@ func StartKeygenCommon(taproot bool, group curve.Curve, participants []party.ID,
 		}
 
 		return &round1{
-			Base:             helper,
+			Base:               helper,
 			taproot:            taproot,
 			threshold:          threshold,
 			refresh:            refresh,

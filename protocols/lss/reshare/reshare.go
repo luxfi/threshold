@@ -73,7 +73,7 @@ func Start(oldConfig *config.Config, newParticipants []party.ID, newThreshold in
 		}
 
 		return &round1{
-			Base:          helper,
+			Base:            helper,
 			oldConfig:       oldConfig,
 			newParticipants: newParticipants,
 			newThreshold:    newThreshold,
