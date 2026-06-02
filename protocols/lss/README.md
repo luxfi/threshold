@@ -8,7 +8,7 @@ August 3, 2025
 
 **Enhanced with:**
 - Multi-chain adapters for 10+ blockchains (XRPL, Ethereum, Bitcoin, Solana, etc.)
-- Post-quantum security via Ringtail lattice-based signatures
+- Post-quantum security via Corona lattice-based signatures
 - Byzantine fault tolerance and emergency recovery
 - 100% test coverage with comprehensive stress testing
 
@@ -30,7 +30,7 @@ LSS MPC ECDSA is a pragmatic framework designed for real-world deployment of thr
 ### Pragmatic Design
 - Supports Protocol I (Localized Nonce Blinding) and Protocol II (Collaborative Nonce Blinding)
 - **NEW: Production-ready adapters for XRPL, Ethereum, Bitcoin, Solana, Cosmos, Polkadot**
-- **NEW: Post-quantum Ringtail signatures (128/192/256-bit security)**
+- **NEW: Post-quantum Corona signatures (128/192/256-bit security)**
 - Compatible with ECDSA, EdDSA, Schnorr, and lattice-based signatures
 - Unified SignerAdapter interface for chain-agnostic operations
 
