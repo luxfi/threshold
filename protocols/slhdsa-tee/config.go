@@ -79,19 +79,19 @@ type Config struct {
 // Errors surfaced by Config.Validate. Distinguished by errors.Is so
 // callers (operator boot scripts, helm chart smoke tests) can switch.
 var (
-	ErrInvalidMode          = errors.New("slhdsa-tee: invalid magnetar mode")
-	ErrEmptyRIM             = errors.New("slhdsa-tee: RequiredRIM must be non-empty (default-deny posture)")
-	ErrEmptyHardware        = errors.New("slhdsa-tee: AllowedHardware must be non-empty (default-deny posture)")
-	ErrNoRequireFlag        = errors.New("slhdsa-tee: at least one Require* TEE flag must be true")
-	ErrMissingKMSKeyID      = errors.New("slhdsa-tee: KMSKeyID required for audit signature")
-	ErrMissingSeedKeyID     = errors.New("slhdsa-tee: WrappedSeedKeyID required for HSM seed storage")
-	ErrApproverMissing      = errors.New("slhdsa-tee: ApproverID required when ApprovalRequired is true")
-	ErrApprovalDenied       = errors.New("slhdsa-tee: approval provider denied or returned mismatched signature")
-	ErrAttestationRequired  = errors.New("slhdsa-tee: attestation envelope required (cannot sign without TEE evidence)")
-	ErrPolicyRefused        = errors.New("slhdsa-tee: release gate refused (RIM, hardware, nonce, or chain verify)")
+	ErrInvalidMode           = errors.New("slhdsa-tee: invalid magnetar mode")
+	ErrEmptyRIM              = errors.New("slhdsa-tee: RequiredRIM must be non-empty (default-deny posture)")
+	ErrEmptyHardware         = errors.New("slhdsa-tee: AllowedHardware must be non-empty (default-deny posture)")
+	ErrNoRequireFlag         = errors.New("slhdsa-tee: at least one Require* TEE flag must be true")
+	ErrMissingKMSKeyID       = errors.New("slhdsa-tee: KMSKeyID required for audit signature")
+	ErrMissingSeedKeyID      = errors.New("slhdsa-tee: WrappedSeedKeyID required for HSM seed storage")
+	ErrApproverMissing       = errors.New("slhdsa-tee: ApproverID required when ApprovalRequired is true")
+	ErrApprovalDenied        = errors.New("slhdsa-tee: approval provider denied or returned mismatched signature")
+	ErrAttestationRequired   = errors.New("slhdsa-tee: attestation envelope required (cannot sign without TEE evidence)")
+	ErrPolicyRefused         = errors.New("slhdsa-tee: release gate refused (RIM, hardware, nonce, or chain verify)")
 	ErrKMSReleaseUnreachable = errors.New("slhdsa-tee: release gate unreachable")
-	ErrHSMUnreachable       = errors.New("slhdsa-tee: HSM provider unreachable")
-	ErrCorruptWrappedSeed   = errors.New("slhdsa-tee: wrapped seed blob fails authenticated decryption")
+	ErrHSMUnreachable        = errors.New("slhdsa-tee: HSM provider unreachable")
+	ErrCorruptWrappedSeed    = errors.New("slhdsa-tee: wrapped seed blob fails authenticated decryption")
 )
 
 // Validate reports the first structural error in cfg. There is no

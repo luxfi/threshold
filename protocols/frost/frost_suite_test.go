@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	log "github.com/luxfi/log"
+	"github.com/luxfi/metric"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/luxfi/metric"
 )
 
 func TestFrost(t *testing.T) {

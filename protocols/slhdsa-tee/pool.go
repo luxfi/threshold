@@ -37,7 +37,7 @@ import (
 // the API; concurrent Combine calls observe the same snapshot for the
 // duration of one call (under RLock).
 type CombinerPool struct {
-	mu       sync.RWMutex
+	mu        sync.RWMutex
 	threshold int
 	rotation  time.Duration
 	issuers   map[string]struct{}
@@ -63,9 +63,9 @@ type PoolMember struct {
 
 	// mu protects LastReport / LastIssuedAt. Per-member lock so
 	// Attest() on one member does not block Combine on another.
-	mu             sync.RWMutex
-	LastReport     *attest.VerifiedReport
-	LastIssuedAt   time.Time
+	mu           sync.RWMutex
+	LastReport   *attest.VerifiedReport
+	LastIssuedAt time.Time
 }
 
 // CombinerPoolConfig captures pool-level policy.

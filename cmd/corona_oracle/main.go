@@ -13,20 +13,22 @@
 // Q = 0x1000000004A01 / N = 256)? The C++ body is deliberately scoped as a
 // single-process oracle with luxcpp's own NTT prime — see corona.hpp lines
 // 31-39. The two Go paths cover different surfaces:
-//   * github.com/luxfi/corona covers the 2-round network protocol.
-//   * This file covers the C++ single-process algebraic shape.
+//   - github.com/luxfi/corona covers the 2-round network protocol.
+//   - This file covers the C++ single-process algebraic shape.
+//
 // Both are first-party algebraic primitives, neither wraps the other.
 //
 // Usage:
-//   cd lux/threshold/cmd/corona_oracle
-//   go run . > ../../../../luxcpp/crypto/corona/test/corona_kat.h
+//
+//	cd lux/threshold/cmd/corona_oracle
+//	go run . > ../../../../luxcpp/crypto/corona/test/corona_kat.h
 //
 // Determinism:
-//   * StreamPRNG: SHA-256(seed || counter_LE8) → 32-byte block, counter++.
-//   * pmf table: math.Exp matches darwin libm to ULPs sufficient for the
+//   - StreamPRNG: SHA-256(seed || counter_LE8) → 32-byte block, counter++.
+//   - pmf table: math.Exp matches darwin libm to ULPs sufficient for the
 //     uint64 CDT entries to be byte-equal (verified empirically; see comment
 //     at gaussianCDT).
-//   * float-to-int: we mirror the C++ static_cast<uint64_t>(d) which on x86
+//   - float-to-int: we mirror the C++ static_cast<uint64_t>(d) which on x86
 //     is FCVTZS / VCVTSS2SI semantics — matched here by uint64(d) in Go.
 package main
 
@@ -45,16 +47,16 @@ import (
 // ============================================================================
 
 const (
-	Q          uint64 = 998244353
-	N          int    = 512
-	L          int    = 4
-	K          int    = 4
-	TAU        int    = 30
-	GAUSS_BOUND int   = 12
-	SIGMA      float64 = 1.7
-	POLY_BYTES int    = N * 4
-	PK_BYTES   int    = (K*L + K) * POLY_BYTES // 40960
-	SIG_BYTES  int    = (1 + L) * POLY_BYTES   // 10240
+	Q           uint64  = 998244353
+	N           int     = 512
+	L           int     = 4
+	K           int     = 4
+	TAU         int     = 30
+	GAUSS_BOUND int     = 12
+	SIGMA       float64 = 1.7
+	POLY_BYTES  int     = N * 4
+	PK_BYTES    int     = (K*L + K) * POLY_BYTES // 40960
+	SIG_BYTES   int     = (1 + L) * POLY_BYTES   // 10240
 )
 
 var B_INF uint64 = Q / 4
@@ -481,13 +483,13 @@ type keyShare struct {
 }
 
 type Context struct {
-	t            uint32
-	n            uint32
-	A            [][]Poly // K x L
-	b            []Poly   // K
-	shares       []keyShare
-	seed         []byte
-	signCounter  uint64
+	t           uint32
+	n           uint32
+	A           [][]Poly // K x L
+	b           []Poly   // K
+	shares      []keyShare
+	seed        []byte
+	signCounter uint64
 }
 
 // Setup mirrors corona.cpp Setup.
@@ -629,14 +631,16 @@ func (ctx *Context) Sign(msg []byte) []byte {
 // ============================================================================
 
 // vectorSpec — one KAT vector. The C++ side will call:
-//   Setup(t, n, seed=seedASCII, seedLen=len(seedASCII))
-//   Sign(msg=msgASCII, msgLen=len(msgASCII))   // single Sign per ctx
+//
+//	Setup(t, n, seed=seedASCII, seedLen=len(seedASCII))
+//	Sign(msg=msgASCII, msgLen=len(msgASCII))   // single Sign per ctx
+//
 // and assert that pk_sha256 / sig_sha256 / sig_first64 match.
 type vectorSpec struct {
-	name    string
-	t, n    uint32
-	seed    string
-	msg     string
+	name string
+	t, n uint32
+	seed string
+	msg  string
 }
 
 // Sixteen deterministic vectors covering: t=1,n=1; t=2,n=3; t=3,n=5; t=4,n=7;

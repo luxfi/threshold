@@ -164,12 +164,12 @@
 //
 // Verification order:
 //
-//	1. Verify domain separation and transcript binding.
-//	2. Verify BLS Beam.
-//	3. Verify ML-DSA attestation set against signer bitmap.
-//	4. Verify Pulsar pulse under the active KeyEra/GroupKey.
-//	5. Verify signer-set and validator-set hashes match epoch state.
-//	6. Verify bundle root / block root linkage.
+//  1. Verify domain separation and transcript binding.
+//  2. Verify BLS Beam.
+//  3. Verify ML-DSA attestation set against signer bitmap.
+//  4. Verify Pulsar pulse under the active KeyEra/GroupKey.
+//  5. Verify signer-set and validator-set hashes match epoch state.
+//  6. Verify bundle root / block root linkage.
 //
 // # See also
 //
