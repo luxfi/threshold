@@ -140,7 +140,7 @@ axiom lagrange_inverse_eval (s : share_t) (Q : int list) :
   reconstruct Q (List.map (poly_eval s) Q) = s.
 
 (* BRIDGE: Crypto.Threshold.Lagrange.threshold_partial_response_identity*)
-(* Specialized to no-y-mask form (BLS partial sigs are pure share^*).  *)
+(* Specialized to no-y-mask form (BLS partial sigs are pure share^s).  *)
 axiom threshold_lagrange_identity :
   forall (Q : int list) (s : share_t),
     uniq Q =>
@@ -179,10 +179,10 @@ module type BLSSigner = {
 
 module BLSRef : BLSSigner = {
   proc sign(sk : share_t, msg : message_t) : signature_t = {
-    var H_m : g2_t;
+    var h_m : g2_t;
     var sigma : g2_t;
-    H_m   <- hash_to_g2 msg;
-    sigma <- g2_scalar_mul sk H_m;
+    h_m   <- hash_to_g2 msg;
+    sigma <- g2_scalar_mul sk h_m;
     return encode_g2 sigma;
   }
 }.
@@ -212,11 +212,11 @@ module BLSThresholdRef : BLS_Threshold = {
     var weighted_sum : g2_t;
     var lam : scalar_t;
     var sigma_i : g2_t;
-    var Q_size : int;
+    var q_size : int;
     weighted_sum <- g2_scalar_mul scalar_zero g2_gen;  (* identity *)
-    Q_size <- size Q;
+    q_size <- size Q;
     i <- 0;
-    while (i < Q_size) {
+    while (i < q_size) {
       lam     <- lagrange Q i;
       (* sigma_i corresponds to position i in Q; resolved via shares.  *)
       sigma_i <- witness;
@@ -242,16 +242,16 @@ declare module S <: BLSSigner.
 
 declare axiom bls_threshold_dispatches_to_bls
     (Q : int list)
-    (shares : share_t list)
+    (secret_shares : share_t list)
     (sig_shares : (int * sig_share_t) list)
     (msg : message_t) :
   uniq Q =>
-  size Q = size shares =>
+  size Q = size secret_shares =>
   (* The threshold protocol's aggregate output equals single-party    *)
   (* BLS.Sign on the Lagrange-reconstructed secret.                    *)
   equiv [ T.aggregate ~ S.sign :
             Q{1} = Q /\ shares{1} = sig_shares /\ msg{1} = msg
-            /\ sk{2} = reconstruct Q shares
+            /\ sk{2} = reconstruct Q secret_shares
             /\ msg{2} = msg
           ==>
             ={res} ].
@@ -277,8 +277,9 @@ proof.
   have hrec : master_secret =
                reconstruct Q (List.map (poly_eval master_secret) Q).
   - by rewrite (lagrange_inverse_eval master_secret Q).
+  rewrite hrec.
   apply (bls_threshold_dispatches_to_bls Q
-           (List.map (poly_eval master_secret) Q) sig_shares msg uQ _) => //=.
+           (List.map (poly_eval master_secret) Q) sig_shares msg uQ _).
   by rewrite size_map.
 qed.
 
