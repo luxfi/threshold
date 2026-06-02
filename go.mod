@@ -150,7 +150,7 @@ require (
 	github.com/luxfi/magnetar v1.2.0
 	github.com/luxfi/metric v1.5.7
 	github.com/luxfi/mpc v1.14.13
-	github.com/luxfi/pulsar v1.0.23
+	github.com/luxfi/pulsar v1.1.1
 )
 
 // e2e validation harness pin (2026-05-31): luxfi/node v1.27.8 is
