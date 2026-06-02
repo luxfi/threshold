@@ -8,7 +8,7 @@
 #
 #   1. Both adapters' lineage / set-rotation / signing / pairwise /
 #      rollback / activation-transcript tests pass (deterministic).
-#   2. The deterministic KAT-style regen for corona vectors that
+#   2. The deterministic KAT-style regen for Corona vectors that
 #      lss_pulsar_test.go pulls in via pulsarThreshold also passes.
 #
 # Output:
