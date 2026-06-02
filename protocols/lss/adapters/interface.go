@@ -39,7 +39,7 @@ const (
 	SignatureEdDSA
 	SignatureSchnorr
 	SignatureBLS
-	SignatureCorona  // Post-quantum lattice-based
+	SignatureCorona    // Post-quantum lattice-based
 	SignatureDilithium // Post-quantum ML-DSA (NIST standard)
 )
 
@@ -101,7 +101,7 @@ type UnifiedConfig struct {
 	// Additional scheme-specific data
 	ECDSAConfig     *ECDSAExtensions
 	EdDSAConfig     *EdDSAExtensions
-	CoronaConfig  *CoronaExtensions
+	CoronaConfig    *CoronaExtensions
 	DilithiumConfig *DilithiumExtensions
 
 	// Verification shares for all parties

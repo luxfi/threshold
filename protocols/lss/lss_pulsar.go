@@ -125,7 +125,7 @@ func (pc *PulsarConfig) KeyEraID() uint64 {
 // Default values used by BuildActivationTranscript when a config does
 // not set HashSuiteID / ImplementationVersion explicitly.
 const (
-	defaultHashSuiteID           = hash.DefaultID            // "Pulsar-SHA3"
+	defaultHashSuiteID           = hash.DefaultID // "Pulsar-SHA3"
 	defaultImplementationVersion = "lss-pulsar-test-1.0"
 )
 
@@ -175,11 +175,11 @@ func BuildActivationTranscript(
 	// Pull old/new lineage from any one config — within an era / a
 	// reshare batch the lineage is the same on every party.
 	var (
-		eraID         uint64
-		oldGen, newGen uint64
-		oldT, newT    int
+		eraID              uint64
+		oldGen, newGen     uint64
+		oldT, newT         int
 		oldEpoch, newEpoch uint64
-		oldKeys, newKeys [][]byte
+		oldKeys, newKeys   [][]byte
 	)
 	for _, c := range oldCfgs {
 		if c == nil || c.State == nil {
@@ -262,13 +262,13 @@ var (
 //
 // Adapter contract guarantees:
 //
-//   Preserved across the call: KeyEraID, GroupKey pointer, master
-//     secret s (held only as shares; never reconstructed in this
-//     process), and the persistent (A, bTilde) public key.
+//	Preserved across the call: KeyEraID, GroupKey pointer, master
+//	  secret s (held only as shares; never reconstructed in this
+//	  process), and the persistent (A, bTilde) public key.
 //
-//   Changed across the call: Generation (incremented by 1), participant
-//     set, threshold, share values, Lambdas, pairwise PRF Seeds, MAC
-//     keys, transcript hash.
+//	Changed across the call: Generation (incremented by 1), participant
+//	  set, threshold, share values, Lambdas, pairwise PRF Seeds, MAC
+//	  keys, transcript hash.
 //
 // Failure behavior: returns an error. The caller (LSS RollbackManager
 // or Quasar consensus) decides whether to retry, rollback, or
@@ -293,12 +293,12 @@ func DynamicResharePulsar(
 	// 1. Validate consistency: all old configs must come from the same
 	// key era at the same generation, with the same GroupKey pointer.
 	var (
-		refKeyEraID    uint64
-		refGen         uint64
-		refGroupKey    *pulsarThreshold.GroupKey
-		refValidators  []string
-		refThreshold   int
-		first          = true
+		refKeyEraID   uint64
+		refGen        uint64
+		refGroupKey   *pulsarThreshold.GroupKey
+		refValidators []string
+		refThreshold  int
+		first         = true
 	)
 	for _, cfg := range oldConfigs {
 		if cfg == nil || cfg.State == nil {

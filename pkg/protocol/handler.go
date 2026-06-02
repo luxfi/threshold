@@ -13,9 +13,9 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/luxfi/log"
+	"github.com/luxfi/metric"
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/party"
-	"github.com/luxfi/metric"
 )
 
 // StartFunc creates the first round of a protocol

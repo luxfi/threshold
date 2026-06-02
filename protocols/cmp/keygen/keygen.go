@@ -41,7 +41,7 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 				PublicSharesECDSA[id] = public.ECDSA
 			}
 			return &round1{
-				Base:                    helper,
+				Base:                      helper,
 				PreviousSecretECDSA:       c.ECDSA,
 				PreviousPublicSharesECDSA: PublicSharesECDSA,
 				PreviousChainKey:          c.ChainKey,
@@ -54,7 +54,7 @@ func Start(info round.Info, pl *pool.Pool, c *config.Config) protocol.StartFunc 
 		VSSConstant := sample.Scalar(rand.Reader, group)
 		VSSSecret := polynomial.NewPolynomial(group, helper.Threshold(), VSSConstant)
 		return &round1{
-			Base:    helper,
+			Base:      helper,
 			VSSSecret: VSSSecret,
 			keyID:     keyID,
 		}, nil

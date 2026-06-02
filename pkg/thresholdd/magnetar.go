@@ -261,6 +261,7 @@ func (s *magnetarScheme) magnetarRefuseUnderStrictPQ() error {
 //   - flip this dispatcher's profile via SetChainSecurityProfile
 //   - wire a CombinerPool via SetCombinerPool (>= Threshold attested
 //     members already provisioned).
+//
 // Until all three steps complete, the dispatcher will refuse Sign
 // AND Combine_TEE on the strict-PQ chain — fail-closed under
 // half-rotated state.
