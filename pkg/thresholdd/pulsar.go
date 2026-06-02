@@ -52,16 +52,27 @@ import (
 // Trust model on sign:
 //
 //   - The 2-round-with-w-reveal protocol (Round1 → Round2W →
-//     Round2Sign → AlgebraicAggregate) runs in-process across all
-//     t signers in the session identified by pubKeyHex via
-//     pulsar.OrchestrateV03Sign. The dispatcher returns the
-//     aggregated PULS-framed wire bytes; callers MUST verify via
-//     VerifyBytes (or pulsar.VerifyBytes) using ONLY the published
-//     PULG-framed group public key.
+//     Round2Sign → AlgebraicAggregate{,Ctx}) runs in-process across
+//     all t signers in the session identified by pubKeyHex via
+//     pulsar.OrchestrateV03Sign (empty ctx) or
+//     pulsar.OrchestrateV03SignCtx (ctx-bound). Both APIs reduce to
+//     the same algebraic-aggregate kernel; the ctx variant threads
+//     the FIPS 204 §5.4 octet-string into the SHAKE-256 μ prehash
+//     so the output verifies under VerifyCtx(pub, msg, ctx, sig).
+//     The dispatcher returns the aggregated PULS-framed wire bytes;
+//     callers MUST verify via VerifyBytes (or pulsar.VerifyBytes /
+//     pulsar.VerifyCtx) using ONLY the published PULG-framed group
+//     public key.
 //   - Rejection-restart: FIPS 204's natural restart probability is
 //     ~5 attempts; we cap at params.MaxRestart (256, abort
 //     probability < 2^-512). The whole loop lives inside
-//     OrchestrateV03Sign so the dispatcher stays thin.
+//     OrchestrateV03Sign{,Ctx} so the dispatcher stays thin.
+//   - NO master sk is materialised in the dispatcher process at
+//     any point during Sign or Sign_Ctx. The historical dealerKey
+//     single-party shortcut was deleted at pulsar v1.1.0; both
+//     Sign and Sign_Ctx now run the full algebraic-aggregate path.
+//     Pinned by TestAlgebraic_NoSkAccess/AlgebraicAggregateCtx in
+//     luxfi/pulsar.
 //
 // Trust model on verify:
 //
@@ -119,30 +130,6 @@ type pulsarSession struct {
 	// pulsar's per-signature freshness contract). Bumped inside the
 	// dispatcher mutex.
 	sessionCounter uint64
-
-	// dealerKey is the single-party FIPS 204 ML-DSA private key
-	// derived from the same master seed that fed the v0.3 trusted
-	// dealer. Its public key is BIT-EQUAL to setup.Pub.Bytes (both
-	// flow through deriveKeyMaterial → mldsa{44,65,87}.NewKeyFromSeed),
-	// so any ctx-bound signature produced via this key verifies under
-	// the v0.3 PULG-framed group public key.
-	//
-	// Sign_Ctx routes through this key to bind FIPS 204 §5.2 ctx
-	// (e.g. `lux-evm-precompile-mldsa-v1`) into the signature —
-	// upstream pulsar v0.3 OrchestrateV03Sign hardcodes empty ctx
-	// (threshold_v03.go: μ = SHAKE-256(tr || 0x00 || 0x00 || M, 64))
-	// and ctx-aware THRESHOLD signing is a v0.4 deliverable. Until
-	// then the precompile-verifiable surface uses the dispatcher's
-	// trusted-dealer privilege: same key, same wire bytes any FIPS 204
-	// verifier accepts, just bypassing the algebraic-aggregate path.
-	//
-	// Trust model: this materialises sk in-process for the lifetime of
-	// the session, which the v0.3 threshold path explicitly does NOT.
-	// The dispatcher's documented role is off-chain test harnesses /
-	// dev tooling / SDK-driven flows — not chain-genesis ceremonies —
-	// so the trade-off is acceptable. Production operators that must
-	// not hold master sk in-process use Sign_TEE (HSM-held seed).
-	dealerKey *pulsar.PrivateKey
 }
 
 func newPulsarScheme() *pulsarScheme {
@@ -192,21 +179,15 @@ func (s *pulsarScheme) Keygen(p keygenParams) (keygenResult, error) {
 		identities[id] = ident
 	}
 
-	// Master seed for this session — used both to (a) deal v0.3
-	// algebraic shares and (b) derive a single-party PrivateKey for
-	// the Sign_Ctx path. The PrivateKey carries its own copy of the
-	// seed; the local masterSeed buffer is wiped immediately after
-	// derivation.
+	// Master seed for this session — feeds the v0.3 trusted dealer and
+	// is wiped immediately after the shares are produced. After this
+	// point NO master-sk-bearing material exists anywhere in this
+	// process: Sign_Ctx now runs the full algebraic-aggregate threshold
+	// loop (pulsar v1.1.0 OrchestrateV03SignCtx), so there is no
+	// dispatcher-retained dealerKey to reconstruct sk from.
 	var masterSeed [pulsar.SeedSize]byte
 	if _, err := rand.Read(masterSeed[:]); err != nil {
 		return keygenResult{}, fmt.Errorf("pulsar keygen: master seed entropy: %w", err)
-	}
-	dealerKey, err := pulsar.KeyFromSeed(params, masterSeed)
-	if err != nil {
-		for i := range masterSeed {
-			masterSeed[i] = 0
-		}
-		return keygenResult{}, fmt.Errorf("pulsar keygen: KeyFromSeed: %w", err)
 	}
 	setup, shares, err := pulsar.DealAlgebraicV03Shares(params, committee, p.Threshold, masterSeed, rand.Reader)
 	for i := range masterSeed {
@@ -245,7 +226,6 @@ func (s *pulsarScheme) Keygen(p keygenParams) (keygenResult, error) {
 		quorumShares: quorumShares,
 		evalPoints:   evalPoints,
 		identities:   identities,
-		dealerKey:    dealerKey,
 	}
 	s.mu.Unlock()
 
@@ -320,7 +300,7 @@ func (s *pulsarScheme) Sign(p signParams) (signResult, error) {
 }
 
 // Sign_Ctx is the ctx-bound permissionless signing surface for the
-// pulsar dispatcher. It emits a FIPS 204 §5.2 context-bound ML-DSA
+// pulsar dispatcher. It emits a FIPS 204 §5.4 context-bound ML-DSA
 // signature on (msg, ctx) under the session's group public key, so
 // callers can produce signatures that satisfy the on-chain EVM
 // precompile's domain-separation contract:
@@ -329,25 +309,84 @@ func (s *pulsarScheme) Sign(p signParams) (signResult, error) {
 //	(pub.VerifySignatureCtx(msg, sig, ctx))
 //
 // Wire bytes: PULS-framed (Signature.MarshalBinary) — bit-identical
-// to a single-party FIPS 204 SignDeterministic on the same (sk, msg,
-// ctx) tuple. Any FIPS 204 verifier holding the session's PULG-framed
-// group public key bytes accepts the result.
+// to a single-party FIPS 204 §5.4 ctx-bound SignTo on the same
+// (master_sk, msg, ctx) tuple. Any FIPS 204 verifier holding the
+// session's PULG-framed group public key bytes accepts the result
+// under VerifyCtx(pub, msg, ctx, sig).
 //
-// Path: routes through pulsar.Sign on the dispatcher-retained
-// dealerKey (see pulsarSession.dealerKey). This bypasses the v0.3
-// algebraic-aggregate threshold loop because v0.3 hardcodes empty
-// ctx (μ = SHAKE-256(tr || 0x00 || 0x00 || M, 64); ctx-aware
-// threshold sign is a v0.4 deliverable upstream). The dispatcher's
-// trusted-dealer role makes the single-party shortcut sound: the
-// dealerKey's pubkey IS bit-equal to the v0.3 setup.Pub bytes.
+// Path (pulsar v1.1.0+): runs the FULL algebraic-aggregate threshold
+// loop via pulsar.OrchestrateV03SignCtx. NO master sk is materialised
+// at any point in this process: parties hold polynomial-vector Shamir
+// shares of (s_1, s_2, t_0) over GF(q); the aggregator combines
+// (z, c·s_2, c·t_0) under Lagrange-linearity; the FIPS 204 §5.4 μ
+// prefix carries ctx into the SHAKE-256 prehash so the output is
+// byte-identical to single-party SignTo on the (existentially
+// quantified) master sk. The historical dealerKey single-party
+// shortcut has been deleted.
 //
 // Compare to Sign_TEE: same ctx semantics, HSM-held sk. Both
 // produce wire bytes verifiable under the same PULG-framed group key.
 //
 // signCtx is the FIPS 204 ctx octet string (0..255 bytes). Pass nil
-// (or the empty hex string "") to bind the empty ctx — semantically
-// equivalent to Sign, but emitted via the single-party path.
+// (or the empty hex string "") to bind the empty ctx — backwards
+// compatible with v0.3 OrchestrateV03Sign byte-for-byte under the
+// same deterministic seeds.
+//
+// NOTE on strict-PQ: this method is the legacy entry point; it does
+// NOT consult the strict-PQ profile gate. Callers that produce
+// signatures destined for a strict-PQ chain MUST go through the
+// JSON-RPC dispatcher (which routes via Sign_Ctx_Profile and runs
+// the gate). In-process callers that want the gate consult
+// RefuseUnderStrictPQ themselves before invoking Sign_Ctx.
 func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
+	return s.signCtxInternal(p)
+}
+
+// Sign_Ctx_Profile is the profile-aware entry point. The dispatcher
+// always routes here when the scheme implements
+// profileAwareCtxSigner (see server.go). The gate fires at entry:
+// on a strict-PQ chain, the call is refused with
+// ErrRefusedUnderStrictPQ (HTTP 503 + documented body); on any
+// other profile, or with no resolver / no chain ID, the call falls
+// through to signCtxInternal.
+//
+// Why the gate sits HERE (not in signCtxInternal): the legacy
+// Sign_Ctx is still public for in-process embedders that have
+// their own outer admission gate (e.g. luxfi/mpc's API surface).
+// Forcing the gate on every caller would surprise those. The
+// dispatcher path — the one network-reachable surface — always
+// runs the gate. One function, one place: profile.go owns the
+// policy; this method owns the call site.
+//
+// HISTORY: this gate guarded the dealer-shortcut shortcut (pulsar
+// v1.0.x) where a single-party PrivateKey lived in pulsarSession.
+// pulsar v1.1.0 deleted dealerKey; signCtxInternal now runs the
+// full algebraic-aggregate threshold path with NO sk-bearing state
+// in process. The strict-PQ refusal is therefore now a POLICY gate
+// (operators may still want to refuse v1 ML-DSA on a strict-PQ
+// chain in favour of v0.4 hybrid composition), not a cryptographic
+// gate against sk leakage. We KEEP IT — strict-PQ semantics is a
+// chain-level policy choice, not a kernel claim.
+func (s *pulsarScheme) Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileResolver) (signResult, error) {
+	if err := RefuseUnderStrictPQ(p.ChainID, "pulsar.sign_ctx", resolver); err != nil {
+		return signResult{}, err
+	}
+	return s.signCtxInternal(p)
+}
+
+// signCtxInternal is the v1.1.0 ctx-bound algebraic-aggregate path.
+// Drives the full Round1 → Round2W → Round2Sign → AlgebraicAggregateCtx
+// loop with the supplied ctx threaded into the FIPS 204 §5.4 step-2 μ
+// prehash. NO master sk is materialised at any point in this function
+// or in the per-party state machines — parties hold polynomial-vector
+// Shamir shares of (s_1, s_2, t_0) over GF(q); the aggregator combines
+// (z, c·s_2, c·t_0) under Lagrange-linearity (TestAlgebraic_NoSkAccess/
+// AlgebraicAggregateCtx pins this AST-structurally upstream).
+//
+// The empty-ctx case (CtxHex == "") is byte-identical to Sign(msg) —
+// pulsar.OrchestrateV03Sign is now a wrapper around
+// OrchestrateV03SignCtx(nil, msg).
+func (s *pulsarScheme) signCtxInternal(p signCtxParams) (signResult, error) {
 	msg, err := hex.DecodeString(p.MessageHex)
 	if err != nil {
 		return signResult{}, fmt.Errorf("messageHex: %w", err)
@@ -362,23 +401,42 @@ func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
 
 	s.mu.Lock()
 	sess, ok := s.sessions[p.PubKeyHex]
-	s.mu.Unlock()
 	if !ok {
+		s.mu.Unlock()
 		return signResult{}, fmt.Errorf("pulsar sign_ctx: unknown pubKeyHex (keygen first)")
 	}
-	if sess.dealerKey == nil {
-		// Defence in depth: every Keygen sets dealerKey. A nil here
-		// would mean session-map corruption — refuse rather than
-		// silently fall back.
-		return signResult{}, fmt.Errorf("pulsar sign_ctx: session missing dealerKey")
+	sess.sessionCounter++
+	counter := sess.sessionCounter
+	setup := sess.setup
+	quorum := append([]pulsar.NodeID(nil), sess.quorum...)
+	quorumShares := append([]*pulsar.AlgebraicKeyShare(nil), sess.quorumShares...)
+	evalPoints := append([]uint32(nil), sess.evalPoints...)
+	identities := sess.identities
+	s.mu.Unlock()
+
+	params := pulsar.MustParamsFor(setup.Mode)
+
+	// Build sessionID from the per-session counter; binds this Sign_Ctx
+	// call to a distinct PRNG seed across concurrent calls against the
+	// same group key. The trailing 8 bytes tag this as the ctx-bound
+	// dispatcher path so a captured wire trace is unambiguously
+	// attributable to Sign_Ctx vs Sign.
+	var sessionID [16]byte
+	binary.BigEndian.PutUint64(sessionID[:8], counter)
+	binary.BigEndian.PutUint64(sessionID[8:], 0xC1C1BAB1ECAFE505) // sign_ctx tag
+
+	// Compute pairwise session keys for the quorum (ML-KEM-768
+	// encapsulation + ML-DSA-65 authentication per pair). The
+	// transcript MUST bind the message but NOT the ctx — session
+	// keys are per-(sid, msg); ctx enters at the μ derivation
+	// inside the v0.4 algebraic-aggregate loop.
+	sessionKeys, err := pulsar.QuorumSessionKeys(quorum, identities, sessionID, msg)
+	if err != nil {
+		return signResult{}, fmt.Errorf("pulsar sign_ctx: QuorumSessionKeys: %w", err)
 	}
 
-	params := pulsar.MustParamsFor(sess.setup.Mode)
-
-	// Deterministic (randomized=false) so the output is KAT-shaped
-	// and byte-stable across retries — mirrors Sign_TEE's
-	// SignDeterministic discipline.
-	sig, err := pulsar.Sign(params, sess.dealerKey, msg, signCtx, false, nil)
+	sig, err := pulsar.OrchestrateV03SignCtx(params, setup, signCtx, msg, sessionID,
+		quorum, quorumShares, evalPoints, sessionKeys, params.MaxRestart, rand.Reader)
 	if err != nil {
 		return signResult{}, fmt.Errorf("pulsar sign_ctx: %w", err)
 	}
@@ -386,7 +444,7 @@ func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
 	// Self-verify safety belt: refuse to publish bytes that would
 	// fail at the caller. Uses pulsar.VerifyCtx so ctx-binding is
 	// covered.
-	if err := pulsar.VerifyCtx(params, sess.setup.Pub, msg, signCtx, sig); err != nil {
+	if err := pulsar.VerifyCtx(params, setup.Pub, msg, signCtx, sig); err != nil {
 		return signResult{}, fmt.Errorf("pulsar sign_ctx: produced signature failed self-verify (kernel bug): %w", err)
 	}
 
