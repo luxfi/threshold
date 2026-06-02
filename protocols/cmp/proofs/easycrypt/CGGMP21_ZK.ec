@@ -59,20 +59,20 @@ declare module Z <: ZKProtocol.
 (* (statement, witness) pairs.                                           *)
 declare axiom zk_completeness :
   forall (stmt : statement_t) (witn : witness_t),
-    True.  (* equiv [ Z.prove ~~~ Z.verify(stmt,_): res = true ]       *)
+    true.  (* equiv [ Z.prove ~~~ Z.verify(stmt,_): res = true ]       *)
 
 (* Soundness: any prover P that produces verifying transcripts on       *)
 (* statements without witnesses succeeds with prob <= 2^-statistical.   *)
 declare axiom zk_soundness :
   forall (stmt : statement_t),
-    True.  (* Probabilistic statement; concrete form lives in CGGMP21.*)
+    true.  (* Probabilistic statement; concrete form lives in CGGMP21.*)
 
 (* Zero-knowledge: simulator's transcript distribution is               *)
 (* statistically-indistinguishable from the real transcript             *)
 (* distribution under any (stmt, witn).                                  *)
 declare axiom zk_zero_knowledge :
   forall (stmt : statement_t) (witn : witness_t),
-    True.  (* equiv [ Z.prove ~ Z.simulate : ={stmt} ==> ={res} ]      *)
+    true.  (* equiv [ Z.prove ~ Z.simulate : ={stmt} ==> ={res} ]      *)
 
 end section ZKSecurity.
 
