@@ -166,7 +166,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 
 	// We have all shares, advance to round3
 	return &round3{
-		Base:      r.Base,
+		Base:        r.Base,
 		commitments: r.commitments,
 		chainKeys:   r.chainKeys,
 		shares:      shares,

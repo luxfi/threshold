@@ -9,9 +9,9 @@ import (
 	"time"
 
 	log "github.com/luxfi/log"
+	"github.com/luxfi/metric"
 	"github.com/luxfi/threshold/pkg/party"
 	"github.com/luxfi/threshold/pkg/protocol"
-	"github.com/luxfi/metric"
 )
 
 // PhaseHarness provides phase-gated test environment for protocol testing

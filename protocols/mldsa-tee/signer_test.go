@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-sev-guest/verify/trust"
 	sevtest "github.com/google/go-sev-guest/testing"
+	"github.com/google/go-sev-guest/verify/trust"
 
 	pulsar "github.com/luxfi/pulsar/ref/go/pkg/pulsar"
 
