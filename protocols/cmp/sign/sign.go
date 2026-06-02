@@ -70,7 +70,7 @@ func StartSign(config *config.Config, signers []party.ID, message []byte, pl *po
 		}
 
 		return &round1{
-			Base:         helper,
+			Base:           helper,
 			PublicKey:      PublicKey,
 			SecretECDSA:    SecretECDSA,
 			SecretPaillier: SecretPaillier,

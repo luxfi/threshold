@@ -47,7 +47,7 @@ func Start(c *config.Config, signers []party.ID, messageHash []byte, pl *pool.Po
 		}
 
 		return &round1{
-			Base:      helper,
+			Base:        helper,
 			config:      c,
 			signers:     signers,
 			messageHash: messageHash,

@@ -10,10 +10,10 @@ import (
 )
 
 type (
-	Config            = keygen.Config
-	TaprootConfig     = keygen.TaprootConfig
-	Signature         = sign.Signature
-	SR25519Signature  = sign.SR25519Signature
+	Config           = keygen.Config
+	TaprootConfig    = keygen.TaprootConfig
+	Signature        = sign.Signature
+	SR25519Signature = sign.SR25519Signature
 )
 
 // EmptyConfig creates an empty Config with a specific group.

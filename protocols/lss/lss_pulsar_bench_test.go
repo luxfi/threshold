@@ -17,19 +17,19 @@ import (
 // synthesized ones.
 //
 // What this measures:
-//   1. Build oldCfgs from a freshly-bootstrapped KeyEra (cost outside
-//      the timer).
-//   2. Time DynamicResharePulsar(oldCfgs, newSet, t_new, ...) end-to-end.
-//      That call covers JVSS verification, share regeneration, and the
-//      activation-cert path (transcripts, deterministic RNG, Pulsar
-//      keyera state mutation). It does NOT include WAN delay; the
-//      cross-WAN projection is in the paper §08.
+//  1. Build oldCfgs from a freshly-bootstrapped KeyEra (cost outside
+//     the timer).
+//  2. Time DynamicResharePulsar(oldCfgs, newSet, t_new, ...) end-to-end.
+//     That call covers JVSS verification, share regeneration, and the
+//     activation-cert path (transcripts, deterministic RNG, Pulsar
+//     keyera state mutation). It does NOT include WAN delay; the
+//     cross-WAN projection is in the paper §08.
 //
 // Reproduction (matches the paper):
 //
-//   cd ~/work/lux/threshold && \
-//   GOWORK=off go test -bench='BenchmarkPulsarReshare' -benchtime=3x \
-//     -run='^$' ./protocols/lss/...
+//	cd ~/work/lux/threshold && \
+//	GOWORK=off go test -bench='BenchmarkPulsarReshare' -benchtime=3x \
+//	  -run='^$' ./protocols/lss/...
 //
 // b.N is fixed via -benchtime=3x so the bench runs deterministically
 // at 3 reps regardless of how long each rep takes (large committees
@@ -42,8 +42,8 @@ func BenchmarkPulsarReshare(b *testing.B) {
 		tOld int
 		tNew int
 	}{
-		{21, 21, 21, 21},   // routine same-set refresh at canonical Lux n
-		{64, 64, 64, 64},   // moderate validator-set expansion target
+		{21, 21, 21, 21},     // routine same-set refresh at canonical Lux n
+		{64, 64, 64, 64},     // moderate validator-set expansion target
 		{128, 128, 128, 128}, // large-set deployment
 	}
 

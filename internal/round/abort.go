@@ -9,8 +9,8 @@ type Abort struct {
 	Err      error
 }
 
-func (*Abort) VerifyMessage(Message) error                  { return nil }
-func (*Abort) StoreMessage(Message) error                   { return nil }
+func (*Abort) VerifyMessage(Message) error                 { return nil }
+func (*Abort) StoreMessage(Message) error                  { return nil }
 func (r *Abort) Finalize(chan<- *Message) (Session, error) { return r, nil }
-func (*Abort) MessageContent() Content                      { return nil }
-func (*Abort) Number() Number                               { return 0 }
+func (*Abort) MessageContent() Content                     { return nil }
+func (*Abort) Number() Number                              { return 0 }
