@@ -13,10 +13,10 @@
 //
 // Citations (canonical proof bucket):
 //
-//   proofs/definitions/transcript-binding.tex
-//     Definition ref:pulsar-transcript
-//   proofs/pulsar/hash-suite-separation.tex
-//     Theorem ref:hash-suite-separation
+//	proofs/definitions/transcript-binding.tex
+//	  Definition ref:pulsar-transcript
+//	proofs/pulsar/hash-suite-separation.tex
+//	  Theorem ref:hash-suite-separation
 package lss
 
 import (

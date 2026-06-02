@@ -9,7 +9,7 @@
 //   - params.go    (T,N) × level parameter sets (Tables 3, 10, 11)
 //   - rss.go       replicated secret sharing, hardcoded optimal partitions
 //   - hrej.go      imbalanced hyperball rejection — STUB; HRej() returns
-//                  "not yet wired to CIRCL ring"
+//     "not yet wired to CIRCL ring"
 //
 // The signer itself — keygen.go, sign.go, combine.go, a_posteriori.go —
 // does not exist yet. Importing this package and calling anything that

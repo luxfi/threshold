@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-sev-guest/verify/trust"
 	sevtest "github.com/google/go-sev-guest/testing"
+	"github.com/google/go-sev-guest/verify/trust"
 
 	coronaThreshold "github.com/luxfi/corona/threshold"
 
