@@ -17,7 +17,7 @@ are not limited to:
 THRESHOLD CRYPTOGRAPHY INNOVATIONS:
 - LSS (Lagrange Secret Sharing) Dynamic Resharing Without Key Reconstruction
 - Multiplicative Blinding Protocols (Protocol I & II) for Share Privacy
-- Ringtail Post-Quantum Lattice-Based Threshold Signatures
+- Corona Post-Quantum Lattice-Based Threshold Signatures
 - Threshold BIP-32 Deterministic Key Derivation
 - Identifiable Abort Protocol with Blame Assignment
 - Automatic Generation-Based Rollback with Party Eviction
