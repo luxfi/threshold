@@ -114,13 +114,13 @@ func (s *Signer) Sign(ctx context.Context, env *Envelope, jobID [32]byte, msg []
 	}
 
 	recv := &SignReceipt{
-		JobID:           jobID,
-		Epoch:           sealed.Epoch,
-		IssuedNonce:     sealed.IssuedNonce,
-		EphemeralPub:    sealed.EphemeralPub,
-		EvidenceKind:    string(env.Kind),
-		EvidenceIssuer:  evidenceIssuerString(env),
-		AuditSignature:  audit,
+		JobID:          jobID,
+		Epoch:          sealed.Epoch,
+		IssuedNonce:    sealed.IssuedNonce,
+		EphemeralPub:   sealed.EphemeralPub,
+		EvidenceKind:   string(env.Kind),
+		EvidenceIssuer: evidenceIssuerString(env),
+		AuditSignature: audit,
 	}
 	return wire, recv, nil
 }
