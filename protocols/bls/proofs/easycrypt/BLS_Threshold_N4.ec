@@ -99,11 +99,9 @@ proof.
   move=> Q shares uQ szQ szs.
   rewrite reconstruct_linear_N4 //=; first by rewrite fresh_sharing_size.
   rewrite (shamir_correct_N4 Q scalar_zero uQ szQ).
-  rewrite derive_pk_homomorphism derive_pk_zero.
-  (* Same one-line group-identity admit as FROST_N4 / CGGMP21_N4 /     *)
-  (* Pulsar_N4. Closure: Crypto.BLS.Threshold.group_pk_identity Lean   *)
-  (* lemma.                                                             *)
-  admit.
+  (* reconstruct Q shares + 0 = reconstruct Q shares by the scalar     *)
+  (* right-identity, so both sides are derive_pk of the same scalar.   *)
+  by rewrite scalar_add_zeroR_N4.
 qed.
 
 (* -------------------------------------------------------------------- *)
