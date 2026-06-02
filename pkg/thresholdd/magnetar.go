@@ -83,13 +83,42 @@ type magnetarScheme struct {
 	// teeBackend is the optional institutional-custody SLH-DSA
 	// signer wired via SetTEEBackend. When nil, Sign_TEE refuses
 	// with errMagnetarTEEUnwired. The default permissionless path
-	// (Sign) is unaffected by the TEE backend's presence.
+	// (Sign) is unaffected by the TEE backend's presence — UNLESS
+	// the chain profile is strict-PQ, in which case Sign itself
+	// refuses (see profile gate below).
 	teeBackend *slhdsatee.Signer
+
+	// pool is the optional t-of-n attested-combiner pool. When the
+	// chain profile is strict-PQ AND the pool is wired, Combine_TEE
+	// routes through the pool's t-of-n agreement. When the pool is
+	// nil but profile is strict-PQ, Combine_TEE refuses with
+	// ErrMagnetarNoTEEAttestation.
+	pool *slhdsatee.CombinerPool
+
+	// profile is the chain-security profile this dispatcher is
+	// bound to. Default is ProfileLegacyCompat (commodity-host
+	// strict-atom Combine is acceptable). Strict-PQ chains MUST
+	// call SetChainSecurityProfile at boot to flip this value;
+	// once flipped, the permissionless Sign path refuses with
+	// ErrMagnetarNoTEEAttestation and only Sign_TEE / Combine_TEE
+	// produce signatures.
+	//
+	// Hickey discipline: profile is ONE value in ONE place. The
+	// gate is the single function magnetarRefuseUnderStrictPQ.
+	// The dispatcher reads it the same way the precompile
+	// contract.RefuseUnderStrictPQ helper reads its
+	// StrictPQReporter: ONE function, ONE place, ONE canonical
+	// refusal sentinel.
+	profile slhdsatee.ChainSecurityProfile
 }
 
 // errMagnetarTEEUnwired is returned by Sign_TEE when no TEE backend
 // has been registered via SetTEEBackend.
 var errMagnetarTEEUnwired = errors.New("magnetar tee sign: no TEE backend wired (call SetTEEBackend first)")
+
+// errMagnetarPoolUnwired is returned by Combine_TEE when no combiner
+// pool has been registered via SetCombinerPool, regardless of profile.
+var errMagnetarPoolUnwired = errors.New("magnetar combine_tee: no combiner pool wired (call SetCombinerPool first)")
 
 // magnetarSession holds the in-process per-validator keypairs for
 // one Keygen output. The canonical PublicKey for the session is the
@@ -195,6 +224,61 @@ func (s *magnetarScheme) Keygen(p keygenParams) (keygenResult, error) {
 	return keygenResult{PublicKey: pkHex, Shares: shareIDs}, nil
 }
 
+// magnetarRefuseUnderStrictPQ is the profile gate for the magnetar
+// dispatcher. ONE function, ONE place — mirrors
+// precompile/contract.RefuseUnderStrictPQ at the precompile layer.
+//
+// Returns slhdsatee.ErrMagnetarNoTEEAttestation when the dispatcher
+// is bound to ProfileStrictPQ. Returns nil otherwise.
+//
+// Called at the top of Sign / Sign_Ctx (the permissionless paths)
+// — under strict-PQ, the permissionless path is hard-refused; only
+// Sign_TEE / Combine_TEE can produce signatures because only those
+// paths route the master-seed reconstruction through an attested
+// TEE.
+//
+// Read under the dispatcher's mutex so SetChainSecurityProfile can
+// flip the gate atomically at boot.
+func (s *magnetarScheme) magnetarRefuseUnderStrictPQ() error {
+	s.mu.Lock()
+	p := s.profile
+	s.mu.Unlock()
+	if p == slhdsatee.ProfileStrictPQ {
+		return slhdsatee.ErrMagnetarNoTEEAttestation
+	}
+	return nil
+}
+
+// SetChainSecurityProfile binds the dispatcher to one of the
+// canonical chain-security profiles. Strict-PQ chains MUST call
+// this at boot with slhdsatee.ProfileStrictPQ; the default value
+// (slhdsatee.ProfileLegacyCompat) preserves the commodity-host
+// permissionless Sign path.
+//
+// Idempotent — re-issuing the same profile is a no-op. Operators
+// rotating a chain into strict-PQ MUST follow the cascade:
+//   - flip the chain profile in luxfi/node ChainConfig
+//   - flip this dispatcher's profile via SetChainSecurityProfile
+//   - wire a CombinerPool via SetCombinerPool (>= Threshold attested
+//     members already provisioned).
+// Until all three steps complete, the dispatcher will refuse Sign
+// AND Combine_TEE on the strict-PQ chain — fail-closed under
+// half-rotated state.
+func (s *magnetarScheme) SetChainSecurityProfile(p slhdsatee.ChainSecurityProfile) {
+	s.mu.Lock()
+	s.profile = p
+	s.mu.Unlock()
+}
+
+// SetCombinerPool wires the t-of-n attested-combiner pool. Required
+// for Combine_TEE under any profile; under strict-PQ, it is the
+// canonical sign surface.
+func (s *magnetarScheme) SetCombinerPool(p *slhdsatee.CombinerPool) {
+	s.mu.Lock()
+	s.pool = p
+	s.mu.Unlock()
+}
+
 // Sign produces a magnetar signature for the message under the
 // session's canonical (FIRST) validator keypair, frames it in the
 // MAGS wire codec, and returns the wire bytes as hex. Output is
@@ -207,7 +291,16 @@ func (s *magnetarScheme) Keygen(p keygenParams) (keygenResult, error) {
 // intentionally omitted here (the bus shape does not carry one);
 // the published bytes verify under VerifyBytes with the same MAGG
 // public-key bytes plus the original message.
+//
+// Profile gate: when the dispatcher is bound to
+// slhdsatee.ProfileStrictPQ, Sign refuses with
+// ErrMagnetarNoTEEAttestation — the permissionless path is hard-
+// refused on strict-PQ chains. Callers MUST use Sign_TEE
+// (single-host attested) or Combine_TEE (t-of-n attested pool).
 func (s *magnetarScheme) Sign(p signParams) (signResult, error) {
+	if err := s.magnetarRefuseUnderStrictPQ(); err != nil {
+		return signResult{}, err
+	}
 	msg, err := hex.DecodeString(p.MessageHex)
 	if err != nil {
 		return signResult{}, fmt.Errorf("messageHex: %w", err)
@@ -274,7 +367,64 @@ func (s *magnetarScheme) Sign(p signParams) (signResult, error) {
 // signCtx is the FIPS 205 ctx octet string (0..255 bytes). Pass nil
 // (or the empty hex string "") to bind the empty ctx — semantically
 // equivalent to Sign.
+//
+// Profile gate: same as Sign — refuses under strict-PQ with
+// ErrMagnetarNoTEEAttestation when the scheme has been bound to
+// slhdsatee.ProfileStrictPQ via SetChainSecurityProfile. Callers
+// MUST use Sign_TEE for ctx-bound institutional-custody signing on
+// strict-PQ chains.
+//
+// NOTE: this method does NOT consult the per-request chain-ID
+// resolver gate (RefuseUnderStrictPQ in profile.go). Callers that
+// reach this method via the JSON-RPC dispatcher go through
+// Sign_Ctx_Profile (where the resolver gate fires before this);
+// in-process callers with their own outer admission gate may
+// bypass the resolver gate.
 func (s *magnetarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
+	return s.signCtxInternal(p)
+}
+
+// Sign_Ctx_Profile is the magnetar profile-aware entry point.
+// Same shape as pulsar.Sign_Ctx_Profile: the per-request chain-ID
+// resolver gate fires first, then the scheme-bound slhdsatee gate
+// (inside signCtxInternal). Two orthogonal axes:
+//
+//   - resolver gate: "does the request's X-Chain-ID resolve to
+//     strict-PQ?" — refuses with ErrRefusedUnderStrictPQ which the
+//     dispatcher maps to HTTP 503 + the documented body.
+//   - slhdsatee scheme gate: "is THIS process bound to strict-PQ
+//     via SetChainSecurityProfile?" — refuses with
+//     ErrMagnetarNoTEEAttestation surfaced as a -32000 JSON-RPC
+//     error. Pre-dates this gate; remains for back-compat with
+//     operators who set the scheme profile but did not wire a
+//     resolver.
+//
+// One function, one place: profile.go::RefuseUnderStrictPQ owns
+// the resolver policy; signCtxInternal owns the scheme-bound
+// policy. They compose without coupling.
+//
+// Removal contract: when the magnetar aggregate-cert ctx-bound
+// path lands AND signCtxInternal swaps to drive that path with NO
+// single-validator shortcut, the resolver gate here becomes dead
+// code. Sign_Ctx_Profile then collapses to
+// `return s.signCtxInternal(p)`.
+func (s *magnetarScheme) Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileResolver) (signResult, error) {
+	if err := RefuseUnderStrictPQ(p.ChainID, "magnetar.sign_ctx", resolver); err != nil {
+		return signResult{}, err
+	}
+	return s.signCtxInternal(p)
+}
+
+// signCtxInternal is the actual ctx-bound sign path. Runs the
+// scheme-bound slhdsatee strict-PQ gate first (refuses with
+// ErrMagnetarNoTEEAttestation under SetChainSecurityProfile
+// strict-PQ), then drives magnetar.SignCtx on the canonical
+// single-validator keypair sess.keys[0].sk. Wire shape is
+// MAGS-framed FIPS 205 ctx-bound bytes.
+func (s *magnetarScheme) signCtxInternal(p signCtxParams) (signResult, error) {
+	if err := s.magnetarRefuseUnderStrictPQ(); err != nil {
+		return signResult{}, err
+	}
 	msg, err := hex.DecodeString(p.MessageHex)
 	if err != nil {
 		return signResult{}, fmt.Errorf("messageHex: %w", err)
@@ -419,6 +569,125 @@ func (s *magnetarScheme) Sign_TEE(
 		return nil, nil, fmt.Errorf("magnetar tee sign: nil receipt")
 	}
 	return wire, receipt.AuditSignature, nil
+}
+
+// PoolCombineMember names a single combiner participating in a
+// Combine_TEE call. The dispatcher carries the per-member attestation
+// payload through to the slhdsatee.CombinerPool.Combine call.
+type PoolCombineMember struct {
+	// Name is the pool-registered member identifier
+	// (matches CombinerPool.AddMember(name, ...)).
+	Name string
+
+	// Kind / EvidenceBytes / RIM / Hardware / TEEPub mirror the
+	// Sign_TEE payload shape. One PoolCombineMember per member
+	// participating in the t-of-n quorum.
+	Kind          string
+	EvidenceBytes []byte
+	RIM           [32]byte
+	Hardware      [32]byte
+	TEEPub        [32]byte
+}
+
+// Combine_TEE is the canonical strict-PQ signing surface. It drives
+// the wired CombinerPool's t-of-n attested-combiner Sign and returns
+// the agreed wire bytes + per-member audit signatures.
+//
+// Hard requirements (no caveat path):
+//
+//   - Pool MUST be wired via SetCombinerPool. errMagnetarPoolUnwired
+//     otherwise.
+//   - At least pool.Threshold() members MUST appear in `members` AND
+//     pass the pool's freshness gate. Otherwise: slhdsatee.
+//     ErrMagnetarInsufficientQuorum / ErrMagnetarStaleAttestation.
+//   - All selected members MUST produce byte-identical wire output.
+//     Divergence: slhdsatee.ErrMagnetarSignatureDivergence.
+//
+// Output: the consolidated wire signature (byte-equal across the
+// quorum) + the per-member audit-signature bytes concatenated as a
+// list. Embedders that need the full SignReceipt list call the pool
+// directly via SetCombinerPool / pool.Combine — the dispatcher
+// surface emits only the bytes that participate in verification
+// (the FIPS 205 wire) + the audit trail for control-plane logging.
+func (s *magnetarScheme) Combine_TEE(
+	ctx context.Context,
+	members []PoolCombineMember,
+	verifyOpts []slhdsateeVerifyOpt,
+	jobID [32]byte,
+	msg []byte,
+	signCtx []byte,
+) ([]byte, [][]byte, error) {
+	s.mu.Lock()
+	pool := s.pool
+	s.mu.Unlock()
+	if pool == nil {
+		return nil, nil, errMagnetarPoolUnwired
+	}
+
+	envs := make(map[string]*slhdsatee.Envelope, len(members))
+	for _, m := range members {
+		if m.Name == "" {
+			return nil, nil, fmt.Errorf("magnetar combine_tee: member with empty Name")
+		}
+		envs[m.Name] = &slhdsatee.Envelope{
+			Kind:          attestKindFromString(m.Kind),
+			EvidenceBytes: append([]byte(nil), m.EvidenceBytes...),
+			RIM:           m.RIM,
+			Hardware:      m.Hardware,
+			TEEPub:        m.TEEPub,
+			VerifyOpts:    teeVerifyOptionsToAttest(verifyOpts),
+		}
+	}
+
+	wire, receipts, err := pool.Combine(ctx, envs, jobID, msg, signCtx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("magnetar combine_tee: %w", err)
+	}
+	if len(receipts) == 0 {
+		return nil, nil, fmt.Errorf("magnetar combine_tee: pool returned no receipts")
+	}
+	audits := make([][]byte, 0, len(receipts))
+	for _, r := range receipts {
+		if r == nil {
+			return nil, nil, fmt.Errorf("magnetar combine_tee: pool returned nil receipt")
+		}
+		audits = append(audits, r.AuditSignature)
+	}
+	return wire, audits, nil
+}
+
+// AttestCombinerMember refreshes one pool member's attestation
+// freshness state. Called by the operator's control plane out-of-
+// band of any sign call; the Combine_TEE path then reads the
+// freshness state without performing any KDS / PCS / NRAS network
+// roundtrip.
+//
+// The dispatcher proxies straight through to CombinerPool.Attest;
+// the call returns slhdsatee sentinels (ErrAttestationRequired etc.)
+// untouched so callers can errors.Is them.
+func (s *magnetarScheme) AttestCombinerMember(
+	ctx context.Context,
+	memberName string,
+	kind string,
+	evidenceBytes []byte,
+	rim, hardware, teePub [32]byte,
+	verifyOpts []slhdsateeVerifyOpt,
+) error {
+	s.mu.Lock()
+	pool := s.pool
+	s.mu.Unlock()
+	if pool == nil {
+		return errMagnetarPoolUnwired
+	}
+	env := &slhdsatee.Envelope{
+		Kind:          attestKindFromString(kind),
+		EvidenceBytes: append([]byte(nil), evidenceBytes...),
+		RIM:           rim,
+		Hardware:      hardware,
+		TEEPub:        teePub,
+		VerifyOpts:    teeVerifyOptionsToAttest(verifyOpts),
+	}
+	return pool.Attest(ctx, memberName, env)
 }
 
 // magnetarSeededReader is a tiny SHA-256-counter deterministic byte
