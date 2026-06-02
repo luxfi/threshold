@@ -87,6 +87,12 @@ axiom derive_pk_homomorphism :
 axiom derive_pk_zero :
   derive_pk scalar_zero = group_zero_pk.
 
+(* BRIDGE: group_zero_pk is the identity of the curve point group       *)
+(* (the point at infinity); right-identity is an AddGroup instance fact  *)
+(* (Mathlib `add_zero`). Same bridge as Pulsar_N4 / CGGMP21_N4.          *)
+axiom group_pk_add_zeroR :
+  forall (p : group_pk_t), group_pk_add p group_zero_pk = p.
+
 (* ===================================================================
    FROST Refresh / Proactive-rotation: public-key preservation theorem.
    =================================================================== *)
@@ -120,9 +126,8 @@ proof.
   rewrite reconstruct_linear_N4 //=; first by rewrite fresh_sharing_size.
   rewrite (shamir_correct_N4 Q scalar_zero uQ szQ).
   rewrite derive_pk_homomorphism derive_pk_zero.
-  (* group_pk_add P group_zero_pk = P (group identity).                 *)
-  (* Stated as a one-line algebraic identity inline.                    *)
-  admit.  (* Lean bridge: derive_pk_group_identity (one line, future). *)
+  (* group_pk_add p group_zero_pk = p (group right-identity).           *)
+  by rewrite group_pk_add_zeroR.
 qed.
 
 (* -------------------------------------------------------------------- *)

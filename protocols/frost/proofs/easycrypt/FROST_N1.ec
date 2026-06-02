@@ -139,6 +139,12 @@ op h_binding : byte_seq -> scalar_t.
 op h_challenge : byte_seq -> scalar_t.
 op h_nonce : byte_seq -> scalar_t.
 
+(* Generic (ciphersuite-agnostic) Schnorr signature encoder: maps the    *)
+(* aggregated commitment R and response z to the signature byte string.  *)
+(* The ciphersuite layer (FROST_Ciphersuite_*.ec) and the Combine        *)
+(* refinement (FROST_N1_Refinement.ec) both pin / consume this operator. *)
+op encode_signature : point_t -> scalar_t -> signature_t.
+
 (* -------------------------------------------------------------------- *)
 (* Shamir / Lagrange algebraic kernel                                   *)
 (* -------------------------------------------------------------------- *)
@@ -275,20 +281,20 @@ declare module S <: SchnorrSigner.
 declare axiom frost_combine_dispatches_to_schnorr
     (sess : session_t)
     (Q : int list)
-    (shares : share_t list)
+    (key_shares : share_t list)
     (commits : commit_list_t)
     (responses : (int * share_response_t) list)
     (group_pk : group_pk_t)
     (msg : message_t) :
   uniq Q =>
-  size Q = size shares =>
+  size Q = size key_shares =>
   (* The threshold protocol's combine output equals single-party        *)
   (* Schnorr Sign on the Lagrange-reconstructed secret.                 *)
   equiv [ T.combine ~ S.sign :
             sess{1} = sess /\ commits{1} = commits
             /\ shares{1} = responses /\ group_pk{1} = group_pk
             /\ msg{1} = msg
-            /\ sk{2} = reconstruct Q shares
+            /\ sk{2} = reconstruct Q key_shares
             /\ msg{2} = msg
           ==>
             ={res} ].
@@ -325,9 +331,10 @@ proof.
   have hrec : master_secret =
                reconstruct Q (List.map (poly_eval master_secret) Q).
   - by rewrite (lagrange_inverse_eval master_secret Q).
+  rewrite hrec.
   apply (frost_combine_dispatches_to_schnorr sess Q
            (List.map (poly_eval master_secret) Q) commits responses
-           group_pk msg uQ _) => //=.
+           group_pk msg uQ _).
   by rewrite size_map.
 qed.
 

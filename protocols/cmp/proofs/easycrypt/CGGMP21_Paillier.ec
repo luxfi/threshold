@@ -32,7 +32,7 @@ require import AllCore List Int IntDiv Distr DBool DInterval SmtMap.
 
 type paillier_pk_t.   (* Public key (modulus N, generator g = N+1).   *)
 type paillier_sk_t.   (* Secret key (factors (p, q) with N = pq).     *)
-type paillier_ct_t.   (* Ciphertext (element of Z_{N^2}^*).            *)
+type paillier_ct_t.   (* Ciphertext (element of the unit group mod N^2). *)
 
 (* Operations.                                                          *)
 op paillier_N : paillier_pk_t -> int.   (* Extract the modulus.        *)
@@ -50,7 +50,7 @@ op paillier_exp : paillier_ct_t -> int -> paillier_ct_t.
 (* `pkg/paillier`; here we axiomatize the result.                       *)
 axiom paillier_modulus_biprime :
   forall (pk : paillier_pk_t),
-    True.  (* Stated as the biprime-test soundness in CCS '21 App C.   *)
+    true.  (* Stated as the biprime-test soundness in CCS '21 App C.   *)
 
 (* -------------------------------------------------------------------- *)
 (* Additive homomorphism (the load-bearing identity)                    *)
@@ -83,7 +83,7 @@ axiom paillier_scalar_homomorphism :
 (* Decryption inverts encryption: dec(sk, enc(pk, m, r)) = m mod N.    *)
 axiom paillier_correctness :
   forall (sk : paillier_sk_t) (pk : paillier_pk_t) (m r : int),
-    True.  (* dec sk (enc pk m r) = m mod N (when sk and pk are paired)*)
+    true.  (* dec sk (enc pk m r) = m mod N (when sk and pk are paired)*)
 
 (* -------------------------------------------------------------------- *)
 (* MtA correctness (CCS '21 §3.2)                                       *)
@@ -99,13 +99,13 @@ axiom paillier_correctness :
 axiom mta_correctness :
   forall (pk_A : paillier_pk_t)
          (sk_A : paillier_sk_t)
-         (a b beta : int)
-         (r_a r_beta : int),
-    let C_A    = paillier_enc pk_A a r_a in
-    let C_B    = paillier_mul (paillier_exp C_A b)
-                              (paillier_enc pk_A (-beta) r_beta) in
-    let alpha  = paillier_dec sk_A C_B in
-    (alpha + beta) %% paillier_N pk_A = (a * b) %% paillier_N pk_A.
+         (a b bta : int)
+         (r_a r_bta : int),
+    let c_A    = paillier_enc pk_A a r_a in
+    let c_B    = paillier_mul (paillier_exp c_A b)
+                              (paillier_enc pk_A (-bta) r_bta) in
+    let alpha  = paillier_dec sk_A c_B in
+    (alpha + bta) %% paillier_N pk_A = (a * b) %% paillier_N pk_A.
 
 (* -------------------------------------------------------------------- *)
 (* End of CGGMP21_Paillier.ec                                            *)
