@@ -162,7 +162,7 @@ op paillier_dec : paillier_sk_t -> int -> int.
 (*   enc(pk, m1, r1) * enc(pk, m2, r2) = enc(pk, m1+m2 mod N, r1*r2)  *)
 axiom paillier_additive_homomorphism :
   forall (pk : paillier_pk_t) (m1 m2 r1 r2 : int),
-    True.  (* Stated mathematically in CGGMP21_Paillier.ec *)
+    true.  (* Stated mathematically in CGGMP21_Paillier.ec *)
 
 (* -------------------------------------------------------------------- *)
 (* Single-party ECDSA reference module                                  *)
@@ -179,10 +179,10 @@ module type ECDSASigner = {
 module ECDSARef : ECDSASigner = {
   proc sign(sk : share_t, msg_hash : message_hash_t, k : scalar_t)
     : signature_t = {
-    var R : point_t;
+    var rpt : point_t;
     var r, s, k_inv, m : scalar_t;
-    R <- scalar_mul k group_g;
-    r <- point_x R;
+    rpt <- scalar_mul k group_g;
+    r <- point_x rpt;
     k_inv <- scalar_inv k;
     m <- h_msg msg_hash;
     s <- scalar_mul_s k_inv (scalar_add m (scalar_mul_s r sk));
@@ -238,17 +238,17 @@ declare module S <: ECDSASigner.
 declare axiom cggmp21_dispatches_to_ecdsa
     (sess : session_t)
     (Q : int list)
-    (shares : share_t list)
+    (key_shares : share_t list)
     (presig : presignature_t)
     (k_recon : scalar_t)
     (msg_hash : message_hash_t)
     (s_shares : (int * scalar_t) list) :
   uniq Q =>
-  size Q = size shares =>
+  size Q = size key_shares =>
   equiv [ T.sign_online ~ S.sign :
             sess{1} = sess /\ presig{1} = presig
             /\ msg_hash{1} = msg_hash /\ shares{1} = s_shares
-            /\ sk{2} = reconstruct Q shares
+            /\ sk{2} = reconstruct Q key_shares
             /\ k{2} = k_recon /\ msg_hash{2} = msg_hash
           ==>
             ={res} ].
@@ -277,9 +277,10 @@ proof.
   have hrec : master_secret =
                reconstruct Q (List.map (poly_eval master_secret) Q).
   - by rewrite (lagrange_inverse_eval master_secret Q).
+  rewrite hrec.
   apply (cggmp21_dispatches_to_ecdsa sess Q
            (List.map (poly_eval master_secret) Q) presig k_recon
-           msg_hash s_shares uQ _) => //=.
+           msg_hash s_shares uQ _).
   by rewrite size_map.
 qed.
 
