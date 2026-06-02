@@ -40,14 +40,14 @@ module FROST_Ref : FROST_Threshold = {
   proc round1(sess : session_t, share : share_t, my_idx : int)
     : commit_pair_t * nonce_pair_t = {
     var d, e : scalar_t;
-    var D, E : point_t;
+    var dd, ee : point_t;
     (* In production the nonces are sampled fresh per Komlo-Goldberg    *)
     (* Fig. 3, Round 1. Here the abstract sampling is witnessed.       *)
     d <- witness;
     e <- witness;
-    D <- scalar_mul d group_g;
-    E <- scalar_mul e group_g;
-    return ((D, E), (d, e));
+    dd <- scalar_mul d group_g;
+    ee <- scalar_mul e group_g;
+    return ((dd, ee), (d, e));
   }
 
   proc round2(sess : session_t, share : share_t, my_idx : int,
@@ -124,12 +124,12 @@ module FROST_Round2_Spec = {
               nonces : nonce_pair_t, commits : commit_list_t,
               msg : message_t) : share_response_t = {
     var rho, c, lam, z : scalar_t;
-    var R : point_t;
+    var rpt : point_t;
     rho <- compute_binding_factor sess commits msg my_idx;
-    R <- aggregate_R commits msg sess;
+    rpt <- aggregate_R commits msg sess;
     (* Group PK is committed in the session; threshold reconstruction   *)
     (* is implicit in the session-binding step.                          *)
-    c <- compute_challenge sess R witness msg;
+    c <- compute_challenge sess rpt witness msg;
     lam <- lagrange (map fst commits) my_idx;
     z <- scalar_add
            (scalar_add nonces.`1
@@ -155,17 +155,17 @@ axiom round2_refinement_axiom :
 (* `FROST_N1.ec` and lives in the ciphersuite layer.                    *)
 (* -------------------------------------------------------------------- *)
 
-op encode_signature : point_t -> scalar_t -> signature_t.
-
+(* encode_signature is declared in the shared base FROST_N1.ec so that   *)
+(* the ciphersuite layer can also pin it; consumed here unchanged.        *)
 module FROST_Combine_Spec = {
   proc combine(sess : session_t, commits : commit_list_t,
                shares : (int * share_response_t) list,
                group_pk : group_pk_t, msg : message_t) : signature_t = {
-    var R : point_t;
+    var rpt : point_t;
     var z : scalar_t;
-    R <- aggregate_R commits msg sess;
+    rpt <- aggregate_R commits msg sess;
     z <- foldr scalar_add scalar_zero (map snd shares);
-    return encode_signature R z;
+    return encode_signature rpt z;
   }
 }.
 
