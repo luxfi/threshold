@@ -17,7 +17,7 @@ The most comprehensive threshold signature implementation supporting **20+ block
 ### ✨ Key Features
 
 - **🌐 Universal Multi-Chain Support** - Native adapters for XRPL, Ethereum, Bitcoin, Solana, TON, Cardano, and 14+ more chains
-- **🔐 Post-Quantum Security** - Ringtail lattice-based signatures with 128/192/256-bit security levels
+- **🔐 Post-Quantum Security** - Corona lattice-based signatures with 128/192/256-bit security levels
 - **⚡ Lightning Fast** - Sub-25ms signing, 12-82ms key generation
 - **🔄 Dynamic Resharing** - Add/remove parties without downtime or key reconstruction
 - **🛡️ Byzantine Fault Tolerant** - Handles up to t-1 malicious parties
@@ -40,7 +40,7 @@ The most comprehensive threshold signature implementation supporting **20+ block
 - **ECDSA** (secp256k1) - Bitcoin, Ethereum, XRPL
 - **EdDSA** (Ed25519) - Solana, TON, Cardano, NEAR
 - **Schnorr** (BIP-340) - Bitcoin Taproot, Polkadot
-- **Ringtail** (Post-Quantum) - All chains via adapter
+- **Corona** (Post-Quantum) - All chains via adapter
 
 ## 🌍 Blockchain Support
 
@@ -99,10 +99,10 @@ manager := lss.NewRollbackManager(maxGenerations)
 restoredConfig, _ := manager.Rollback(targetGeneration)
 ```
 
-### Post-Quantum Signatures (Ringtail)
+### Post-Quantum Signatures (Corona)
 ```go
 // Create post-quantum adapter
-pqAdapter := adapters.NewRingtailAdapter(256, numParties) // 256-bit security
+pqAdapter := adapters.NewCoronaAdapter(256, numParties) // 256-bit security
 
 // Generate preprocessing
 preprocessing := pqAdapter.GeneratePreprocessing(parties, threshold, 100)

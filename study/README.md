@@ -55,7 +55,7 @@ break against MLWE/RLWE leaves it standing.
   - All build under `lake build Crypto`.
 - **Papers**:
   - `papers/lp-073-pulsar/lp-073-pulsar.tex`
-  - `papers/lux-corona-pq/lux-ringtail-pq.tex` (legacy filename)
+  - `papers/lux-corona-pq/lux-corona-pq.tex`
   - `papers/lp-074-magnetar/` — open.
 - **Go implementations**:
   - `~/work/lux/pulsar/` + `~/work/lux/pulsar-mptc/` (NIST MPTC)
