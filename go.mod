@@ -147,7 +147,7 @@ require (
 	github.com/google/go-sev-guest v0.14.1
 	github.com/luxfi/corona v0.7.6
 	github.com/luxfi/lens v0.1.4
-	github.com/luxfi/magnetar v1.1.0
+	github.com/luxfi/magnetar v1.2.0
 	github.com/luxfi/metric v1.5.7
 	github.com/luxfi/mpc v1.14.13
 	github.com/luxfi/pulsar v1.0.23
