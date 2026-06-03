@@ -172,6 +172,22 @@ func TestCoronaRoundTrip(t *testing.T) {
 	roundtrip(t, "corona", 1, 2)
 }
 
+// TestCoronaCoronaWireAlias pins the backward-compatibility behavior
+// of the legacy "corona" scheme name introduced when the R-LWE
+// threshold module was renamed Corona → Corona (luxfi/corona
+// AUDIT-2026-06.md §4.3). External clients that still send the legacy
+// scheme name on the JSON-RPC wire MUST continue to dispatch into the
+// corona handler. The canonical name in all new code is "corona"; the
+// alias exists only for an external-caller migration window.
+//
+// See schemeAliases / canonicalScheme in server.go.
+func TestCoronaCoronaWireAlias(t *testing.T) {
+	// Same parameters as TestCoronaRoundTrip (1-of-2 satisfies the
+	// kernel's strict t < n requirement); routing through the alias
+	// MUST be identical to routing through the canonical name.
+	roundtrip(t, "corona", 1, 2)
+}
+
 // TestMagnetarRoundTrip exercises the magnetar dispatcher end-to-
 // end: keygen generates `participants` per-validator-standalone
 // SLH-DSA keypairs via the v0.5 PerValidatorKeypair primary
