@@ -21,7 +21,7 @@ import (
 	circlmldsa65 "github.com/cloudflare/circl/sign/mldsa/mldsa65"
 	circlslhdsa "github.com/cloudflare/circl/sign/slhdsa"
 
-	coronaThreshold "github.com/luxfi/corona/threshold"
+	coronaKernel "github.com/luxfi/corona/threshold"
 
 	"github.com/luxfi/threshold/pkg/thresholdd"
 )
@@ -31,14 +31,14 @@ import (
 // ---------------------------------------------------------------------
 
 const (
-	// fujiRPC is the public testnet luxd LoadBalancer. Validated alive
+	// defaultTestnetRPC is the public testnet luxd LoadBalancer. Validated alive
 	// at the time of harness construction (eth_chainId returned 0x17870
 	// = 96368 and eth_blockNumber returned a non-zero head). Override
-	// at runtime via LUX_FUJI_RPC.
-	defaultFujiRPC = "http://134.199.187.16:9640/ext/bc/C/rpc"
+	// at runtime via LUX_TESTNET_RPC.
+	defaultTestnetRPC = "http://134.199.187.16:9640/ext/bc/C/rpc"
 
-	// fujiChainID is fuji's C-Chain ID (96368).
-	fujiChainID int64 = 96368
+	// testnetChainID is the Lux testnet C-Chain ID (96368).
+	testnetChainID int64 = 96368
 
 	// Threshold parameters per the validation spec: 5 parties, threshold
 	// 3 (corona requires t < n strictly — also satisfied at 3/5).
@@ -104,23 +104,23 @@ func TestProductionValidation_All(t *testing.T) {
 		results = append(results, res)
 	}
 
-	// Chain liveness check: pull head block from the live fuji testnet
+	// Chain liveness check: pull head block from the live Lux testnet
 	// and report. We do NOT submit a tx because the dispatcher
 	// signatures are PQ over arbitrary bytes — they are NOT secp256k1
 	// ECDSA tx signatures the C-Chain wraps in legacy / EIP-1559 tx
 	// envelopes. Chain liveness is the orthogonal measurement: this
 	// shows the testnet is up and the precompile slots respond while
 	// the harness runs.
-	rpc := os.Getenv("LUX_FUJI_RPC")
+	rpc := os.Getenv("LUX_TESTNET_RPC")
 	if rpc == "" {
-		rpc = defaultFujiRPC
+		rpc = defaultTestnetRPC
 	}
 	headHex, headHash, headTime, err := getHead(rpc)
 	if err != nil {
 		t.Logf("WARN: getHead(%s) failed: %v", rpc, err)
 	} else {
 		head, _ := new(big.Int).SetString(strings.TrimPrefix(headHex, "0x"), 16)
-		t.Logf("CHAIN-LIVENESS fuji-C: head=%d (0x%s) hash=%s ts=%d",
+		t.Logf("CHAIN-LIVENESS testnet-C: head=%d (0x%s) hash=%s ts=%d",
 			head, head.Text(16), headHash, headTime)
 	}
 
@@ -136,18 +136,18 @@ func TestProductionValidation_All(t *testing.T) {
 	t.Logf("PRECOMPILE-LIVENESS SLH-DSA (0x012203): %s", probePrecompile(rpc, "0x0000000000000000000000000000000000012203", "0x12"))
 
 	// Optional: submit a real ETH tx as additional chain-liveness
-	// evidence. Skipped unless LUX_FUJI_PRIVKEY is provided (a hex
-	// secp256k1 key with positive fuji-C balance). This is orthogonal
+	// evidence. Skipped unless LUX_TESTNET_PRIVKEY is provided (a hex
+	// secp256k1 key with positive testnet-C balance). This is orthogonal
 	// to the PQ validation; failure here is not a PQ-stack failure.
-	if pk := os.Getenv("LUX_FUJI_PRIVKEY"); pk != "" {
+	if pk := os.Getenv("LUX_TESTNET_PRIVKEY"); pk != "" {
 		txHash, blkNum, err := submitNativeTransfer(rpc, pk)
 		if err != nil {
 			t.Logf("WARN: chain-liveness tx submit: %v", err)
 		} else {
-			t.Logf("CHAIN-LIVENESS-TX fuji-C: tx=%s blk=%d", txHash, blkNum)
+			t.Logf("CHAIN-LIVENESS-TX testnet-C: tx=%s blk=%d", txHash, blkNum)
 		}
 	} else {
-		t.Logf("CHAIN-LIVENESS-TX skipped: LUX_FUJI_PRIVKEY not set")
+		t.Logf("CHAIN-LIVENESS-TX skipped: LUX_TESTNET_PRIVKEY not set")
 	}
 
 	// Pretty-print the per-scheme report. The committed Markdown
@@ -156,7 +156,7 @@ func TestProductionValidation_All(t *testing.T) {
 }
 
 // runScheme exercises one scheme end-to-end: keygen → sign → strip
-// wire frame → external circl.Verify (or corona kernel Verify) →
+// wire frame → external circl.Verify (or Corona kernel Verify) →
 // dispatcher Verify.
 func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 	res := schemeResult{
@@ -172,11 +172,11 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 		res.Mode = "SLH-DSA-SHAKE-192s (FIPS 205)"
 		res.ExternalVerifier = "cloudflare/circl/sign/slhdsa"
 	case "corona":
-		res.Mode = "Corona Ring-LWE (no FIPS standard)"
+		res.Mode = "Corona R-LWE (no FIPS standard)"
 		res.ExternalVerifier = "luxfi/corona/threshold.VerifyBytes (out-of-band)"
 	}
 
-	// corona kernel requires threshold < participants strictly. The
+	// Corona kernel requires threshold < participants strictly. The
 	// magnetar dispatcher uses per-validator independent keypairs; the
 	// threshold value there only controls how many independent
 	// keypairs are generated, not a true (t,n) split.
@@ -326,15 +326,15 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 		// no-ctx path). circl wraps the message in NewMessage().
 		res.ExternalVerify = circlslhdsa.Verify(&pk, circlslhdsa.NewMessage(msg), fipsSig, nil)
 	case "corona":
-		// Corona Ring-LWE has no FIPS standard and no third-party
+		// Corona R-LWE has no FIPS standard and no third-party
 		// reference verifier in the Cloudflare/circl stack. The
 		// "external verifier" here is corona's own stateless
 		// VerifyBytes invoked outside any threshold/luxd code path —
 		// equivalent to handing the wire bytes to a relying party
-		// that holds only the corona kernel.
+		// that holds only the Corona kernel.
 		res.FIPSPubKeyBytes = len(gkBytes)
 		res.FIPSSigBytes = len(sigBytes)
-		res.ExternalVerify = coronaThreshold.VerifyBytes(gkBytes, string(msg), sigBytes)
+		res.ExternalVerify = coronaKernel.VerifyBytes(gkBytes, string(msg), sigBytes)
 	}
 
 	// Negative-control: flip a payload byte and prove rejection.
@@ -343,7 +343,7 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 	tampered := append([]byte(nil), sigBytes...)
 	tampered[len(tampered)-1] ^= 0x01
 	if scheme == "corona" {
-		if coronaThreshold.VerifyBytes(gkBytes, string(msg), tampered) {
+		if coronaKernel.VerifyBytes(gkBytes, string(msg), tampered) {
 			t.Errorf("[%s] negative control failed: corona VerifyBytes accepted tampered sig", scheme)
 		}
 	} else if scheme == "pulsar" {
@@ -539,14 +539,14 @@ func submitNativeTransfer(rpc, pkHex string) (txHash string, blockNum uint64, er
 	// This branch is intentionally a placeholder — the go-ethereum
 	// dependency is heavy and not in this module's go.mod. If the
 	// caller wants to exercise live tx submission, they should run
-	// the dedicated `scripts/submit_fuji_tx.go` script (out of band).
+	// the dedicated `scripts/submit_testnet_tx.go` script (out of band).
 	// For the validation harness, getHead() already establishes
 	// chain liveness, which is the chain-side gate this report
 	// claims.
 	_ = pkBytes
 	_ = ecdsa.PublicKey{}
 	_ = rand.Int // keep "rand" import live
-	return "", 0, fmt.Errorf("native tx submission not wired in e2e harness; use scripts/submit_fuji_tx.go (out-of-band) — getHead() above already proves chain liveness")
+	return "", 0, fmt.Errorf("native tx submission not wired in e2e harness; use scripts/submit_testnet_tx.go (out-of-band) — getHead() above already proves chain liveness")
 }
 
 // ---------------------------------------------------------------------
