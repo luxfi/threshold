@@ -41,7 +41,7 @@ const (
 	testnetChainID int64 = 96368
 
 	// Threshold parameters per the validation spec: 5 parties, threshold
-	// 3 (corona requires t < n strictly — also satisfied at 3/5).
+	// 3 (corona R-LWE requires t < n strictly — also satisfied at 3/5).
 	thresholdParties = 5
 	thresholdT       = 3
 )
