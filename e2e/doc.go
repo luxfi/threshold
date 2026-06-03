@@ -5,7 +5,7 @@
 //
 // What this package does
 //
-//   - Drives the in-process pulsar / ringtail / magnetar dispatchers from
+//   - Drives the in-process pulsar / corona / magnetar dispatchers from
 //     pkg/thresholdd over the JSON-RPC HTTP surface. Same code path
 //     that mpcd hosts in production.
 //
@@ -36,8 +36,8 @@
 //     dispatcher would need a Sign_Ctx method that takes the EVM
 //     precompile ctx — out of scope for this validation pass).
 //
-//   - Does NOT exercise the ringtail-on-chain path (no FIPS standard for
-//     R-LWE; ringtail's external verifier is the Ringtail kernel
+//   - Does NOT exercise the corona-on-chain path (no FIPS standard for
+//     R-LWE; corona's external verifier is the Corona kernel
 //     VerifyBytes invoked outside any threshold/luxd code path).
 //
 // Run
