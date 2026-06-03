@@ -146,6 +146,28 @@ type Server struct {
 	chainProfileResolver ChainProfileResolver
 }
 
+// schemeAliases maps deprecated scheme names to their canonical names
+// for backward compatibility on the JSON-RPC wire. Inbound requests
+// using the deprecated name are silently routed to the canonical
+// scheme; outbound documentation and responses always use the
+// canonical name. Remove an entry once external callers have migrated.
+//
+//	"ringtail" → "corona"  (renamed 2026-06 per AUDIT-2026-06.md §4.3
+//	                        in luxfi/corona; canonical R-LWE name).
+var schemeAliases = map[string]string{
+	"ringtail": "corona",
+}
+
+// canonicalScheme normalizes an inbound scheme name through the alias
+// table, returning the canonical name. Unknown names pass through
+// unchanged so the caller's "unknown scheme" error path still fires.
+func canonicalScheme(name string) string {
+	if c, ok := schemeAliases[name]; ok {
+		return c
+	}
+	return name
+}
+
 // NewServer builds the dispatcher with the wired schemes.
 //
 //	cggmp21  — Canetti-Gennaro-Goldfeder-Makriyannis-Peled 2021 ECDSA.
@@ -157,7 +179,9 @@ type Server struct {
 //	           2026-05-31 once corona threshold/wire.go shipped canonical
 //	           Signature.MarshalBinary / GroupKey.MarshalBinary /
 //	           VerifyBytes. Trust-model disclosure on the dispatcher's
-//	           keygen is in corona.go.
+//	           keygen is in corona.go. Legacy wire-name "ringtail" is
+//	           accepted on read via schemeAliases (deprecated; emit
+//	           "corona" on all new clients).
 //	magnetar — SLH-DSA per-validator-standalone (luxfi/magnetar). Wired
 //	           via the canonical MAGS/MAGG wire codec; see magnetar.go.
 //	doerner  — Doerner-Kondi-Lee-Shelat 2018 2-of-n ECDSA. Reserved
@@ -239,6 +263,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeError(w, req.ID, -32601, "method not found: "+req.Method)
 		return
 	}
+	// Normalize legacy wire names (e.g. "ringtail" → "corona") so old
+	// clients continue to dispatch correctly. See schemeAliases for the
+	// deprecation list.
+	schemeName = canonicalScheme(schemeName)
 
 	s.mu.RLock()
 	sc, exists := s.schemes[schemeName]
