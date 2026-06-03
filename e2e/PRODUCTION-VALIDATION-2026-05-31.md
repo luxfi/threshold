@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-31
 **Module:** `github.com/luxfi/threshold/e2e`
-**Cluster:** `do-sfo3-lux-k8s`, namespace `lux-testnet` (fuji, networkID=2)
+**Cluster:** `do-sfo3-lux-k8s`, namespace `lux-testnet` (networkID=2)
 **luxd image:** `ghcr.io/luxfi/node:v1.28.5` (5 validators, all bootstrapped)
 **Public RPC:** `http://134.199.187.16:9640/ext/bc/C/rpc` (C-Chain ID 0x17870 = 96368)
 **Host:** Apple M1 Max, 10 cores, Go 1.26.3, darwin/arm64
@@ -152,7 +152,7 @@ have surfaced any false-positive via `t.Errorf`. Test passes.
 ## Chain liveness
 
 ```
-CHAIN-LIVENESS fuji-C: head=947 (0x3b3)
+CHAIN-LIVENESS testnet-C: head=947 (0x3b3)
                        hash=0x7d0425560eca5c2d51e472c04f8f1d70badf40b80256ee53e27484cdd4fe48d4
                        ts=1780338852 (Mon Jun 1 11:34:12 PDT 2026)
 
@@ -179,7 +179,7 @@ sparsely (block 946 → 947 was 3.8 days) because there is no organic
 testnet traffic. This is irrelevant to the PQ validation: the dispatcher
 schemes sign arbitrary bytes, not C-Chain ECDSA tx envelopes.
 
-No fuji-C secp256k1 key was available in the harness environment, so
+No testnet-C secp256k1 key was available in the harness environment, so
 no live tx hash is reported. The chain-liveness evidence above (block
 head + precompile slot probes) is sufficient to claim the production
 cluster is up and accepting RPC traffic at the same time the PQ
