@@ -21,7 +21,7 @@ import (
 	circlmldsa65 "github.com/cloudflare/circl/sign/mldsa/mldsa65"
 	circlslhdsa "github.com/cloudflare/circl/sign/slhdsa"
 
-	ringtailKernel "github.com/luxfi/corona/threshold"
+	coronaKernel "github.com/luxfi/corona/threshold"
 
 	"github.com/luxfi/threshold/pkg/thresholdd"
 )
@@ -41,7 +41,7 @@ const (
 	testnetChainID int64 = 96368
 
 	// Threshold parameters per the validation spec: 5 parties, threshold
-	// 3 (ringtail requires t < n strictly — also satisfied at 3/5).
+	// 3 (corona R-LWE requires t < n strictly — also satisfied at 3/5).
 	thresholdParties = 5
 	thresholdT       = 3
 )
@@ -99,7 +99,7 @@ func TestProductionValidation_All(t *testing.T) {
 
 	results := []schemeResult{}
 
-	for _, scheme := range []string{"pulsar", "magnetar", "ringtail"} {
+	for _, scheme := range []string{"pulsar", "magnetar", "corona"} {
 		res := runScheme(t, hs.URL, scheme)
 		results = append(results, res)
 	}
@@ -156,7 +156,7 @@ func TestProductionValidation_All(t *testing.T) {
 }
 
 // runScheme exercises one scheme end-to-end: keygen → sign → strip
-// wire frame → external circl.Verify (or Ringtail kernel Verify) →
+// wire frame → external circl.Verify (or Corona kernel Verify) →
 // dispatcher Verify.
 func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 	res := schemeResult{
@@ -171,12 +171,12 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 	case "magnetar":
 		res.Mode = "SLH-DSA-SHAKE-192s (FIPS 205)"
 		res.ExternalVerifier = "cloudflare/circl/sign/slhdsa"
-	case "ringtail":
-		res.Mode = "Ringtail R-LWE (no FIPS standard)"
+	case "corona":
+		res.Mode = "Corona R-LWE (no FIPS standard)"
 		res.ExternalVerifier = "luxfi/corona/threshold.VerifyBytes (out-of-band)"
 	}
 
-	// Ringtail kernel requires threshold < participants strictly. The
+	// Corona kernel requires threshold < participants strictly. The
 	// magnetar dispatcher uses per-validator independent keypairs; the
 	// threshold value there only controls how many independent
 	// keypairs are generated, not a true (t,n) split.
@@ -263,7 +263,7 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 
 	// --- External verify: strip the wire envelope, hand the FIPS
 	// payload to cloudflare/circl directly. No threshold / luxd /
-	// ringtail code path on the verifier side. ---
+	// corona code path on the verifier side. ---
 	switch scheme {
 	case "pulsar":
 		// PULS / PULG share an 11-byte header: magic(4) + ver(2) +
@@ -325,16 +325,16 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 		// circl.Verify with ctx=nil (matches magnetar.ValidatorSign
 		// no-ctx path). circl wraps the message in NewMessage().
 		res.ExternalVerify = circlslhdsa.Verify(&pk, circlslhdsa.NewMessage(msg), fipsSig, nil)
-	case "ringtail":
-		// Ringtail R-LWE has no FIPS standard and no third-party
+	case "corona":
+		// Corona R-LWE has no FIPS standard and no third-party
 		// reference verifier in the Cloudflare/circl stack. The
-		// "external verifier" here is ringtail's own stateless
+		// "external verifier" here is corona's own stateless
 		// VerifyBytes invoked outside any threshold/luxd code path —
 		// equivalent to handing the wire bytes to a relying party
-		// that holds only the Ringtail kernel.
+		// that holds only the Corona kernel.
 		res.FIPSPubKeyBytes = len(gkBytes)
 		res.FIPSSigBytes = len(sigBytes)
-		res.ExternalVerify = ringtailKernel.VerifyBytes(gkBytes, string(msg), sigBytes)
+		res.ExternalVerify = coronaKernel.VerifyBytes(gkBytes, string(msg), sigBytes)
 	}
 
 	// Negative-control: flip a payload byte and prove rejection.
@@ -342,9 +342,9 @@ func runScheme(t *testing.T, rpcURL, scheme string) schemeResult {
 	// report fields but is logged for the record.
 	tampered := append([]byte(nil), sigBytes...)
 	tampered[len(tampered)-1] ^= 0x01
-	if scheme == "ringtail" {
-		if ringtailKernel.VerifyBytes(gkBytes, string(msg), tampered) {
-			t.Errorf("[%s] negative control failed: ringtail VerifyBytes accepted tampered sig", scheme)
+	if scheme == "corona" {
+		if coronaKernel.VerifyBytes(gkBytes, string(msg), tampered) {
+			t.Errorf("[%s] negative control failed: corona VerifyBytes accepted tampered sig", scheme)
 		}
 	} else if scheme == "pulsar" {
 		fipsPK, _ := stripPulsarFrame(gkBytes, magicPULG)
