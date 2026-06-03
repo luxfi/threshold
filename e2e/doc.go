@@ -17,7 +17,7 @@
 //     pulsar / magnetar code path on the verifier side.
 //
 //   - Submits a real C-Chain native-token transfer against the live
-//     fuji testnet luxd RPC and waits for inclusion in a block. This
+//     Lux testnet luxd RPC and waits for inclusion in a block. This
 //     is the chain-liveness gate that proves the production cluster
 //     accepts and finalises transactions while the PQ harness runs.
 //
@@ -37,14 +37,14 @@
 //     precompile ctx — out of scope for this validation pass).
 //
 //   - Does NOT exercise the corona-on-chain path (no FIPS standard for
-//     R-LWE; corona's external verifier is the corona kernel
+//     R-LWE; corona's external verifier is the Corona kernel
 //     VerifyBytes invoked outside any threshold/luxd code path).
 //
 // Run
 //
 //	go test ./e2e -run TestProductionValidation_All -v -count=1 -timeout=10m
 //
-// The harness is hard-coded against the public fuji testnet
+// The harness is hard-coded against the public Lux testnet
 // LoadBalancer (134.199.187.16:9640). Run from a host with network
 // reach to that IP.
 package e2e
