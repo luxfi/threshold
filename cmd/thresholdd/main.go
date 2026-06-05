@@ -1,64 +1,50 @@
-// Command thresholdd exposes all six luxfi/threshold protocols
-// (cggmp21, frost, pulsar, corona, bls, doerner) over a single
-// process-local JSON-RPC 2.0 endpoint.
+// Command thresholdd exposes all luxfi/threshold protocols
+// (cggmp21, frost, pulsar, corona, magnetar, bls, doerner) over a
+// single process-local ZAP byte-passthrough endpoint.
 //
-// Wire format mirrors the teleport mpc bus (mpc/src/signers/rpc.ts):
+// Wire shape (see ~/work/lux/threshold/pkg/thresholdd/zap_schema.go):
 //
-//	POST / with body
-//	  {"jsonrpc":"2.0","id":N,"method":"<scheme>.<op>","params":{...}}
+//	ZAP message with procedure opcode in msg.Flags upper byte; the
+//	procedure name is `<scheme>.<op>` and the dispatcher routes by
+//	the FNV-1a opcode derived from that name.
 //
-// Methods (six namespaces, three ops each):
+// Procedures (per scheme):
 //
-//	<scheme>.keygen { threshold, participants }
-//	                -> { publicKey: hex, shares: [hex, ...] }
-//	<scheme>.sign   { messageHex, pubKeyHex }
-//	                -> { signatureHex }
-//	<scheme>.verify { messageHex, signatureHex, pubKeyHex }
-//	                -> { ok: bool }
+//	<scheme>.keygen { Threshold, Participants }
+//	                -> { PublicKey, Shares }   (all bytes)
+//	<scheme>.sign   { Message, PubKey }
+//	                -> { Signature }
+//	<scheme>.verify { Message, Signature, PubKey }
+//	                -> { OK }
 //
 // The dispatcher itself lives in pkg/thresholdd so the same server is
 // embedded by luxfi/mpc's production daemon (mpcd): one wire, one
 // implementation, two startup paths.
 //
-// Bind defaults to 127.0.0.1:7300 — this is process-local IPC.
+// Bind defaults to 127.0.0.1:7301 — this is process-local IPC.
 // Use --listen :0 to take a random port for parallel tests.
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/luxfi/threshold/pkg/thresholdd"
 )
 
 func main() {
-	listen := flag.String("listen", "127.0.0.1:7300", "bind address for JSON-RPC server")
+	listen := flag.String("listen", "127.0.0.1:7301", "bind address for the ZAP dispatcher")
 	flag.Parse()
 
-	srv, err := thresholdd.NewServer()
-	if err != nil {
-		log.Fatalf("thresholdd: build server: %v", err)
-	}
-
-	// Optional bearer-token auth (Red HIGH B1). Empty token = no gate;
-	// matches the historical dev-tooling default but lets operators
-	// flip it on without touching the binary.
-	if tok := os.Getenv("THRESHOLDD_AUTH_TOKEN"); tok != "" {
-		srv.SetAuthToken(tok)
-		fmt.Fprintln(os.Stderr, "thresholdd: bearer-token auth enabled")
-	}
-
 	// Refuse non-loopback binds unless explicitly overridden. Closes
-	// the operator-typo attack: a stray `--listen 0.0.0.0:7300` would
+	// the operator-typo attack: a stray `--listen 0.0.0.0:7301` would
 	// otherwise expose the dispatcher cluster-wide. Override knob is
 	// THRESHOLDD_ALLOW_REMOTE=1 (mirrors the MPC_THRESHOLD_ALLOW_REMOTE
 	// knob in luxfi/mpc's mpcd).
@@ -70,39 +56,50 @@ func main() {
 		)
 	}
 
-	ln, err := net.Listen("tcp", *listen)
+	// Split host:port — ZapServerConfig takes an int port. The host
+	// half is validated by isLoopbackBind above; the listener inside
+	// zap.Node binds 0.0.0.0:<port> + ::0:<port> internally, so a
+	// loopback-only deployment relies on the os-level firewall +
+	// process-local IPC posture (matches the legacy HTTP path).
+	_, portStr, err := net.SplitHostPort(*listen)
 	if err != nil {
-		log.Fatalf("thresholdd: listen %s: %v", *listen, err)
+		log.Fatalf("thresholdd: bad --listen %q: %v", *listen, err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Fatalf("thresholdd: bad port %q: %v", portStr, err)
 	}
 
-	httpSrv := &http.Server{
-		Handler:           srv,
-		ReadHeaderTimeout: 5 * time.Second,
+	cfg := thresholdd.ZapServerConfig{
+		NodeID:    "thresholdd",
+		Port:      port,
+		AuthToken: os.Getenv("THRESHOLDD_AUTH_TOKEN"),
+	}
+	if cfg.AuthToken != "" {
+		fmt.Fprintln(os.Stderr, "thresholdd: bearer-token auth enabled")
 	}
 
-	fmt.Fprintf(os.Stderr, "thresholdd: listening on %s\n", ln.Addr())
-
-	idle := make(chan struct{})
-	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-		<-sig
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = httpSrv.Shutdown(ctx)
-		close(idle)
-	}()
-
-	if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("thresholdd: serve: %v", err)
+	srv, err := thresholdd.NewZapServer(cfg)
+	if err != nil {
+		log.Fatalf("thresholdd: build server: %v", err)
 	}
-	<-idle
+	if err := srv.Start(); err != nil {
+		log.Fatalf("thresholdd: start: %v", err)
+	}
+	defer srv.Stop()
+
+	fmt.Fprintf(os.Stderr, "thresholdd: ZAP dispatcher listening on %s (nodeID=%s)\n", *listen, srv.NodeID())
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+	fmt.Fprintln(os.Stderr, "thresholdd: shutdown signal received")
 }
 
 // isLoopbackBind reports whether the given listen address resolves to
 // a loopback or unspecified-but-explicit-loopback host. Accepts the
 // historical `:port` shorthand only when paired with `127.0.0.1` /
-// `[::1]`; bare `:7300` (which resolves to 0.0.0.0:7300) is NOT
+// `[::1]`; bare `:7301` (which resolves to 0.0.0.0:7301) is NOT
 // considered loopback — operators must spell out the host.
 func isLoopbackBind(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
