@@ -18,7 +18,7 @@ import (
 
 // cggmp21Scheme wires luxfi/threshold/protocols/cmp (the CGGMP21 fork
 // the threshold repo ships — see protocols/cmp/CLAUDE.md) into the
-// JSON-RPC surface.
+// dispatcher's scheme surface.
 //
 // Keygen simulates `participants` parties in-process, runs the CGGMP21
 // keygen protocol, and indexes the resulting per-party Configs by the

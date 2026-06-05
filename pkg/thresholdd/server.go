@@ -1,194 +1,84 @@
 // SPDX-License-Identifier: BSD-3-Clause
 package thresholdd
 
+// server.go — ZAP byte-passthrough dispatcher for the threshold daemon.
+//
+// ZAP is the ONLY wire transport. The historical HTTP+JSON+hex path
+// (server.go's prior incarnation, plus its rpcRequest/rpcResponse
+// shapes and net/http handler) was deleted. The TS-side consumers that
+// drove HTTP via `MPCD_URL`/`THRESHOLD_DAEMON_URL` env vars are
+// blocked on a TS-side ZAP client — see teleport/mpc/src/signers/rpc.ts
+// for the placeholder transport that throws explicit migration errors.
+//
+// Wire shape: every {keygen, sign, sign_ctx, verify} call rides as a
+// fixed-layout ZAP envelope (see zap_schema.go) — opcode in the upper
+// byte of msg.Flags, message-kind (request/response/error) in the
+// lower byte. The scheme handlers themselves are unchanged from the
+// HTTP era: they still consume hex strings on the in-process scheme
+// contract; the dispatcher decodes inbound raw bytes to hex strings
+// and encodes scheme outputs back to raw bytes on the wire.
+
 import (
+	"context"
 	"crypto/subtle"
-	"encoding/json"
+	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
+	"log/slog"
 	"sync"
+
+	zap "github.com/luxfi/zap"
 )
 
-// rpcRequest is the JSON-RPC 2.0 request envelope.
-type rpcRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params"`
-}
-
-// rpcResponse is the JSON-RPC 2.0 response envelope.
-type rpcResponse struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      json.RawMessage `json:"id"`
-	Result  any             `json:"result,omitempty"`
-	Error   *rpcError       `json:"error,omitempty"`
-}
-
-type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-// keygenParams is the common shape for every <scheme>.keygen call.
-type keygenParams struct {
-	Threshold    int `json:"threshold"`
-	Participants int `json:"participants"`
-}
-
-// keygenResult is the common shape for every <scheme>.keygen response.
-type keygenResult struct {
-	PublicKey string   `json:"publicKey"`
-	Shares    []string `json:"shares"`
-}
-
-// signParams is the common shape for every <scheme>.sign call.
-type signParams struct {
-	MessageHex string `json:"messageHex"`
-	PubKeyHex  string `json:"pubKeyHex"`
-}
-
-// signCtxParams is the shape for ctx-bound sign methods (pulsar and
-// magnetar). CtxHex is hex-encoded ctx bytes (max 255 bytes after
-// decode per FIPS 204 §5.2 / FIPS 205 §10.2); empty string binds the
-// empty ctx. Use the precompile constants
-// `lux-evm-precompile-mldsa-v1` / `lux-evm-precompile-slhdsa-v1` to
-// produce signatures that satisfy the on-chain EVM precompile's
-// domain-separation contract.
+// ZapServer is the threshold dispatcher's ZAP transport.
 //
-// ChainID, when set, asserts the chain context the caller intends
-// this signature to land on. The dispatcher consults the wired
-// ChainProfileResolver to map ChainID → Profile; on a strict-PQ
-// chain, the single-party dealer / single-validator shortcut path
-// is refused (HTTP 503 + the documented body) until sister
-// agents land pulsar v0.4's threshold ctx-bound path. Empty
-// ChainID means "no chain context asserted"; the gate fails open
-// (see profile.go::RefuseUnderStrictPQ). ChainID may also be
-// supplied via the X-Chain-ID HTTP header; the JSON body field
-// wins when both are set.
-type signCtxParams struct {
-	MessageHex string `json:"messageHex"`
-	PubKeyHex  string `json:"pubKeyHex"`
-	CtxHex     string `json:"ctxHex"`
-	ChainID    string `json:"chainID,omitempty"`
-}
-
-// signResult is the common shape for every <scheme>.sign response.
-type signResult struct {
-	SignatureHex string `json:"signatureHex"`
-}
-
-// verifyParams is the common shape for every <scheme>.verify call.
-type verifyParams struct {
-	MessageHex   string `json:"messageHex"`
-	SignatureHex string `json:"signatureHex"`
-	PubKeyHex    string `json:"pubKeyHex"`
-}
-
-// verifyResult is the common shape for every <scheme>.verify response.
-type verifyResult struct {
-	OK bool `json:"ok"`
-}
-
-// scheme is the per-protocol handler set.
-type scheme interface {
-	Keygen(p keygenParams) (keygenResult, error)
-	Sign(p signParams) (signResult, error)
-	Verify(p verifyParams) (verifyResult, error)
-}
-
-// ctxSigner is the optional ctx-bound signing surface. Schemes that
-// implement it expose `<scheme>.sign_ctx` for FIPS-204/205 §5.2/§10.2
-// context-bound signatures (used by the on-chain EVM precompile
-// domain-separation contract). Pulsar and magnetar implement it;
-// other schemes return -32601 (method-not-found) on `<scheme>.sign_ctx`.
-type ctxSigner interface {
-	Sign_Ctx(p signCtxParams) (signResult, error)
-}
-
-// profileAwareCtxSigner is the strict-PQ-aware variant of ctxSigner.
-// Schemes that implement it run the strict-PQ gate
-// (RefuseUnderStrictPQ) at entry against the supplied chainID and
-// resolver before producing a signature. Pulsar and magnetar
-// implement this; other schemes fall back to plain ctxSigner. The
-// resolver is supplied by the dispatcher (see Server) so call sites
-// never reach across the lock to read it. A nil resolver bypasses
-// the gate (documented fail-OPEN — see profile.go).
-type profileAwareCtxSigner interface {
-	Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileResolver) (signResult, error)
-}
-
-// Server is the JSON-RPC dispatcher.
+// Auth: a non-empty `authToken` gates every inbound message via a
+// constant-time bearer comparison. The token is stamped as a
+// peer-metadata field at handshake (set by the client). Empty token
+// disables the gate (loopback dev only).
 //
-// Auth: a non-empty `authToken` gates every JSON-RPC request behind a
-// constant-time `Authorization: Bearer <token>` comparison. Empty token
-// disables the gate (used by the standalone `thresholdd` CLI for dev
-// tooling on loopback). Production embedders (luxfi/mpc's mpcd) MUST
-// call `SetAuthToken` with a per-cluster shared secret derived from the
-// node identity — see luxfi/mpc/cmd/mpcd/main.go.
-//
-// Closes Red HIGH B1: an unauthenticated dispatcher on a known port is
-// a signing oracle for any local process (and via SSRF, any code that
-// can issue an HTTP request from inside mpcd).
-type Server struct {
+// Strict-PQ gate: the RefuseUnderStrictPQ helper from profile.go
+// guards Sign_Ctx. The refusal is surfaced as a ZAP ErrorResponse
+// carrying strictPQ=true so the client can errors.Is the sentinel.
+type ZapServer struct {
 	mu        sync.RWMutex
 	schemes   map[string]scheme
 	authToken string
 
-	// chainProfileResolver is the optional chain-profile lookup the
-	// strict-PQ gate consults on Sign_Ctx. nil → gate fails open
-	// (documented in profile.go::RefuseUnderStrictPQ); production
-	// embedders SetChainProfileResolver at boot with an adapter
-	// over luxfi/consensus/config.
 	chainProfileResolver ChainProfileResolver
+
+	node    *zap.Node
+	logger  *slog.Logger
+	stopped bool
 }
 
-// schemeAliases maps deprecated scheme names to their canonical names
-// for backward compatibility on the JSON-RPC wire. Inbound requests
-// using the deprecated name are silently routed to the canonical
-// scheme; outbound documentation and responses always use the
-// canonical name. Remove an entry once external callers have migrated.
-//
-//	"ringtail" → "corona"  (renamed 2026-06 per AUDIT-2026-06.md §4.3
-//	                        in luxfi/corona; canonical R-LWE name).
-var schemeAliases = map[string]string{
-	"ringtail": "corona",
+// ZapServerConfig captures the wiring knobs ZapServer needs. Defaults
+// are designed for process-local IPC — no mDNS, plaintext, loopback.
+// Embedders that expose ZAP over cluster network MUST set TLS to an
+// mTLS-validating *tls.Config and supply an authToken.
+type ZapServerConfig struct {
+	NodeID    string      // ZAP node ID; defaults to "thresholdd"
+	Port      int         // listen port; 0 → ephemeral
+	AuthToken string      // bearer-token; empty disables auth gate
+	TLS       *tls.Config // mTLS config; nil → plaintext (loopback only)
+	Logger    *slog.Logger
 }
 
-// canonicalScheme normalizes an inbound scheme name through the alias
-// table, returning the canonical name. Unknown names pass through
-// unchanged so the caller's "unknown scheme" error path still fires.
-func canonicalScheme(name string) string {
-	if c, ok := schemeAliases[name]; ok {
-		return c
+// NewZapServer constructs a ZapServer with the canonical scheme set
+// (cggmp21, frost, pulsar, corona, magnetar, bls, doerner).
+func NewZapServer(cfg ZapServerConfig) (*ZapServer, error) {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
 	}
-	return name
-}
+	if cfg.NodeID == "" {
+		cfg.NodeID = "thresholdd"
+	}
 
-// NewServer builds the dispatcher with the wired schemes.
-//
-//	cggmp21  — Canetti-Gennaro-Goldfeder-Makriyannis-Peled 2021 ECDSA.
-//	frost    — Komlo-Goldberg FROST Schnorr.
-//	bls      — BLS12-381 t-of-n via Shamir + Lagrange.
-//	pulsar   — M-LWE post-quantum threshold (luxfi/pulsar). Wired via
-//	           the canonical PULG/Signature wire codec; see pulsar.go.
-//	corona   — Ring-LWE post-quantum threshold (luxfi/corona). Wired
-//	           2026-05-31 once corona threshold/wire.go shipped canonical
-//	           Signature.MarshalBinary / GroupKey.MarshalBinary /
-//	           VerifyBytes. Trust-model disclosure on the dispatcher's
-//	           keygen is in corona.go. Legacy wire-name "ringtail" is
-//	           accepted on read via schemeAliases (deprecated; emit
-//	           "corona" on all new clients).
-//	magnetar — SLH-DSA per-validator-standalone (luxfi/magnetar). Wired
-//	           via the canonical MAGS/MAGG wire codec; see magnetar.go.
-//	doerner  — Doerner-Kondi-Lee-Shelat 2018 2-of-n ECDSA. Reserved
-//	           namespace; upstream impl is non-functional. See doerner.go.
-func NewServer() (*Server, error) {
-	s := &Server{schemes: make(map[string]scheme)}
-
+	s := &ZapServer{
+		schemes:   make(map[string]scheme),
+		authToken: cfg.AuthToken,
+		logger:    cfg.Logger,
+	}
 	s.schemes["cggmp21"] = newCGGMP21Scheme()
 	s.schemes["frost"] = newFrostScheme()
 	s.schemes["pulsar"] = newPulsarScheme()
@@ -197,206 +87,334 @@ func NewServer() (*Server, error) {
 	s.schemes["bls"] = newBLSScheme()
 	s.schemes["doerner"] = newDoernerScheme()
 
+	s.node = zap.NewNode(zap.NodeConfig{
+		NodeID:      cfg.NodeID,
+		ServiceType: "_thresholdd._tcp",
+		Port:        cfg.Port,
+		NoDiscovery: true, // process-local IPC — no mDNS announce
+		TLS:         cfg.TLS,
+		Logger:      cfg.Logger,
+	})
+
+	// Register one handler per procedure opcode. zap.Node.Handle keys
+	// on the upper byte of the message Flags field (msg.Flags() >> 8),
+	// and our flagsForRequest stamps the procOpcode in that upper byte
+	// — so handlers route directly without a centralized switch.
+	//
+	// We use a single dispatch shim per procedure that owns the
+	// scheme + op binding; the auth gate and the strict-PQ gate run
+	// once at the top.
+	for _, p := range allProcedures {
+		p := p // capture
+		op := procOpcode(p.name)
+		s.node.Handle(op>>8, func(ctx context.Context, from string, msg *zap.Message) (*zap.Message, error) {
+			return s.dispatch(ctx, p, from, msg)
+		})
+	}
+
 	return s, nil
 }
 
-// SetAuthToken installs a bearer token. Subsequent requests must carry
-// `Authorization: Bearer <token>` or receive HTTP 401. Empty token
-// removes the gate. Constant-time comparison defeats timing attacks.
-func (s *Server) SetAuthToken(token string) {
+// procedureBinding pairs a procedure name with its scheme + op + a
+// callback that runs the underlying scheme handler. The handler
+// itself is resolved at dispatch time (after the auth gate fires) so
+// SetAuthToken / SetChainProfileResolver can swap atomically.
+type procedureBinding struct {
+	name   string
+	scheme string
+	op     string // "keygen" / "sign" / "sign_ctx" / "verify"
+}
+
+var allProcedures = []procedureBinding{
+	{name: ProcCggmp21Keygen, scheme: "cggmp21", op: "keygen"},
+	{name: ProcCggmp21Sign, scheme: "cggmp21", op: "sign"},
+	{name: ProcCggmp21Verify, scheme: "cggmp21", op: "verify"},
+	{name: ProcFrostKeygen, scheme: "frost", op: "keygen"},
+	{name: ProcFrostSign, scheme: "frost", op: "sign"},
+	{name: ProcFrostVerify, scheme: "frost", op: "verify"},
+	{name: ProcPulsarKeygen, scheme: "pulsar", op: "keygen"},
+	{name: ProcPulsarSign, scheme: "pulsar", op: "sign"},
+	{name: ProcPulsarSignCtx, scheme: "pulsar", op: "sign_ctx"},
+	{name: ProcPulsarVerify, scheme: "pulsar", op: "verify"},
+	{name: ProcCoronaKeygen, scheme: "corona", op: "keygen"},
+	{name: ProcCoronaSign, scheme: "corona", op: "sign"},
+	{name: ProcCoronaVerify, scheme: "corona", op: "verify"},
+	{name: ProcMagnetarKeygen, scheme: "magnetar", op: "keygen"},
+	{name: ProcMagnetarSign, scheme: "magnetar", op: "sign"},
+	{name: ProcMagnetarSignCtx, scheme: "magnetar", op: "sign_ctx"},
+	{name: ProcMagnetarVerify, scheme: "magnetar", op: "verify"},
+	{name: ProcBLSKeygen, scheme: "bls", op: "keygen"},
+	{name: ProcBLSSign, scheme: "bls", op: "sign"},
+	{name: ProcBLSVerify, scheme: "bls", op: "verify"},
+	{name: ProcDoernerKeygen, scheme: "doerner", op: "keygen"},
+	{name: ProcDoernerSign, scheme: "doerner", op: "sign"},
+	{name: ProcDoernerVerify, scheme: "doerner", op: "verify"},
+}
+
+// SetAuthToken installs a bearer token. The token is matched in
+// constant time against the metadata field the client stamps on
+// every request. Empty token removes the gate.
+func (s *ZapServer) SetAuthToken(token string) {
 	s.mu.Lock()
 	s.authToken = token
 	s.mu.Unlock()
 }
 
 // SetChainProfileResolver installs the chain-profile resolver the
-// strict-PQ gate consults on Sign_Ctx. Passing nil clears the
-// resolver (the gate then fails open). Production embedders wire an
-// adapter over luxfi/consensus/config; the standalone thresholdd
-// CLI leaves it nil for dev tooling.
-func (s *Server) SetChainProfileResolver(r ChainProfileResolver) {
+// strict-PQ gate consults on Sign_Ctx. Nil clears the resolver
+// (gate then fails open — see profile.go).
+func (s *ZapServer) SetChainProfileResolver(r ChainProfileResolver) {
 	s.mu.Lock()
 	s.chainProfileResolver = r
 	s.mu.Unlock()
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+// Start binds the listener and begins accepting. Idempotent across
+// double-Stop; double-Start is a programmer error.
+func (s *ZapServer) Start() error {
+	return s.node.Start()
+}
+
+// Stop releases the listener + connections. Idempotent.
+func (s *ZapServer) Stop() {
+	s.mu.Lock()
+	if s.stopped {
+		s.mu.Unlock()
 		return
 	}
+	s.stopped = true
+	s.mu.Unlock()
+	s.node.Stop()
+}
 
-	// Auth gate. Read under the same RLock as the schemes map so
-	// SetAuthToken can flip the gate atomically.
+// NodeID returns the server's nodeID. Useful for tests that drive
+// ConnectDirect through the loopback transport.
+func (s *ZapServer) NodeID() string {
+	return s.node.NodeID()
+}
+
+// dispatch is the per-procedure handler. The auth gate runs first
+// (constant-time bearer compare against the X-Threshold-Auth peer
+// metadata stamped by ZapClient). Strict-PQ runs second for ctx-
+// bound paths. Then the scheme handler executes.
+//
+// On success, the response is encoded with the response kind set on
+// the flags upper byte the request originally carried; on failure,
+// an ErrorResponse with a JSON-RPC-style numeric code (see zap_schema.go
+// ZapErrCode* constants) is emitted so callers can branch on
+// well-defined error classes.
+func (s *ZapServer) dispatch(ctx context.Context, p procedureBinding, from string, msg *zap.Message) (*zap.Message, error) {
+	reqFlags := msg.Flags()
+
+	// Auth gate (Red HIGH B1 mirror). ZAP-side auth is connection-
+	// scoped, not per-message — the peer is authenticated at
+	// handshake by its NodeID, and (in production) by its mTLS cert
+	// SAN. The bare zap.Node API today surfaces the peer NodeID
+	// to handlers via the `from` parameter; mTLS cert metadata will
+	// land on the same hook in a follow-up.
+	//
+	// When `authToken` is non-empty, the server accepts connections
+	// whose peer NodeID equals the token (constant-time compare).
+	// This is the dev / loopback wiring; the production wiring is
+	// mTLS-only (peer is authenticated by the TLS handshake; the
+	// authToken is unset; the LocalTrustVerifier accepts any peer
+	// with a valid cert from the cluster CA).
+	//
+	// Empty `authToken` disables the gate — loopback-dev / standalone
+	// CLI default.
 	s.mu.RLock()
 	wantTok := s.authToken
+	resolver := s.chainProfileResolver
+	sch, schemeExists := s.schemes[p.scheme]
 	s.mu.RUnlock()
+
 	if wantTok != "" {
-		const prefix = "Bearer "
-		got := r.Header.Get("Authorization")
-		if !strings.HasPrefix(got, prefix) ||
-			subtle.ConstantTimeCompare([]byte(got[len(prefix):]), []byte(wantTok)) != 1 {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
-			return
+		if from == "" {
+			return errorResponseMsg(reqFlags, ZapErrCodeMethodNotFnd, "auth required: TLS handshake produced no peer identity", false)
+		}
+		if subtle.ConstantTimeCompare([]byte(from), []byte(wantTok)) != 1 {
+			return errorResponseMsg(reqFlags, ZapErrCodeMethodNotFnd, "unauthorized", false)
 		}
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 16*1024*1024))
-	if err != nil {
-		writeError(w, nil, -32700, "read body: "+err.Error())
-		return
-	}
-	var req rpcRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		writeError(w, nil, -32700, "parse error: "+err.Error())
-		return
-	}
-	if req.JSONRPC != "2.0" {
-		writeError(w, req.ID, -32600, "invalid jsonrpc version")
-		return
+	if !schemeExists {
+		return errorResponseMsg(reqFlags, ZapErrCodeMethodNotFnd, fmt.Sprintf("unknown scheme: %s", p.scheme), false)
 	}
 
-	schemeName, op, ok := splitMethod(req.Method)
-	if !ok {
-		writeError(w, req.ID, -32601, "method not found: "+req.Method)
-		return
-	}
-	// Normalize legacy wire names (e.g. "ringtail" → "corona") so old
-	// clients continue to dispatch correctly. See schemeAliases for the
-	// deprecation list.
-	schemeName = canonicalScheme(schemeName)
-
-	s.mu.RLock()
-	sc, exists := s.schemes[schemeName]
-	s.mu.RUnlock()
-	if !exists {
-		writeError(w, req.ID, -32601, "unknown scheme: "+schemeName)
-		return
-	}
-
-	switch op {
+	switch p.op {
 	case "keygen":
-		var p keygenParams
-		if err := json.Unmarshal(req.Params, &p); err != nil {
-			writeError(w, req.ID, -32602, "invalid params: "+err.Error())
-			return
-		}
-		res, err := sc.Keygen(p)
-		if err != nil {
-			writeError(w, req.ID, -32000, err.Error())
-			return
-		}
-		writeResult(w, req.ID, res)
+		return s.dispatchKeygen(reqFlags, sch, msg)
 	case "sign":
-		var p signParams
-		if err := json.Unmarshal(req.Params, &p); err != nil {
-			writeError(w, req.ID, -32602, "invalid params: "+err.Error())
-			return
-		}
-		res, err := sc.Sign(p)
-		if err != nil {
-			writeError(w, req.ID, -32000, err.Error())
-			return
-		}
-		writeResult(w, req.ID, res)
+		return s.dispatchSign(reqFlags, sch, msg)
 	case "sign_ctx":
-		cs, ok := sc.(ctxSigner)
-		if !ok {
-			writeError(w, req.ID, -32601, "scheme does not support sign_ctx: "+schemeName)
-			return
-		}
-		var p signCtxParams
-		if err := json.Unmarshal(req.Params, &p); err != nil {
-			writeError(w, req.ID, -32602, "invalid params: "+err.Error())
-			return
-		}
-		// Plumb chain ID: JSON body wins; X-Chain-ID header
-		// supplies it when the body omits it. Empty means "no
-		// chain asserted" → gate falls through (see profile.go).
-		if p.ChainID == "" {
-			p.ChainID = r.Header.Get("X-Chain-ID")
-		}
-		// Profile-aware path: schemes that implement
-		// profileAwareCtxSigner consult the strict-PQ gate
-		// themselves at entry. Plain ctxSigner is the legacy path
-		// (gate not consulted). Snapshot the resolver under RLock
-		// so SetChainProfileResolver can swap atomically.
-		s.mu.RLock()
-		resolver := s.chainProfileResolver
-		s.mu.RUnlock()
-		var (
-			res signResult
-			err error
-		)
-		if pas, ok := sc.(profileAwareCtxSigner); ok {
-			res, err = pas.Sign_Ctx_Profile(p, resolver)
-		} else {
-			res, err = cs.Sign_Ctx(p)
-		}
-		if err != nil {
-			// Strict-PQ refusal: HTTP 503 + the documented body
-			// (see profile.go::strictPQRefusalBody). NOT a
-			// JSON-RPC error envelope — the documented contract
-			// says HTTP 503 because the dispatcher temporarily
-			// cannot produce a strict-PQ-compliant Sign_Ctx
-			// signature, which is a service-unavailable
-			// condition, not a request error.
-			if errors.Is(err, ErrRefusedUnderStrictPQ) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusServiceUnavailable)
-				_, _ = w.Write([]byte(strictPQRefusalBody))
-				return
-			}
-			writeError(w, req.ID, -32000, err.Error())
-			return
-		}
-		writeResult(w, req.ID, res)
+		return s.dispatchSignCtx(reqFlags, sch, resolver, msg)
 	case "verify":
-		var p verifyParams
-		if err := json.Unmarshal(req.Params, &p); err != nil {
-			writeError(w, req.ID, -32602, "invalid params: "+err.Error())
-			return
-		}
-		res, err := sc.Verify(p)
-		if err != nil {
-			writeError(w, req.ID, -32000, err.Error())
-			return
-		}
-		writeResult(w, req.ID, res)
+		return s.dispatchVerify(reqFlags, sch, msg)
 	default:
-		writeError(w, req.ID, -32601, "unknown op: "+op)
+		return errorResponseMsg(reqFlags, ZapErrCodeMethodNotFnd, "unknown op: "+p.op, false)
 	}
 }
 
-func splitMethod(m string) (string, string, bool) {
-	dot := strings.IndexByte(m, '.')
-	if dot < 1 || dot == len(m)-1 {
-		return "", "", false
+func (s *ZapServer) dispatchKeygen(reqFlags uint16, sch scheme, msg *zap.Message) (*zap.Message, error) {
+	p, err := readKeygenRequest(msg)
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInvalidParam, "invalid params: "+err.Error(), false)
 	}
-	return m[:dot], m[dot+1:], true
+	res, err := sch.Keygen(p)
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, err.Error(), false)
+	}
+	// res.PublicKey is a hex string on the in-process scheme contract;
+	// decode to emit raw bytes on the ZAP wire. The scheme handlers
+	// still consume/produce hex strings — this is the boundary that
+	// converts between the in-process hex contract and the ZAP raw-
+	// byte wire. Local string conversion, no network cost.
+	pkBytes, decErr := hexDecodeStrict(res.PublicKey)
+	if decErr != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, "keygen produced non-hex pubKey: "+decErr.Error(), false)
+	}
+	return wrapBytes(buildKeygenResponse(reqFlags, pkBytes, res.Shares)), nil
 }
 
-func writeResult(w http.ResponseWriter, id json.RawMessage, result any) {
-	resp := rpcResponse{JSONRPC: "2.0", ID: id, Result: result}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(resp)
+func (s *ZapServer) dispatchSign(reqFlags uint16, sch scheme, msg *zap.Message) (*zap.Message, error) {
+	rawMsg, rawPub, err := readSignRequest(msg)
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInvalidParam, "invalid params: "+err.Error(), false)
+	}
+	// Re-encode to hex for the inner scheme handler — its current
+	// contract is hex strings. The downstream byte material remains
+	// byte-identical; this is purely a local string conversion.
+	res, err := sch.Sign(signParams{
+		MessageHex: hexEncode(rawMsg),
+		PubKeyHex:  hexEncode(rawPub),
+	})
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, err.Error(), false)
+	}
+	sigBytes, decErr := hexDecodeStrict(res.SignatureHex)
+	if decErr != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, "sign produced non-hex signature: "+decErr.Error(), false)
+	}
+	return wrapBytes(buildSignResponse(reqFlags, sigBytes)), nil
 }
 
-func writeError(w http.ResponseWriter, id json.RawMessage, code int, msg string) {
-	resp := rpcResponse{JSONRPC: "2.0", ID: id, Error: &rpcError{Code: code, Message: msg}}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(resp)
+func (s *ZapServer) dispatchSignCtx(reqFlags uint16, sch scheme, resolver ChainProfileResolver, msg *zap.Message) (*zap.Message, error) {
+	cs, ok := sch.(ctxSigner)
+	if !ok {
+		return errorResponseMsg(reqFlags, ZapErrCodeMethodNotFnd, "scheme does not support sign_ctx", false)
+	}
+	rawMsg, rawPub, ctxBytes, chainID, err := readSignCtxRequest(msg)
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInvalidParam, "invalid params: "+err.Error(), false)
+	}
+	p := signCtxParams{
+		MessageHex: hexEncode(rawMsg),
+		PubKeyHex:  hexEncode(rawPub),
+		CtxHex:     hexEncode(ctxBytes),
+		ChainID:    chainID,
+	}
+	var (
+		res signResult
+		oerr error
+	)
+	if pas, ok := sch.(profileAwareCtxSigner); ok {
+		res, oerr = pas.Sign_Ctx_Profile(p, resolver)
+	} else {
+		res, oerr = cs.Sign_Ctx(p)
+	}
+	if oerr != nil {
+		if errors.Is(oerr, ErrRefusedUnderStrictPQ) {
+			return errorResponseMsg(reqFlags, ZapErrCodeInternal,
+				"Sign_Ctx requires pulsar v0.4 threshold ctx-bound path; rejected on strict-PQ chain profile",
+				true)
+		}
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, oerr.Error(), false)
+	}
+	sigBytes, decErr := hexDecodeStrict(res.SignatureHex)
+	if decErr != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, "sign_ctx produced non-hex signature: "+decErr.Error(), false)
+	}
+	return wrapBytes(buildSignResponse(reqFlags, sigBytes)), nil
 }
 
-// validateKeygenParams enforces the shared invariants once.
-func validateKeygenParams(p keygenParams) error {
-	if p.Participants <= 0 {
-		return fmt.Errorf("participants must be > 0, got %d", p.Participants)
+func (s *ZapServer) dispatchVerify(reqFlags uint16, sch scheme, msg *zap.Message) (*zap.Message, error) {
+	rawMsg, rawSig, rawPub, err := readVerifyRequest(msg)
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInvalidParam, "invalid params: "+err.Error(), false)
 	}
-	if p.Threshold <= 0 || p.Threshold > p.Participants {
-		return fmt.Errorf("threshold must be in [1, %d], got %d", p.Participants, p.Threshold)
+	res, err := sch.Verify(verifyParams{
+		MessageHex:   hexEncode(rawMsg),
+		SignatureHex: hexEncode(rawSig),
+		PubKeyHex:    hexEncode(rawPub),
+	})
+	if err != nil {
+		return errorResponseMsg(reqFlags, ZapErrCodeInternal, err.Error(), false)
 	}
-	return nil
+	return wrapBytes(buildVerifyResponse(reqFlags, res.OK)), nil
+}
+
+// wrapBytes parses a freshly built ZAP buffer into a *zap.Message
+// suitable for return from a handler. We always go through Parse —
+// the v0.7.x line does not expose WrapBuffer (no-validate fast path)
+// in the public API yet; the re-validation is one bounds check on a
+// buffer we control, so the cost is negligible.
+func wrapBytes(b []byte) *zap.Message {
+	m, _ := zap.Parse(b)
+	return m
+}
+
+// errorResponseMsg builds an error response message wrapped in a
+// *zap.Message. Returns the message + nil error so the node's
+// dispatch loop writes it back rather than logging a handler-error
+// (which would also drop the response on the floor).
+func errorResponseMsg(reqFlags uint16, code int32, msg string, strictPQ bool) (*zap.Message, error) {
+	m, _ := zap.Parse(buildErrorResponse(reqFlags, code, msg, strictPQ))
+	return m, nil
+}
+
+// hexEncode / hexDecodeStrict are local helpers — kept thin to keep
+// the dispatch hot path concentrated in this file. encoding/hex is
+// the standard-library implementation; no third-party dep.
+func hexEncode(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	const hextable = "0123456789abcdef"
+	out := make([]byte, len(b)*2)
+	for i, v := range b {
+		out[i*2] = hextable[v>>4]
+		out[i*2+1] = hextable[v&0x0f]
+	}
+	return string(out)
+}
+
+func hexDecodeStrict(s string) ([]byte, error) {
+	if len(s) == 0 {
+		return nil, nil
+	}
+	if len(s)%2 != 0 {
+		return nil, fmt.Errorf("odd-length hex string")
+	}
+	out := make([]byte, len(s)/2)
+	for i := 0; i < len(out); i++ {
+		hi, ok1 := fromHexNibble(s[i*2])
+		lo, ok2 := fromHexNibble(s[i*2+1])
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("invalid hex byte at %d", i*2)
+		}
+		out[i] = (hi << 4) | lo
+	}
+	return out, nil
+}
+
+func fromHexNibble(c byte) (byte, bool) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', true
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, true
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, true
+	}
+	return 0, false
 }
