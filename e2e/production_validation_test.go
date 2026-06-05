@@ -3,7 +3,6 @@ package e2e
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/binary"
@@ -12,7 +11,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -22,8 +20,6 @@ import (
 	circlslhdsa "github.com/cloudflare/circl/sign/slhdsa"
 
 	coronaKernel "github.com/luxfi/corona/threshold"
-
-	"github.com/luxfi/threshold/pkg/thresholdd"
 )
 
 // ---------------------------------------------------------------------
@@ -45,22 +41,6 @@ const (
 	thresholdParties = 5
 	thresholdT       = 3
 )
-
-// rpcEnvelope is the JSON-RPC 2.0 request/response shape the
-// thresholdd dispatcher speaks.
-type rpcEnvelope struct {
-	JSONRPC string          `json:"jsonrpc"`
-	ID      int             `json:"id"`
-	Method  string          `json:"method,omitempty"`
-	Params  any             `json:"params,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *rpcErr         `json:"error,omitempty"`
-}
-
-type rpcErr struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
 
 // schemeResult bundles all the measurements for one scheme so the
 // report can be assembled from a uniform shape.
@@ -85,22 +65,28 @@ type schemeResult struct {
 }
 
 // ---------------------------------------------------------------------
-// Harness — drives the thresholdd dispatcher via the same JSON-RPC
-// surface mpcd exposes in production. No mock paths.
+// Harness — drives the thresholdd dispatcher over its native ZAP wire
+// (same code path mpcd exposes in production). No mock paths.
 // ---------------------------------------------------------------------
 
 func TestProductionValidation_All(t *testing.T) {
-	srv, err := thresholdd.NewServer()
-	if err != nil {
-		t.Fatalf("thresholdd.NewServer: %v", err)
+	// Runs three PQ schemes (Pulsar ML-DSA-65, Magnetar SLH-DSA, Corona
+	// R-LWE) end-to-end through the dispatcher. Under `-race` each
+	// scheme's sign easily exceeds 60s (SLH-DSA hash trees + corona
+	// ring-LWE polynomial sampling) and the harness also hits the live
+	// testnet RPC. Gate the whole flow under -short so the package's
+	// -race build stays under the 10m timeout.
+	if testing.Short() {
+		t.Skip("skipping PQ-scheme + live-testnet E2E under -short")
 	}
-	hs := httptest.NewServer(srv)
-	defer hs.Close()
+
+	dh := startZapDispatcher(t)
+	defer dh.stop()
 
 	results := []schemeResult{}
 
 	for _, scheme := range []string{"pulsar", "magnetar", "corona"} {
-		res := runScheme(t, hs.URL, scheme)
+		res := runScheme(t, dh.addr, scheme)
 		results = append(results, res)
 	}
 
@@ -421,38 +407,8 @@ func stripFrame(buf []byte, wantMagic uint32, family string) ([]byte, error) {
 	return payload, nil
 }
 
-// ---------------------------------------------------------------------
-// JSON-RPC client. Same envelope shape the production mpcd-embedded
-// dispatcher accepts. No auth token (the in-process test server has
-// SetAuthToken unset).
-// ---------------------------------------------------------------------
-
-func rpcCall(url, method string, params any) (json.RawMessage, error) {
-	body := rpcEnvelope{JSONRPC: "2.0", ID: 1, Method: method, Params: params}
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal: %w", err)
-	}
-	req, err := http.NewRequestWithContext(context.Background(), "POST", url, bytes.NewReader(buf))
-	if err != nil {
-		return nil, fmt.Errorf("new request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("rpc do: %w", err)
-	}
-	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
-	var env rpcEnvelope
-	if err := dec.Decode(&env); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	if env.Error != nil {
-		return nil, fmt.Errorf("rpc error [%d]: %s", env.Error.Code, env.Error.Message)
-	}
-	return env.Result, nil
-}
+// rpcCall lives in zap_helpers.go (ZAP-backed). The prior HTTP+JSON+hex
+// helper was deleted alongside the HTTP path in pkg/thresholdd.
 
 // ---------------------------------------------------------------------
 // Live testnet chain liveness probes.

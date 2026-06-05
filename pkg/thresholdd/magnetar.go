@@ -17,7 +17,7 @@ import (
 )
 
 // magnetarScheme wires luxfi/magnetar (FIPS 205 SLH-DSA, hash-based
-// post-quantum signature) into the JSON-RPC surface.
+// post-quantum signature) into the dispatcher's scheme surface.
 //
 // Wire-format contract (closed 2026-05-31): magnetar now publishes
 // canonical MarshalBinary / UnmarshalGroupKey on Signature and
@@ -45,7 +45,7 @@ import (
 //
 // What this dispatcher exposes:
 //
-//   - The PRIMARY per-validator standalone path is the JSON-RPC
+//   - The PRIMARY per-validator standalone path is the dispatcher
 //     surface. Keygen generates `participants` independent SLH-DSA
 //     keypairs; the dispatcher retains them all keyed by the FIRST
 //     validator's MAGG-framed public-key hex; Sign returns the FIRST
@@ -54,8 +54,8 @@ import (
 //     the (msg, pk_0) pair — verifiable by any external party with
 //     a FIPS 205 verifier and the documented MAGG / MAGS frame.
 //   - The N-of-N collected-signatures form (ValidatorAggregateCert)
-//     is not on the JSON-RPC surface today because the bus shape
-//     (one signatureHex per .sign call) doesn't naturally carry N
+//     is not on the dispatcher surface today because the bus shape
+//     (one signature per .sign call) doesn't naturally carry N
 //     parallel signatures. That form is the consensus-layer's job;
 //     embedders that need it call magnetar.BuildAggregateCert /
 //     VerifyAggregateCert directly.
@@ -129,7 +129,7 @@ type magnetarSession struct {
 
 	// keys are the N per-validator keypairs. Index 0 is the
 	// canonical signer (the one whose pk is published as the
-	// session's PublicKey on the JSON-RPC surface). Indices 1..N-1
+	// session's PublicKey on the dispatcher surface). Indices 1..N-1
 	// are retained for future cert-form bus extensions.
 	keys []magnetarKeypair
 }
@@ -377,7 +377,7 @@ func (s *magnetarScheme) Sign(p signParams) (signResult, error) {
 //
 // NOTE: this method does NOT consult the per-request chain-ID
 // resolver gate (RefuseUnderStrictPQ in profile.go). Callers that
-// reach this method via the JSON-RPC dispatcher go through
+// reach this method via the ZAP dispatcher go through
 // Sign_Ctx_Profile (where the resolver gate fires before this);
 // in-process callers with their own outer admission gate may
 // bypass the resolver gate.
@@ -390,12 +390,13 @@ func (s *magnetarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
 // resolver gate fires first, then the scheme-bound slhdsatee gate
 // (inside signCtxInternal). Two orthogonal axes:
 //
-//   - resolver gate: "does the request's X-Chain-ID resolve to
+//   - resolver gate: "does the request's chain ID resolve to
 //     strict-PQ?" — refuses with ErrRefusedUnderStrictPQ which the
-//     dispatcher maps to HTTP 503 + the documented body.
+//     ZAP dispatcher surfaces as an error response with
+//     strictPQ=true so the client can errors.Is the sentinel.
 //   - slhdsatee scheme gate: "is THIS process bound to strict-PQ
 //     via SetChainSecurityProfile?" — refuses with
-//     ErrMagnetarNoTEEAttestation surfaced as a -32000 JSON-RPC
+//     ErrMagnetarNoTEEAttestation surfaced as a ZapErrCodeInternal
 //     error. Pre-dates this gate; remains for back-compat with
 //     operators who set the scheme profile but did not wire a
 //     resolver.
@@ -497,10 +498,10 @@ func (s *magnetarScheme) Verify(p verifyParams) (verifyResult, error) {
 }
 
 // SetTEEBackend wires a slhdsatee.Signer as the institutional-custody
-// TEE-gated signing path. The default JSON-RPC `magnetar.sign` method
-// is UNAFFECTED — it remains the permissionless per-validator
-// standalone path. Operators that need attested release must call
-// SetTEEBackend at boot and use Sign_TEE.
+// TEE-gated signing path. The default `magnetar.sign` procedure is
+// UNAFFECTED — it remains the permissionless per-validator standalone
+// path. Operators that need attested release must call SetTEEBackend
+// at boot and use Sign_TEE.
 //
 // Passing nil clears the backend (subsequent Sign_TEE calls return
 // errMagnetarTEEUnwired).

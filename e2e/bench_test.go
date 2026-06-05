@@ -5,12 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/luxfi/threshold/pkg/thresholdd"
 )
 
 // TestProductionValidation_Bench runs N keygen+sign cycles per scheme
@@ -25,12 +22,8 @@ func TestProductionValidation_Bench(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping bench in -short mode")
 	}
-	srv, err := thresholdd.NewServer()
-	if err != nil {
-		t.Fatalf("thresholdd.NewServer: %v", err)
-	}
-	hs := httptest.NewServer(srv)
-	defer hs.Close()
+	dh := startZapDispatcher(t)
+	defer dh.stop()
 
 	type sched struct {
 		Name string
@@ -49,7 +42,7 @@ func TestProductionValidation_Bench(t *testing.T) {
 		signSamples := make([]time.Duration, 0, c.Iter)
 		for i := 0; i < c.Iter; i++ {
 			tKg := time.Now()
-			kg, err := rpcCall(hs.URL, c.Name+".keygen",
+			kg, err := rpcCall(dh.addr, c.Name+".keygen",
 				map[string]any{"threshold": c.T, "participants": c.N})
 			dKg := time.Since(tKg)
 			if err != nil {
@@ -63,7 +56,7 @@ func TestProductionValidation_Bench(t *testing.T) {
 
 			msg := fmt.Sprintf("bench iter %d for %s", i, c.Name)
 			tSg := time.Now()
-			_, err = rpcCall(hs.URL, c.Name+".sign", map[string]any{
+			_, err = rpcCall(dh.addr, c.Name+".sign", map[string]any{
 				"messageHex": hex.EncodeToString([]byte(msg)),
 				"pubKeyHex":  kgR.PublicKey,
 			})

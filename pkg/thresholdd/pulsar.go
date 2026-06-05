@@ -17,7 +17,7 @@ import (
 )
 
 // pulsarScheme wires luxfi/pulsar (Module-LWE FIPS 204 ML-DSA-65
-// post-quantum threshold signatures) into the JSON-RPC surface.
+// post-quantum threshold signatures) into the dispatcher's scheme surface.
 //
 // Wire-format contract (closed 2026-05-31): pulsar now publishes
 // canonical MarshalBinary / UnmarshalBinary on Signature and
@@ -40,14 +40,13 @@ import (
 //     shares of (s_1, s_2, t_0) over GF(q) and the aggregator
 //     combines (z, c·s_2, c·t_0) under Lagrange-linearity
 //     (TestAlgebraic_NoSkAccess pins this AST-structurally). This
-//     matches corona's symmetric dealer contract: a JSON-RPC
-//     dispatcher is for off-chain test harnesses, MPC bus
-//     integration tests, and SDK-driven dev tooling — NOT
-//     chain-genesis ceremonies. Chain-genesis runs a
-//     no-trusted-dealer DKG (pulsar.NewDKGSession), which the
-//     dispatcher does NOT expose because the DKG is interactive
-//     across messaging rounds and does not fit a single-shot
-//     JSON-RPC envelope.
+//     matches corona's symmetric dealer contract: the dispatcher is
+//     for off-chain test harnesses, MPC bus integration tests, and
+//     SDK-driven dev tooling — NOT chain-genesis ceremonies. Chain-
+//     genesis runs a no-trusted-dealer DKG (pulsar.NewDKGSession),
+//     which the dispatcher does NOT expose because the DKG is
+//     interactive across messaging rounds and does not fit a
+//     single-shot procedure envelope.
 //
 // Trust model on sign:
 //
@@ -105,7 +104,7 @@ type pulsarSession struct {
 	// dispatcher retains them in-process; subsequent Sign calls
 	// reference the session via pubKeyHex (the PULG-framed group
 	// public key bytes). This avoids exposing raw share polynomials
-	// over JSON-RPC.
+	// over the wire.
 	shares []*pulsar.AlgebraicKeyShare
 
 	// quorum is the canonical t-element committee (sorted by NodeID).
@@ -335,8 +334,8 @@ func (s *pulsarScheme) Sign(p signParams) (signResult, error) {
 // NOTE on strict-PQ: this method is the legacy entry point; it does
 // NOT consult the strict-PQ profile gate. Callers that produce
 // signatures destined for a strict-PQ chain MUST go through the
-// JSON-RPC dispatcher (which routes via Sign_Ctx_Profile and runs
-// the gate). In-process callers that want the gate consult
+// ZAP dispatcher (which routes via Sign_Ctx_Profile and runs the
+// gate). In-process callers that want the gate consult
 // RefuseUnderStrictPQ themselves before invoking Sign_Ctx.
 func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
 	return s.signCtxInternal(p)
@@ -344,11 +343,11 @@ func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
 
 // Sign_Ctx_Profile is the profile-aware entry point. The dispatcher
 // always routes here when the scheme implements
-// profileAwareCtxSigner (see server.go). The gate fires at entry:
+// profileAwareCtxSigner (see types.go). The gate fires at entry:
 // on a strict-PQ chain, the call is refused with
-// ErrRefusedUnderStrictPQ (HTTP 503 + documented body); on any
-// other profile, or with no resolver / no chain ID, the call falls
-// through to signCtxInternal.
+// ErrRefusedUnderStrictPQ (the ZAP dispatcher surfaces this as an
+// error response with strictPQ=true); on any other profile, or with
+// no resolver / no chain ID, the call falls through to signCtxInternal.
 //
 // Why the gate sits HERE (not in signCtxInternal): the legacy
 // Sign_Ctx is still public for in-process embedders that have
@@ -480,9 +479,9 @@ func (s *pulsarScheme) Verify(p verifyParams) (verifyResult, error) {
 }
 
 // SetTEEBackend wires a mldsatee.Signer as the institutional-custody
-// TEE-gated signing path. The default JSON-RPC `pulsar.sign` method
-// is UNAFFECTED — it remains the permissionless v0.3 algebraic-
-// aggregate path.
+// TEE-gated signing path. The default `pulsar.sign` procedure is
+// UNAFFECTED — it remains the permissionless v0.3 algebraic-aggregate
+// path.
 //
 // Passing nil clears the backend (subsequent Sign_TEE calls return
 // errPulsarTEEUnwired).

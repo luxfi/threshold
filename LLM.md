@@ -11,7 +11,7 @@ Production-ready universal threshold signature implementation supporting 20+ blo
 ```
 threshold/
 ├── cmd/threshold-cli/     # CLI tool
-├── cmd/thresholdd/        # JSON-RPC 2.0 daemon — all six schemes over one socket (127.0.0.1:7300)
+├── cmd/thresholdd/        # ZAP byte-passthrough daemon — all seven schemes over one socket (127.0.0.1:7301). HTTP+JSON+hex deleted 2026-06-04.
 ├── internal/              # Private implementation details
 │   ├── bip32/            # BIP-32 key derivation
 │   ├── elgamal/          # ElGamal encryption
