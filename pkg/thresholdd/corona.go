@@ -16,7 +16,7 @@ import (
 )
 
 // coronaScheme wires luxfi/corona/threshold (Ring-LWE post-quantum
-// threshold signatures) into the JSON-RPC surface.
+// threshold signatures) into the dispatcher's scheme surface.
 //
 // Wire-format contract (closed 2026-05-31): the corona kernel now
 // publishes canonical MarshalBinary / UnmarshalBinary on Signature and
@@ -27,7 +27,7 @@ import (
 // Trust model on keygen:
 //
 //   - The dispatcher runs the trusted-dealer GenerateKeys path
-//     in-process (matches the BLS scheme: this is the JSON-RPC
+//     in-process (matches the BLS scheme: this is the dispatcher
 //     contract, NOT the on-chain production path). The Pedersen-DKG
 //     no-trusted-dealer path lives at luxfi/corona/keyera.Bootstrap and
 //     is what consensus drives at chain genesis. The dispatcher exists
@@ -89,7 +89,7 @@ func newCoronaScheme() *coronaScheme {
 // not the raw secret material. The dispatcher retains the actual
 // KeyShare structs in-process keyed by the PublicKey hex; subsequent
 // Sign calls reference the session via PubKeyHex. This avoids exposing
-// raw share polynomials over JSON-RPC, which would otherwise leak the
+// raw share polynomials over the wire, which would otherwise leak the
 // secret share material to anyone who can read the response.
 func (s *coronaScheme) Keygen(p keygenParams) (keygenResult, error) {
 	if err := validateKeygenParams(p); err != nil {
@@ -247,9 +247,9 @@ func (s *coronaScheme) Verify(p verifyParams) (verifyResult, error) {
 }
 
 // SetTEEBackend wires a rlwetee.Signer as the institutional-custody
-// TEE-gated signing path. The default JSON-RPC `corona.sign` method
-// is UNAFFECTED — it remains the permissionless trusted-dealer
-// 2-round threshold path.
+// TEE-gated signing path. The default `corona.sign` procedure is
+// UNAFFECTED — it remains the permissionless trusted-dealer 2-round
+// threshold path.
 //
 // Passing nil clears the backend (subsequent Sign_TEE calls return
 // errCoronaTEEUnwired).

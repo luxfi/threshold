@@ -13,8 +13,8 @@ import (
 
 // blsScheme wires luxfi/threshold/protocols/bls (Shamir t-of-n with
 // Lagrange interpolation over BLS12-381 G2 signatures) into the
-// JSON-RPC surface. Keygen runs a TrustedDealer in-process — that is
-// the canonical luxfi/threshold path (see protocols/bls/bls_test.go).
+// dispatcher's scheme surface. Keygen runs a TrustedDealer in-process
+// — that is the canonical luxfi/threshold path (see protocols/bls/bls_test.go).
 type blsScheme struct {
 	mu       sync.Mutex
 	sessions map[string]*blsSession
