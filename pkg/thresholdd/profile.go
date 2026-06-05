@@ -41,9 +41,11 @@ import (
 //   - StrictPQ profile: NO single-party dealer/single-validator
 //     shortcut on Sign_Ctx (or any other path that would surface a
 //     bit-equal classical-shape signature without an actual
-//     threshold-bound ctx). Gate RETURNS HTTP 503 + the documented
-//     body so the caller knows the operation is temporarily refused
-//     pending sister-agent's pulsar v0.4 ctx-bound path landing.
+//     threshold-bound ctx). Gate RETURNS ErrRefusedUnderStrictPQ so
+//     the caller knows the operation is temporarily refused pending
+//     sister-agent's pulsar v0.4 ctx-bound path landing. The ZAP
+//     dispatcher surfaces this as an error message with strictPQ=true
+//     so the client can errors.Is the sentinel.
 //   - LegacyCompat / Permissive profile: shortcuts acceptable as
 //     documented dev-tooling. Operators are responsible for not
 //     building production on top of permissive profiles.
@@ -108,9 +110,9 @@ func (p Profile) String() string {
 	}
 }
 
-// ChainProfileResolver maps a chain ID (the X-Chain-ID HTTP header
-// or the optional ChainID field on signCtxParams) to the chain's
-// active Profile. The resolver lives on the embedder side so this
+// ChainProfileResolver maps a chain ID (the ChainID field on
+// signCtxParams, transported in the ZAP SignCtxRequest envelope) to
+// the chain's active Profile. The resolver lives on the embedder side so this
 // package does not import luxfi/consensus/config; luxfi/mpc and
 // luxfi/node each wire their own resolver from genesis manifest /
 // runtime profile state.
@@ -166,14 +168,9 @@ func IsStrictPQProfile(chainID string, resolver ChainProfileResolver) bool {
 
 // ErrRefusedUnderStrictPQ is the sentinel returned by
 // RefuseUnderStrictPQ when the operation is refused on a strict-PQ
-// chain. The HTTP layer maps this to a 503 with the documented
-// body; in-process callers may inspect it with errors.Is.
+// chain. In-process callers inspect it with errors.Is; the ZAP
+// dispatcher surfaces it as an error response with strictPQ=true.
 var ErrRefusedUnderStrictPQ = errors.New("operation refused on strict-PQ chain profile")
-
-// strictPQRefusalBody is the documented JSON-RPC body the dispatcher
-// returns alongside HTTP 503 when the strict-PQ gate fires. Pinned
-// here so server.go and tests share one canonical string.
-const strictPQRefusalBody = `{"error": "Sign_Ctx requires pulsar v0.4 threshold ctx-bound path; rejected on strict-PQ chain profile"}`
 
 // RefuseUnderStrictPQ is THE single policy gate. Call sites that
 // surface a single-party dealer / single-validator shortcut on a
