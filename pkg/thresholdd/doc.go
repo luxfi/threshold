@@ -1,6 +1,11 @@
-// Package thresholdd is the JSON-RPC 2.0 dispatcher that exposes every
-// luxfi/threshold protocol (cggmp21, frost, pulsar, corona, bls,
-// doerner) on a single process-local HTTP endpoint.
+// Package thresholdd is the ZAP-native dispatcher that exposes every
+// luxfi/threshold protocol (cggmp21, frost, pulsar, corona, magnetar,
+// bls, doerner) on a single byte-passthrough transport.
+//
+// One wire, one transport: the historical HTTP+JSON+hex path was
+// removed in favour of ZAP byte-passthrough. There is no JSON-RPC
+// fallback, no `--http` flag, no deprecation shim. Pre-cutover
+// JSON-RPC clients fail to connect — that is the documented behaviour.
 //
 // The same dispatcher is started by both:
 //
@@ -10,29 +15,29 @@
 //     as a sub-listener so a single MPC process owns every threshold
 //     scheme it speaks.
 //
-// Wire format mirrors the teleport mpc bus (mpc/src/signers/rpc.ts):
+// Wire shape (see zap_schema.go for the field offsets):
 //
-//	POST / with body
-//	  {"jsonrpc":"2.0","id":N,"method":"<scheme>.<op>","params":{...}}
+//	ZAP message with procedure opcode in msg.Flags upper byte;
+//	message kind (request/response/error) in the lower byte.
 //
-// Methods (per scheme):
+// Procedures (per scheme):
 //
-//	<scheme>.keygen   { threshold, participants }
-//	                  -> { publicKey: hex, shares: [hex, ...] }
-//	<scheme>.sign     { messageHex, pubKeyHex }
-//	                  -> { signatureHex }
-//	<scheme>.verify   { messageHex, signatureHex, pubKeyHex }
-//	                  -> { ok: bool }
+//	<scheme>.keygen   { Threshold, Participants }
+//	                  -> { PublicKey, Shares }   (all bytes)
+//	<scheme>.sign     { Message, PubKey }
+//	                  -> { Signature }
+//	<scheme>.verify   { Message, Signature, PubKey }
+//	                  -> { OK }
 //
 // Pulsar and magnetar additionally expose:
 //
-//	<scheme>.sign_ctx { messageHex, pubKeyHex, ctxHex }
-//	                  -> { signatureHex }
+//	<scheme>.sign_ctx { Message, PubKey, Ctx, ChainID }
+//	                  -> { Signature }
 //
-// where ctxHex is the FIPS-204 §5.2 / FIPS-205 §10.2 context octet
-// string (hex-encoded; empty string binds the empty ctx). Signatures
-// emitted via sign_ctx satisfy the on-chain EVM precompile's
-// domain-separation contract (`lux-evm-precompile-mldsa-v1` /
+// where Ctx is the FIPS-204 §5.2 / FIPS-205 §10.2 context octet
+// string (raw bytes; empty binds the empty ctx). Signatures emitted
+// via sign_ctx satisfy the on-chain EVM precompile's domain-
+// separation contract (`lux-evm-precompile-mldsa-v1` /
 // `lux-evm-precompile-slhdsa-v1`) — verifiable by passing the same
 // ctx to luxfi/precompile/{mldsa,slhdsa}.VerifySignatureCtx, or by
 // any FIPS-204/205 verifier with ctx-binding support.
@@ -59,10 +64,11 @@
 //	  - Strict-PQ profile (ProfileID 0x01 or 0x03 in
 //	    luxfi/consensus/config terms): NO single-party dealer
 //	    shortcuts ANYWHERE on the dispatcher. Sign_Ctx refuses
-//	    with HTTP 503 + the documented body until the underlying
-//	    primitive is swapped to a proper threshold ctx-bound path
-//	    (pulsar v0.4 OrchestrateV03SignCtx; magnetar aggregate
-//	    cert with ctx).
+//	    with a ZAP ErrorResponse carrying strictPQ=true (callers
+//	    branch via errors.Is(ErrRefusedUnderStrictPQ)) until the
+//	    underlying primitive is swapped to a proper threshold
+//	    ctx-bound path (pulsar v0.4 OrchestrateV03SignCtx;
+//	    magnetar aggregate cert with ctx).
 //	  - Legacy-compat profile (everything else): dealer shortcuts
 //	    are acceptable as documented dev-tooling. Operators are
 //	    responsible for not building production on top of
@@ -75,13 +81,10 @@
 //	luxfi/mpc / luxfi/node wire an adapter that calls
 //	config.ProfileByID under the hood.
 //
-//	X-Chain-ID HTTP header (or the optional ChainID field on
-//	signCtxParams) carries the chain assertion per request.
-//
 //	When sister-agent's pulsar v0.4 / magnetar aggregate-cert
 //	ctx-bound paths land, the dispatcher's Sign_Ctx swaps to
 //	those — the gate then becomes dead code on those call sites
-//	and the X-Chain-ID-based refusal vanishes. profile.go and
+//	and the chain-ID-based refusal vanishes. profile.go and
 //	the gate function stay as the documented audit hook for any
 //	future primitive-soundness gate on strict-PQ chains.
 package thresholdd

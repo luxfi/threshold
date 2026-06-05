@@ -5,14 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"net/http/httptest"
 	"testing"
 
 	circlmldsa65 "github.com/cloudflare/circl/sign/mldsa/mldsa65"
 	circlslhdsa "github.com/cloudflare/circl/sign/slhdsa"
 	coronaThreshold "github.com/luxfi/corona/threshold"
-
-	"github.com/luxfi/threshold/pkg/thresholdd"
 )
 
 // TestProductionValidation_WireCapture is the byte-identity capture
@@ -32,26 +29,30 @@ import (
 //   - circl slhdsa.Verify(&pk, NewMessage(msg), fipsSig, nil) == true
 //   - corona.VerifyBytes(gkBytes, string(msg), sigBytes) == true
 func TestProductionValidation_WireCapture(t *testing.T) {
-	srv, err := thresholdd.NewServer()
-	if err != nil {
-		t.Fatalf("thresholdd.NewServer: %v", err)
+	// Same heavy PQ keygen+sign cost as TestProductionValidation_All —
+	// gate under -short so the package's -race build clears the 10m
+	// timeout. See bench_test.go for the matching gate on the bench
+	// variant.
+	if testing.Short() {
+		t.Skip("skipping wire-capture under -short")
 	}
-	hs := httptest.NewServer(srv)
-	defer hs.Close()
+
+	dh := startZapDispatcher(t)
+	defer dh.stop()
 
 	msg := []byte("WIRE-CAPTURE 2026-05-31 byte-identity reproducer")
 	t.Logf("CAPTURE-MSG-SHA256 : %s", hexShort(sha256.Sum256(msg)))
 
 	// --- pulsar ---
 	{
-		kg, err := rpcCall(hs.URL, "pulsar.keygen", map[string]any{"threshold": 3, "participants": 5})
+		kg, err := rpcCall(dh.addr, "pulsar.keygen", map[string]any{"threshold": 3, "participants": 5})
 		if err != nil {
 			t.Fatalf("pulsar.keygen: %v", err)
 		}
 		var kgR struct{ PublicKey string }
 		_ = json.Unmarshal(kg, &kgR)
 		gk, _ := hex.DecodeString(kgR.PublicKey)
-		sg, err := rpcCall(hs.URL, "pulsar.sign", map[string]any{
+		sg, err := rpcCall(dh.addr, "pulsar.sign", map[string]any{
 			"messageHex": hex.EncodeToString(msg), "pubKeyHex": kgR.PublicKey,
 		})
 		if err != nil {
@@ -80,14 +81,14 @@ func TestProductionValidation_WireCapture(t *testing.T) {
 
 	// --- magnetar ---
 	{
-		kg, err := rpcCall(hs.URL, "magnetar.keygen", map[string]any{"threshold": 5, "participants": 5})
+		kg, err := rpcCall(dh.addr, "magnetar.keygen", map[string]any{"threshold": 5, "participants": 5})
 		if err != nil {
 			t.Fatalf("magnetar.keygen: %v", err)
 		}
 		var kgR struct{ PublicKey string }
 		_ = json.Unmarshal(kg, &kgR)
 		gk, _ := hex.DecodeString(kgR.PublicKey)
-		sg, err := rpcCall(hs.URL, "magnetar.sign", map[string]any{
+		sg, err := rpcCall(dh.addr, "magnetar.sign", map[string]any{
 			"messageHex": hex.EncodeToString(msg), "pubKeyHex": kgR.PublicKey,
 		})
 		if err != nil {
@@ -116,14 +117,14 @@ func TestProductionValidation_WireCapture(t *testing.T) {
 
 	// --- corona ---
 	{
-		kg, err := rpcCall(hs.URL, "corona.keygen", map[string]any{"threshold": 3, "participants": 5})
+		kg, err := rpcCall(dh.addr, "corona.keygen", map[string]any{"threshold": 3, "participants": 5})
 		if err != nil {
 			t.Fatalf("corona.keygen: %v", err)
 		}
 		var kgR struct{ PublicKey string }
 		_ = json.Unmarshal(kg, &kgR)
 		gk, _ := hex.DecodeString(kgR.PublicKey)
-		sg, err := rpcCall(hs.URL, "corona.sign", map[string]any{
+		sg, err := rpcCall(dh.addr, "corona.sign", map[string]any{
 			"messageHex": hex.EncodeToString(msg), "pubKeyHex": kgR.PublicKey,
 		})
 		if err != nil {
