@@ -16,8 +16,8 @@ import (
 )
 
 // frostScheme wires luxfi/threshold/protocols/frost (RFC 9591) into
-// the JSON-RPC surface. secp256k1 group only — the registry's policyId
-// is "SCHNORR-SECP256K1-FROST-RFC9591".
+// the dispatcher's scheme surface. secp256k1 group only — the
+// registry's policyId is "SCHNORR-SECP256K1-FROST-RFC9591".
 type frostScheme struct {
 	mu       sync.Mutex
 	sessions map[string]*frostSession
