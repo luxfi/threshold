@@ -68,6 +68,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6 // indirect
 	github.com/aws/smithy-go v1.24.2 // indirect
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -86,6 +87,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.21.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
+	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
@@ -99,11 +101,13 @@ require (
 	github.com/luxfi/ids v1.2.9 // indirect
 	github.com/luxfi/math v1.4.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
+	github.com/luxfi/mdns v0.1.0 // indirect
 	github.com/luxfi/mock v0.1.1 // indirect
 	github.com/luxfi/pq v1.0.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
+	github.com/miekg/dns v1.1.72 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
@@ -151,6 +155,7 @@ require (
 	github.com/luxfi/metric v1.5.7
 	github.com/luxfi/mpc v1.14.13
 	github.com/luxfi/pulsar v1.1.1
+	github.com/luxfi/zap v0.2.0
 )
 
 // e2e validation harness pin (2026-05-31): luxfi/node v1.27.8 is
@@ -158,4 +163,3 @@ require (
 // v1.27.7 and v1.27.9). Local replace pins to the workspace
 // checkout so the e2e harness can build against the same node
 // sources that produced the live testnet luxd image.
-replace github.com/luxfi/node => ../node
