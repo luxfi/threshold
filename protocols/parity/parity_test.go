@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // Package parity holds the apples-to-apples bench harness comparing
-// Corona (Ring-LWE threshold sig, MAC-N×N-pairwise Ringtail-class
+// Corona (Ring-LWE threshold sig, MAC-N×N-pairwise Corona-class
 // scheme) against Pulsar (Shamir-seed-reveal aggregator producing a
 // FIPS 204 ML-DSA signature). Both schemes are exercised through their
 // canonical threshold/protocols/<x> alias surfaces.
