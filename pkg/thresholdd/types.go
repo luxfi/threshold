@@ -110,28 +110,6 @@ type profileAwareCtxSigner interface {
 	Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileResolver) (signResult, error)
 }
 
-// schemeAliases maps deprecated scheme names to their canonical names
-// for backward compatibility on the dispatcher's procedure-routing
-// surface. Inbound requests using the deprecated name are silently
-// routed to the canonical scheme; outbound documentation and
-// responses always use the canonical name. Remove an entry once
-// external callers have migrated.
-//
-//	"corona" → "corona"  (renamed 2026-06 per AUDIT-2026-06.md §4.3
-//	                        in luxfi/corona; canonical R-LWE name).
-var schemeAliases = map[string]string{
-	"corona": "corona",
-}
-
-// canonicalScheme normalises an inbound scheme name through the alias
-// table, returning the canonical name. Unknown names pass through
-// unchanged so the caller's "unknown scheme" error path still fires.
-func canonicalScheme(name string) string {
-	if c, ok := schemeAliases[name]; ok {
-		return c
-	}
-	return name
-}
 
 // validateKeygenParams enforces the shared invariants once.
 func validateKeygenParams(p keygenParams) error {
