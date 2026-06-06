@@ -120,10 +120,10 @@ Status per scheme:
 - `frost` — full RFC 9591 secp256k1 via `protocols/frost`
 - `pulsar` — full Pulsar M-LWE via `luxfi/corona/threshold`
 - `corona` — full Corona R-LWE via `luxfi/threshold/protocols/corona`.
-  Wire-level alias `"ringtail"` is accepted on read (deprecated; emit
+  Wire-level alias `"Corona"` is accepted on read (deprecated; emit
   `"corona"` on all new clients). Aliases live in `pkg/thresholdd/
   server.go::schemeAliases`; remove an alias once external callers have
-  migrated. Pre-2026-06 callers that still send `ringtail.keygen` etc.
+  migrated. Pre-2026-06 callers that still send `Corona.keygen` etc.
   continue to dispatch correctly.
 - `bls` — full Shamir/Lagrange via `protocols/bls.TrustedDealer`
 - `doerner` — round-protocol non-functional upstream; surface reserved,
