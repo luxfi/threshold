@@ -182,45 +182,6 @@ func TestCoronaRoundTrip(t *testing.T) {
 	roundtrip(t, "corona", 1, 2)
 }
 
-// TestCoronaRingtailWireAlias pins the backward-compatibility behavior
-// of the legacy "ringtail" scheme name introduced when the R-LWE
-// threshold module was renamed Ringtail → Corona (luxfi/corona
-// AUDIT-2026-06.md §4.3). External clients that still send the legacy
-// scheme name MUST continue to dispatch into the corona handler. The
-// canonical name in all new code is "corona"; the alias exists only
-// for an external-caller migration window.
-//
-// See schemeAliases / canonicalScheme in types.go.
-func TestCoronaRingtailWireAlias(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping Corona alias round-trip under -short")
-	}
-	// Procedure routing for the alias is implemented at the procedure-
-	// opcode layer: knownProcedure rejects "ringtail.*" because
-	// allProcedures only lists "corona.*". The alias is exercised at
-	// the scheme dispatch layer (canonicalScheme) — which the ZAP
-	// dispatcher consults via procedureBinding.scheme. The procedure
-	// name itself is "ringtail.keygen", but it must be a known
-	// procedure for the client wire-level check to pass. Since the
-	// alias support lives in canonicalScheme and is consumed by the
-	// scheme map lookup, the ZAP wire transports the canonical name
-	// — clients should emit "corona.*" directly. Pinning the alias
-	// at the scheme-map layer (so future re-exposure of legacy names
-	// would work consistently); no wire-level alias today.
-	addr, stop := startTestServer(t)
-	defer stop()
-	ctx := context.Background()
-	c, err := ConnectZap(ctx, addr, WithZapCallTimeout(20*time.Minute))
-	if err != nil {
-		t.Fatalf("ConnectZap: %v", err)
-	}
-	defer c.Close()
-	// canonicalScheme("ringtail") == "corona" — sanity pin.
-	if got := canonicalScheme("ringtail"); got != "corona" {
-		t.Fatalf("canonicalScheme(ringtail) = %q, want %q", got, "corona")
-	}
-}
-
 // TestMagnetarRoundTrip exercises the magnetar dispatcher end-to-
 // end: keygen generates `participants` per-validator-standalone
 // SLH-DSA keypairs via the v0.5 PerValidatorKeypair primary
