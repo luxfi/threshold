@@ -1,4 +1,4 @@
-# LLM.md - Threshold Signatures Library
+# Threshold Signatures Library
 
 AI assistant context for the Lux Threshold Signatures Library.
 
