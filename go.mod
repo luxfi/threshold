@@ -25,7 +25,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1
 	github.com/gtank/merlin v0.1.1
 	github.com/gtank/ristretto255 v0.2.0
-	github.com/luxfi/log v1.4.1
+	github.com/luxfi/log v1.4.3
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 )
@@ -89,14 +89,14 @@ require (
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/luxfi/accel v1.1.9 // indirect
 	github.com/luxfi/cache v1.2.1 // indirect
 	github.com/luxfi/compress v0.0.5 // indirect
 	github.com/luxfi/concurrent v0.0.3 // indirect
-	github.com/luxfi/database v1.18.3 // indirect
+	github.com/luxfi/database v1.19.3 // indirect
 	github.com/luxfi/hsm v1.1.3 // indirect
 	github.com/luxfi/ids v1.2.9 // indirect
 	github.com/luxfi/math v1.4.1 // indirect
@@ -105,7 +105,7 @@ require (
 	github.com/luxfi/mock v0.1.1 // indirect
 	github.com/luxfi/pq v1.0.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.21 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
