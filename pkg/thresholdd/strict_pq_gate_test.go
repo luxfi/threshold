@@ -66,6 +66,14 @@ func TestRefuseUnderStrictPQ_PolicyMatrix(t *testing.T) {
 		"lux-testnet": ProfileLegacyCompat,
 	})
 
+	// Production posture (what mpcd wires): def=ProfileStrictPQ, so any
+	// chain not on the legacy allow-list — INCLUDING empty/unknown —
+	// DEFAULT-REFUSES. This proves the fail-CLOSED behavior: a caller
+	// cannot bypass the gate by omitting or faking the chain context.
+	strictDefaultResolver := NewStaticChainProfileResolver(ProfileStrictPQ, map[string]Profile{
+		"lux-testnet": ProfileLegacyCompat,
+	})
+
 	tests := []struct {
 		name      string
 		chainID   string
@@ -100,6 +108,25 @@ func TestRefuseUnderStrictPQ_PolicyMatrix(t *testing.T) {
 			name:      "unknown chain passes (fail-OPEN)",
 			chainID:   "some-other-chain",
 			resolver:  strictResolver,
+			wantError: false,
+		},
+		// Fail-CLOSED proofs (production posture, def=ProfileStrictPQ).
+		{
+			name:      "empty chainID REFUSED on strict-default node",
+			chainID:   "",
+			resolver:  strictDefaultResolver,
+			wantError: true,
+		},
+		{
+			name:      "unknown chain REFUSED on strict-default node",
+			chainID:   "some-other-chain",
+			resolver:  strictDefaultResolver,
+			wantError: true,
+		},
+		{
+			name:      "legacy allow-listed chain passes on strict-default node",
+			chainID:   "lux-testnet",
+			resolver:  strictDefaultResolver,
 			wantError: false,
 		},
 	}
