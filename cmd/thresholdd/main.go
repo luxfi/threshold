@@ -1,5 +1,5 @@
 // Command thresholdd exposes all luxfi/threshold protocols
-// (cggmp21, frost, pulsar, corona, magnetar, bls, doerner) over a
+// (cggmp21, frost, pulsar, corona, magnetar, doerner) over a
 // single process-local ZAP byte-passthrough endpoint.
 //
 // Wire shape (see ~/work/lux/threshold/pkg/thresholdd/zap_schema.go):

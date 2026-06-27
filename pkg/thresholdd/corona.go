@@ -27,8 +27,8 @@ import (
 // Trust model on keygen:
 //
 //   - The dispatcher runs the trusted-dealer GenerateKeys path
-//     in-process (matches the BLS scheme: this is the dispatcher
-//     contract, NOT the on-chain production path). The Pedersen-DKG
+//     in-process (this is the dispatcher contract for off-chain test
+//     harnesses, NOT the on-chain production path). The Pedersen-DKG
 //     no-trusted-dealer path lives at luxfi/corona/keyera.Bootstrap and
 //     is what consensus drives at chain genesis. The dispatcher exists
 //     for off-chain test harnesses, MPC bus integration tests, and

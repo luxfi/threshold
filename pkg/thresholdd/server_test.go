@@ -2,73 +2,13 @@
 package thresholdd
 
 import (
-	"context"
-	"fmt"
-	"net"
 	"testing"
-	"time"
 )
 
 // server_test.go — ZAP-side correctness + benchmark tests. The prior
 // HTTP↔ZAP parity tests are gone with the HTTP path; cryptographic
 // correctness across the ZAP wire is asserted by thresholdd_test.go
 // (full per-scheme round-trips) and the dedicated tests here.
-
-// TestZapServer_BLSRoundTrip exercises keygen + sign + verify end-
-// to-end over the ZAP wire. BLS keygen is fast (no Paillier safe-
-// prime sampling) so this is the cheapest smoke test.
-func TestZapServer_BLSRoundTrip(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping BLS round-trip under -short")
-	}
-	addr, stop := startTestServer(t)
-	defer stop()
-
-	ctx := context.Background()
-	c, err := ConnectZap(ctx, addr, WithZapCallTimeout(20*time.Second))
-	if err != nil {
-		t.Fatalf("ConnectZap: %v", err)
-	}
-	defer c.Close()
-
-	pubKey, shares, err := c.Keygen(ctx, "bls", 2, 3)
-	if err != nil {
-		t.Fatalf("Keygen: %v", err)
-	}
-	if len(pubKey) == 0 {
-		t.Fatalf("empty pubKey")
-	}
-	if len(shares) != 3 {
-		t.Fatalf("shares=%d want=3", len(shares))
-	}
-
-	msg := []byte("zap-bls-roundtrip-message")
-	sig, err := c.Sign(ctx, "bls", msg, pubKey)
-	if err != nil {
-		t.Fatalf("Sign: %v", err)
-	}
-	if len(sig) == 0 {
-		t.Fatalf("empty signature")
-	}
-
-	ok, err := c.Verify(ctx, "bls", msg, sig, pubKey)
-	if err != nil {
-		t.Fatalf("Verify: %v", err)
-	}
-	if !ok {
-		t.Fatalf("Verify failed: round-trip signature rejected")
-	}
-
-	// Forgery: different message must verify false.
-	wrong := []byte("zap-bls-other-message")
-	bad, err := c.Verify(ctx, "bls", wrong, sig, pubKey)
-	if err != nil {
-		t.Fatalf("Verify (forgery): %v", err)
-	}
-	if bad {
-		t.Fatalf("Verify accepted forgery")
-	}
-}
 
 // TestZapShares_RoundTrip covers the EncodeShares / DecodeShares
 // helper. Trivial layout, but a regression here would corrupt every
@@ -129,100 +69,5 @@ func TestProcOpcode_StableAndNonReserved(t *testing.T) {
 			t.Errorf("opcode collision: %q and %q both hash to 0x%04x — rename one", existing, p.name, op)
 		}
 		seen[op] = p.name
-	}
-}
-
-// BenchmarkZapServer_BLSSign measures end-to-end Sign() latency over
-// the ZAP transport. Reports ns/op + ops/sec.
-func BenchmarkZapServer_BLSSign(b *testing.B) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		b.Fatalf("probe listen: %v", err)
-	}
-	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
-	ln.Close()
-	var port int
-	fmt.Sscanf(portStr, "%d", &port)
-	srv, err := NewZapServer(ZapServerConfig{NodeID: "bench-zap", Port: port})
-	if err != nil {
-		b.Fatalf("NewZapServer: %v", err)
-	}
-	if err := srv.Start(); err != nil {
-		b.Fatalf("Start: %v", err)
-	}
-	defer srv.Stop()
-	time.Sleep(20 * time.Millisecond)
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-
-	ctx := context.Background()
-	c, err := ConnectZap(ctx, addr, WithZapCallTimeout(30*time.Second))
-	if err != nil {
-		b.Fatalf("ConnectZap: %v", err)
-	}
-	defer c.Close()
-
-	pubKey, _, err := c.Keygen(ctx, "bls", 2, 3)
-	if err != nil {
-		b.Fatalf("Keygen: %v", err)
-	}
-	msg := []byte("bench-message-zap")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := c.Sign(ctx, "bls", msg, pubKey)
-		if err != nil {
-			b.Fatalf("Sign iter %d: %v", i, err)
-		}
-	}
-}
-
-// BenchmarkZapServer_BLSVerify measures end-to-end Verify() latency
-// over the ZAP transport.
-func BenchmarkZapServer_BLSVerify(b *testing.B) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		b.Fatalf("probe: %v", err)
-	}
-	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
-	ln.Close()
-	var port int
-	fmt.Sscanf(portStr, "%d", &port)
-	srv, err := NewZapServer(ZapServerConfig{NodeID: "bench-zap-v", Port: port})
-	if err != nil {
-		b.Fatalf("NewZapServer: %v", err)
-	}
-	if err := srv.Start(); err != nil {
-		b.Fatalf("Start: %v", err)
-	}
-	defer srv.Stop()
-	time.Sleep(20 * time.Millisecond)
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-
-	ctx := context.Background()
-	c, err := ConnectZap(ctx, addr, WithZapCallTimeout(30*time.Second))
-	if err != nil {
-		b.Fatalf("ConnectZap: %v", err)
-	}
-	defer c.Close()
-
-	pubKey, _, err := c.Keygen(ctx, "bls", 2, 3)
-	if err != nil {
-		b.Fatalf("Keygen: %v", err)
-	}
-	msg := []byte("bench-verify-msg")
-	sig, err := c.Sign(ctx, "bls", msg, pubKey)
-	if err != nil {
-		b.Fatalf("Sign: %v", err)
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		ok, err := c.Verify(ctx, "bls", msg, sig, pubKey)
-		if err != nil {
-			b.Fatalf("Verify iter %d: %v", i, err)
-		}
-		if !ok {
-			b.Fatalf("Verify iter %d: rejected own signature", i)
-		}
 	}
 }
