@@ -65,7 +65,7 @@ type ZapServerConfig struct {
 }
 
 // NewZapServer constructs a ZapServer with the canonical scheme set
-// (cggmp21, frost, pulsar, corona, magnetar, bls, doerner).
+// (cggmp21, frost, pulsar, corona, magnetar, doerner).
 func NewZapServer(cfg ZapServerConfig) (*ZapServer, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
@@ -84,7 +84,6 @@ func NewZapServer(cfg ZapServerConfig) (*ZapServer, error) {
 	s.schemes["pulsar"] = newPulsarScheme()
 	s.schemes["corona"] = newCoronaScheme()
 	s.schemes["magnetar"] = newMagnetarScheme()
-	s.schemes["bls"] = newBLSScheme()
 	s.schemes["doerner"] = newDoernerScheme()
 
 	s.node = zap.NewNode(zap.NodeConfig{
@@ -143,9 +142,6 @@ var allProcedures = []procedureBinding{
 	{name: ProcMagnetarSign, scheme: "magnetar", op: "sign"},
 	{name: ProcMagnetarSignCtx, scheme: "magnetar", op: "sign_ctx"},
 	{name: ProcMagnetarVerify, scheme: "magnetar", op: "verify"},
-	{name: ProcBLSKeygen, scheme: "bls", op: "keygen"},
-	{name: ProcBLSSign, scheme: "bls", op: "sign"},
-	{name: ProcBLSVerify, scheme: "bls", op: "verify"},
 	{name: ProcDoernerKeygen, scheme: "doerner", op: "keygen"},
 	{name: ProcDoernerSign, scheme: "doerner", op: "sign"},
 	{name: ProcDoernerVerify, scheme: "doerner", op: "verify"},
@@ -314,7 +310,7 @@ func (s *ZapServer) dispatchSignCtx(reqFlags uint16, sch scheme, resolver ChainP
 		ChainID:    chainID,
 	}
 	var (
-		res signResult
+		res  signResult
 		oerr error
 	)
 	if pas, ok := sch.(profileAwareCtxSigner); ok {

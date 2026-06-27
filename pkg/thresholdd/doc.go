@@ -1,6 +1,6 @@
 // Package thresholdd is the ZAP-native dispatcher that exposes every
 // luxfi/threshold protocol (cggmp21, frost, pulsar, corona, magnetar,
-// bls, doerner) on a single byte-passthrough transport.
+// doerner) on a single byte-passthrough transport.
 //
 // One wire, one transport: the historical HTTP+JSON+hex path was
 // removed in favour of ZAP byte-passthrough. There is no JSON-RPC
