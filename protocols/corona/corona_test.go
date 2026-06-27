@@ -24,7 +24,7 @@ import (
 // -----------------------------------------------------------------------------
 
 func TestBootstrap_RejectsEmptyValidators(t *testing.T) {
-	era, err := Bootstrap(1, nil, PulsarGroupID(0), 0, rand.Reader)
+	era, err := Bootstrap(1, nil, CoronaGroupID(0), 0, rand.Reader)
 	if era != nil {
 		t.Fatalf("era should be nil on error, got %v", era)
 	}
@@ -34,14 +34,14 @@ func TestBootstrap_RejectsEmptyValidators(t *testing.T) {
 }
 
 func TestBootstrap_RejectsThresholdZero(t *testing.T) {
-	_, err := Bootstrap(0, []party.ID{"a", "b"}, PulsarGroupID(0), 0, rand.Reader)
+	_, err := Bootstrap(0, []party.ID{"a", "b"}, CoronaGroupID(0), 0, rand.Reader)
 	if !errors.Is(err, ErrInvalidThreshold) {
 		t.Fatalf("want ErrInvalidThreshold, got %v", err)
 	}
 }
 
 func TestBootstrap_RejectsThresholdAboveN(t *testing.T) {
-	_, err := Bootstrap(3, []party.ID{"a", "b"}, PulsarGroupID(0), 0, rand.Reader)
+	_, err := Bootstrap(3, []party.ID{"a", "b"}, CoronaGroupID(0), 0, rand.Reader)
 	if !errors.Is(err, ErrInvalidThreshold) {
 		t.Fatalf("want ErrInvalidThreshold, got %v", err)
 	}
@@ -50,7 +50,7 @@ func TestBootstrap_RejectsThresholdAboveN(t *testing.T) {
 func TestBootstrap_NilEntropyDefaultsToCryptoRand(t *testing.T) {
 	// Passing nil entropy must NOT panic and must not return an entropy-related
 	// error — Bootstrap is documented to fall back to crypto/rand.Reader.
-	era, err := Bootstrap(1, []party.ID{"only"}, PulsarGroupID(0), 0, nil)
+	era, err := Bootstrap(1, []party.ID{"only"}, CoronaGroupID(0), 0, nil)
 	if err != nil {
 		// Bootstrap may still fail for kernel reasons in a constrained env;
 		// the contract we are pinning here is "no panic from nil entropy".
@@ -99,21 +99,21 @@ func TestReshare_RejectsThresholdZeroOrAboveN(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestReanchor_RejectsEmptyValidators(t *testing.T) {
-	_, err := Reanchor(nil, 1, nil, PulsarGroupID(0), rand.Reader)
+	_, err := Reanchor(nil, 1, nil, CoronaGroupID(0), rand.Reader)
 	if !errors.Is(err, ErrEmptyValidators) {
 		t.Fatalf("want ErrEmptyValidators, got %v", err)
 	}
 }
 
 func TestReanchor_RejectsThresholdZero(t *testing.T) {
-	_, err := Reanchor(nil, 0, []party.ID{"a"}, PulsarGroupID(0), rand.Reader)
+	_, err := Reanchor(nil, 0, []party.ID{"a"}, CoronaGroupID(0), rand.Reader)
 	if !errors.Is(err, ErrInvalidThreshold) {
 		t.Fatalf("want ErrInvalidThreshold, got %v", err)
 	}
 }
 
 func TestReanchor_RejectsThresholdAboveN(t *testing.T) {
-	_, err := Reanchor(nil, 2, []party.ID{"a"}, PulsarGroupID(0), rand.Reader)
+	_, err := Reanchor(nil, 2, []party.ID{"a"}, CoronaGroupID(0), rand.Reader)
 	if !errors.Is(err, ErrInvalidThreshold) {
 		t.Fatalf("want ErrInvalidThreshold, got %v", err)
 	}

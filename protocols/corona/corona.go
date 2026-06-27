@@ -1,13 +1,18 @@
 // Copyright (C) 2025-2026, Lux Industries Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package corona wires the Pulsar lattice threshold kernel
-// (github.com/luxfi/pulsar) into the threshold orchestration layer's
-// round-based protocol framework (github.com/luxfi/threshold/internal/round).
+// Package corona wires the github.com/luxfi/corona Module-LWE threshold
+// signature kernel (the Ringtail/Raccoon line, q=0x1000000004A01) into the
+// threshold orchestration layer's round-based protocol framework
+// (github.com/luxfi/threshold/internal/round).
+//
+// Corona is distinct from Pulsar: both are Module-LWE threshold schemes, but
+// Pulsar (github.com/luxfi/pulsar) is FIPS-204/ML-DSA byte-equal (q=8380417)
+// while Corona is the Ringtail/Raccoon construction (q=0x1000000004A01, 48-bit).
 //
 // Layer separation
 //
-//	pulsar (math kernel)
+//	corona (math kernel, github.com/luxfi/corona)
 //	  ├── primitives, sign, threshold, reshare, dkg2, keyera
 //	  └── single-process API; deterministic; KAT-replayable.
 //
@@ -16,15 +21,10 @@
 //	  ├── party.ID, pool.Pool conventions
 //	  └── distributed protocol entrypoints (StartFunc).
 //
-// This package is the equivalent of protocols/corona/ but built on
-// the pulsar fork — proper t-of-n via general Shamir, lattice-correct
-// Pedersen DKG (dkg2), full VSR with activation cert (reshare), and
-// the keyera lifecycle (Bootstrap → Reshare* → Reanchor).
-//
-// Use this for new code. The protocols/corona/ package is kept for
-// backwards compatibility but its refresh body is a stub and its DKG
-// inherits the upstream pseudoinverse-recoverable Feldman commit (see
-// luxcpp/crypto/corona/RED-DKG-REVIEW.md).
+// This package provides proper t-of-n via general Shamir, lattice-correct
+// Pedersen DKG (dkg2), full VSR with activation cert (reshare), and the
+// keyera lifecycle (Bootstrap → Reshare* → Reanchor). See doc.go for the
+// full Quasar PQ-threshold lane design narrative.
 package corona
 
 import (
@@ -39,10 +39,10 @@ import (
 	"github.com/luxfi/threshold/pkg/party"
 )
 
-// Aliases for kernel types so callers do not have to import pulsar
+// Aliases for kernel types so callers do not have to import corona
 // directly when they only need surface types.
 type (
-	// KeyEra is the Pulsar group lineage. One key era is opened by
+	// KeyEra is the Corona group lineage. One key era is opened by
 	// Bootstrap and closed by Reanchor; epochs within an era rotate
 	// shares via Reshare while preserving the GroupKey.
 	KeyEra = keyera.KeyEra
@@ -52,16 +52,15 @@ type (
 	// from "key rotation".
 	EpochShareState = keyera.EpochShareState
 
-	// PulsarKeyEraID is a monotonically increasing identifier for a
+	// CoronaKeyEraID is a monotonically increasing identifier for a
 	// key era; bumped only at Reanchor. Aliased to the canonical
-	// luxfi/corona/keyera.CoronaKeyEraID — the rename in corona only
-	// touched the type name; the semantic is unchanged.
-	PulsarKeyEraID = keyera.CoronaKeyEraID
+	// luxfi/corona/keyera.CoronaKeyEraID.
+	CoronaKeyEraID = keyera.CoronaKeyEraID
 
-	// PulsarGroupID identifies one Pulsar group for partitioned-set
+	// CoronaGroupID identifies one Corona group for partitioned-set
 	// deployments (each group has its own GroupKey lineage). Aliased
 	// to luxfi/corona/keyera.CoronaGroupID.
-	PulsarGroupID = keyera.CoronaGroupID
+	CoronaGroupID = keyera.CoronaGroupID
 
 	// GroupKey is the persistent (A, bTilde) public key. Pointer is
 	// shared across all share states within a key era.
@@ -71,10 +70,10 @@ type (
 	// pairwise PRF/MAC material for the current epoch.
 	KeyShare = threshold.KeyShare
 
-	// Signer drives the 2-round Pulsar signing protocol for one party.
+	// Signer drives the 2-round Corona signing protocol for one party.
 	Signer = threshold.Signer
 
-	// Round1Data, Round2Data, Signature mirror the pulsar kernel.
+	// Round1Data, Round2Data, Signature mirror the corona kernel.
 	Round1Data = threshold.Round1Data
 	Round2Data = threshold.Round2Data
 	Signature  = threshold.Signature
@@ -82,13 +81,13 @@ type (
 
 // Errors returned by the package.
 var (
-	ErrEmptyValidators  = errors.New("pulsar: empty validator set")
-	ErrInvalidThreshold = errors.New("pulsar: invalid threshold")
-	ErrPartyNotInSet    = errors.New("pulsar: party not in committee")
+	ErrEmptyValidators  = errors.New("corona: empty validator set")
+	ErrInvalidThreshold = errors.New("corona: invalid threshold")
+	ErrPartyNotInSet    = errors.New("corona: party not in committee")
 )
 
 // validatorIDs converts a party.ID slice into the canonical
-// validator-string form pulsar/keyera consumes. Stable sort is the
+// validator-string form corona/keyera consumes. Stable sort is the
 // caller's responsibility (typically sorted-by-public-key per
 // consensus convention).
 func validatorIDs(ids []party.ID) []string {
@@ -112,7 +111,7 @@ func validatorIDs(ids []party.ID) []string {
 // Use this in production for the genesis ceremony only. Subsequent
 // epoch rotations go through Reshare, which never requires a trusted
 // dealer.
-func Bootstrap(t int, validators []party.ID, groupID PulsarGroupID, eraID PulsarKeyEraID, entropy io.Reader) (*KeyEra, error) {
+func Bootstrap(t int, validators []party.ID, groupID CoronaGroupID, eraID CoronaKeyEraID, entropy io.Reader) (*KeyEra, error) {
 	if len(validators) == 0 {
 		return nil, ErrEmptyValidators
 	}
@@ -136,7 +135,7 @@ func Bootstrap(t int, validators []party.ID, groupID PulsarGroupID, eraID Pulsar
 // rand defaults to crypto/rand.Reader.
 func Reshare(era *KeyEra, newValidators []party.ID, newThreshold int, randSource io.Reader) (*EpochShareState, error) {
 	if era == nil {
-		return nil, errors.New("pulsar: nil key era")
+		return nil, errors.New("corona: nil key era")
 	}
 	if len(newValidators) == 0 {
 		return nil, ErrEmptyValidators
@@ -158,7 +157,7 @@ func Reshare(era *KeyEra, newValidators []party.ID, newThreshold int, randSource
 //
 // The new era's EraID is one greater than prev's; the new era's
 // GenesisEpoch and starting Epoch continue from prev's last epoch.
-func Reanchor(prev *KeyEra, t int, validators []party.ID, groupID PulsarGroupID, entropy io.Reader) (*KeyEra, error) {
+func Reanchor(prev *KeyEra, t int, validators []party.ID, groupID CoronaGroupID, entropy io.Reader) (*KeyEra, error) {
 	if len(validators) == 0 {
 		return nil, ErrEmptyValidators
 	}
@@ -173,14 +172,14 @@ func Reanchor(prev *KeyEra, t int, validators []party.ID, groupID PulsarGroupID,
 	return era, err
 }
 
-// NewSigner constructs a Pulsar signer for one party from the per-epoch
+// NewSigner constructs a Corona signer for one party from the per-epoch
 // KeyShare emitted by Bootstrap or Reshare. The signer drives the
 // 2-round signing protocol via Round1 / Round2 / Finalize.
 func NewSigner(share *KeyShare) *Signer {
 	return threshold.NewSigner(share)
 }
 
-// Verify checks a Pulsar signature against the persistent GroupKey.
+// Verify checks a Corona signature against the persistent GroupKey.
 // The GroupKey pointer is shared across every Reshare within a key
 // era, so verifiers do not need to track epoch boundaries — any
 // signature in the era verifies against the same GroupKey.
@@ -193,7 +192,7 @@ func Verify(gk *GroupKey, message string, sig *Signature) bool {
 // the committee.
 func ShareForParty(state *EpochShareState, id party.ID) (*KeyShare, error) {
 	if state == nil {
-		return nil, errors.New("pulsar: nil share state")
+		return nil, errors.New("corona: nil share state")
 	}
 	share, ok := state.Shares[string(id)]
 	if !ok {
