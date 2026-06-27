@@ -196,14 +196,6 @@ func TestMagnetarRoundTrip(t *testing.T) {
 	roundtrip(t, "magnetar", 1, 1)
 }
 
-func TestBLSRoundTrip(t *testing.T) {
-	t.Parallel()
-	if testing.Short() {
-		t.Skip("skipping BLS round-trip under -short")
-	}
-	roundtrip(t, "bls", 2, 3)
-}
-
 // TestDoernerExplicitlyBroken asserts the daemon surfaces the upstream
 // breakage clearly rather than silently returning bad data. See
 // doerner.go header for why this is the test surface today.
@@ -271,7 +263,7 @@ func TestAuthTokenRejectsWrongPeer(t *testing.T) {
 		t.Fatalf("ConnectZap: %v", err)
 	}
 	defer c.Close()
-	_, _, err = c.Keygen(ctx, "bls", 2, 3)
+	_, _, err = c.Keygen(ctx, "frost", 2, 3)
 	if err == nil {
 		t.Fatalf("expected unauthorized error, got success")
 	}
@@ -285,7 +277,7 @@ func TestAuthTokenRejectsWrongPeer(t *testing.T) {
 func TestAuthTokenAcceptsValid(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
-		t.Skip("skipping auth-token positive path under -short (drives BLS keygen)")
+		t.Skip("skipping auth-token positive path under -short (drives frost keygen)")
 	}
 	addr, stop := startTestServerWithConfig(t, ZapServerConfig{AuthToken: "secret-token"})
 	defer stop()
@@ -298,7 +290,7 @@ func TestAuthTokenAcceptsValid(t *testing.T) {
 		t.Fatalf("ConnectZap: %v", err)
 	}
 	defer c.Close()
-	pubKey, _, err := c.Keygen(ctx, "bls", 2, 3)
+	pubKey, _, err := c.Keygen(ctx, "frost", 2, 3)
 	if err != nil {
 		t.Fatalf("Keygen with valid token: %v", err)
 	}
@@ -314,7 +306,7 @@ func TestAuthTokenAcceptsValid(t *testing.T) {
 func TestAuthTokenEmptyAllowsAnonymous(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {
-		t.Skip("skipping anonymous-auth positive path under -short (drives BLS keygen)")
+		t.Skip("skipping anonymous-auth positive path under -short (drives frost keygen)")
 	}
 	addr, stop := startTestServer(t)
 	defer stop()
@@ -325,7 +317,7 @@ func TestAuthTokenEmptyAllowsAnonymous(t *testing.T) {
 		t.Fatalf("ConnectZap: %v", err)
 	}
 	defer c.Close()
-	pubKey, _, err := c.Keygen(ctx, "bls", 2, 3)
+	pubKey, _, err := c.Keygen(ctx, "frost", 2, 3)
 	if err != nil {
 		t.Fatalf("Keygen with empty token: %v", err)
 	}

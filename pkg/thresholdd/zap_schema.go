@@ -38,29 +38,26 @@ import (
 // Server.Register and force a name change at build time, never
 // silent routing.
 const (
-	ProcCggmp21Keygen    = "cggmp21.keygen"
-	ProcCggmp21Sign      = "cggmp21.sign"
-	ProcCggmp21Verify    = "cggmp21.verify"
-	ProcFrostKeygen      = "frost.keygen"
-	ProcFrostSign        = "frost.sign"
-	ProcFrostVerify      = "frost.verify"
-	ProcPulsarKeygen     = "pulsar.keygen"
-	ProcPulsarSign       = "pulsar.sign"
-	ProcPulsarSignCtx    = "pulsar.sign_ctx"
-	ProcPulsarVerify     = "pulsar.verify"
-	ProcCoronaKeygen     = "corona.keygen"
-	ProcCoronaSign       = "corona.sign"
-	ProcCoronaVerify     = "corona.verify"
-	ProcMagnetarKeygen   = "magnetar.keygen"
-	ProcMagnetarSign     = "magnetar.sign"
-	ProcMagnetarSignCtx  = "magnetar.sign_ctx"
-	ProcMagnetarVerify   = "magnetar.verify"
-	ProcBLSKeygen        = "bls.keygen"
-	ProcBLSSign          = "bls.sign"
-	ProcBLSVerify        = "bls.verify"
-	ProcDoernerKeygen    = "doerner.keygen"
-	ProcDoernerSign      = "doerner.sign"
-	ProcDoernerVerify    = "doerner.verify"
+	ProcCggmp21Keygen   = "cggmp21.keygen"
+	ProcCggmp21Sign     = "cggmp21.sign"
+	ProcCggmp21Verify   = "cggmp21.verify"
+	ProcFrostKeygen     = "frost.keygen"
+	ProcFrostSign       = "frost.sign"
+	ProcFrostVerify     = "frost.verify"
+	ProcPulsarKeygen    = "pulsar.keygen"
+	ProcPulsarSign      = "pulsar.sign"
+	ProcPulsarSignCtx   = "pulsar.sign_ctx"
+	ProcPulsarVerify    = "pulsar.verify"
+	ProcCoronaKeygen    = "corona.keygen"
+	ProcCoronaSign      = "corona.sign"
+	ProcCoronaVerify    = "corona.verify"
+	ProcMagnetarKeygen  = "magnetar.keygen"
+	ProcMagnetarSign    = "magnetar.sign"
+	ProcMagnetarSignCtx = "magnetar.sign_ctx"
+	ProcMagnetarVerify  = "magnetar.verify"
+	ProcDoernerKeygen   = "doerner.keygen"
+	ProcDoernerSign     = "doerner.sign"
+	ProcDoernerVerify   = "doerner.verify"
 )
 
 // Fixed-payload layouts. The unsigned-integer fields and the offset
@@ -116,10 +113,10 @@ const (
 	// constants below) so callers can branch on well-defined error
 	// classes. RefusedStrictPQ is the strict-PQ refusal signal — a
 	// separate flag so the consumer can errors.Is(ErrRefusedUnderStrictPQ).
-	zapErrRespOffCode      = 0
-	zapErrRespOffMsg       = 8
-	zapErrRespOffStrictPQ  = 16
-	zapErrRespSize         = 24
+	zapErrRespOffCode     = 0
+	zapErrRespOffMsg      = 8
+	zapErrRespOffStrictPQ = 16
+	zapErrRespSize        = 24
 )
 
 // ZAP message flag layout: the upper byte carries the message kind

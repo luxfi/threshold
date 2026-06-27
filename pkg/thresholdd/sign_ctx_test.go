@@ -262,11 +262,11 @@ func TestSign_Ctx_UnsupportedSchemeReturnsMethodNotFound(t *testing.T) {
 	}
 	defer c.Close()
 
-	// cggmp21/frost/bls/corona/doerner do NOT register sign_ctx
+	// cggmp21/frost/corona/doerner do NOT register sign_ctx
 	// procedures in allProcedures, so knownProcedure rejects on the
 	// client side. That is the canonical method-not-found path: the
 	// client refuses to round-trip a procedure it does not know.
-	for _, sch := range []string{"cggmp21", "frost", "bls", "corona", "doerner"} {
+	for _, sch := range []string{"cggmp21", "frost", "corona", "doerner"} {
 		_, err := c.SignCtx(ctx, sch, []byte{0}, []byte{0}, []byte{0}, "")
 		if err == nil {
 			t.Fatalf("%s.sign_ctx: expected error, got success", sch)

@@ -18,8 +18,8 @@ import (
 // listed party and returns the final per-party result map.
 //
 // This is the production path the daemon uses for the protocols that
-// actually need a round-based exchange (cmp / frost / doerner). Pulsar,
-// corona, and bls have direct single-process keygen functions and skip
+// actually need a round-based exchange (cmp / frost / doerner). Pulsar
+// and corona have direct single-process keygen functions and skip
 // this runner.
 func runMultiparty(
 	partyIDs []party.ID,
