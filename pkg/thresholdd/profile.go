@@ -192,17 +192,19 @@ var ErrRefusedUnderStrictPQ = errors.New("operation refused on strict-PQ chain p
 //
 // Returns nil — gate passes — when:
 //
-//   - resolver is nil (no chain-profile resolver wired; documented
-//     fail-OPEN for backward compatibility), OR
-//   - chainID is empty (caller did not assert a chain; treat as
-//     "no chain context, no strict-PQ posture to enforce"), OR
+//   - resolver is nil (no chain-profile resolver wired; dev-only
+//     default — production MUST wire a resolver), OR
 //   - resolver returns a non-strict-PQ profile.
+//
+// Empty chainID is NOT a pass condition: it is forwarded to the
+// resolver, which maps "" to ProfileStrictPQ (fail-CLOSED), so a
+// caller cannot bypass the gate by omitting the chain context.
 //
 // Returns ErrRefusedUnderStrictPQ wrapped with op + chainID when
 // the chain is on ProfileStrictPQ. The wrapped message MUST stay
 // stable so audit-log parsing downstream does not break.
 func RefuseUnderStrictPQ(chainID, op string, resolver ChainProfileResolver) error {
-	if resolver == nil || chainID == "" {
+	if resolver == nil {
 		return nil
 	}
 	if resolver.ResolveChainProfile(chainID) != ProfileStrictPQ {
