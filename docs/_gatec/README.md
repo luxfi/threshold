@@ -83,14 +83,52 @@ whatever aggregate model the gate-A refactor settles on (the per-node
 decomposition is identical: one share per process, message-driven rounds,
 share-free aggregate — only the type names change).
 
+## corona dealerless distributed DKG (the live M-Chain finality lane)
+
+`corona_distributed_dkg_test.go` proves the GENESIS half for the corona
+lane — the R-LWE/Raccoon scheme that, unlike pulsar/ML-DSA, has a genuine
+dealerless DKG (`corona/dkg2`). It drives ONE separate `*dkg2.DKGSession`
+per node:
+
+- `TestDistributedDKG_SingleShareCustody`: n=5 separate sessions, each
+  runs Round1 with its OWN seed and `Round2Identify` over ONLY the shares
+  addressed to it → ONLY its own share. Shares are distinct; no process
+  holds the master secret or another node's share.
+- `TestDistributedDKG_YieldsWorkingGroupKey`: the per-node Round1 outputs
+  feed corona's reference assembly (`keyera.FinishBootstrapPedersen`) to
+  derive the group key + per-node KeyShares; the committee threshold-signs
+  a message that VERIFIES under the dealerless group key (wrong message
+  fails). Honest caveat: the assembly's Round2/β-flooding still co-locates
+  in `FinishBootstrapPedersen` — that is the keyera per-node refactor that
+  remains; the share-DEALING Round1 is genuinely per-node.
+
+Reproduce (against immutable released corona v0.7.6, what `threshold`
+pins):
+
+```sh
+export SDKROOT="$(xcrun --show-sdk-path)"; export GOWORK=off
+rm -rf /tmp/corona-gatec
+cp -r "$(go env GOMODCACHE)/github.com/luxfi/corona@v0.7.6" /tmp/corona-gatec
+chmod -R u+w /tmp/corona-gatec
+cp corona_distributed_dkg_test.go /tmp/corona-gatec/keyera/
+cd /tmp/corona-gatec && go test ./keyera/ -run TestDistributedDKG -v -count=1
+# --- PASS: TestDistributedDKG_SingleShareCustody (0.08s)
+# --- PASS: TestDistributedDKG_YieldsWorkingGroupKey (0.43s)
+```
+
 ## Honest scope (see ../DISTRIBUTED_SIGNER_GATEC.md)
 
-- BUILT + PROVEN: the pulsar v0.3 distributed signer (this dir).
-- NOT BUILT (designed): corona dealerless distributed DKG driver
-  (the live M-Chain finality lane has the dealerless `dkg2` primitive;
-  the per-node network driver is the remaining work) and the quasar
-  `EpochManager` self-node custody refactor.
+- BUILT + PROVEN: pulsar v0.3 distributed SIGNER (`distributed.go`) and
+  corona dealerless distributed DKG share-DEALING + custody + working-key
+  validity (`corona_distributed_dkg_test.go`).
+- DESIGNED, PARTIAL: the corona per-node ASSEMBLY (β-flooding / bTilde so
+  the group key is derived per-node too, not via the co-locating
+  `FinishBootstrapPedersen`) and the quasar `EpochManager` self-node
+  custody refactor.
 - RESEARCH-GRADE GAP: a dealerless, byte-FIPS-204-compatible ML-DSA
   (pulsar) DKG. `pulsar.NewDKGSession` is the v0.1 SEED DKG — it
   reconstructs the master sk at every party and yields a v0.1 `KeyShare`,
-  NOT an `AlgebraicKeyShare`. It is not the dealerless algebraic path.
+  NOT an `AlgebraicKeyShare`. It is not the dealerless algebraic path. The
+  pulsar lane therefore uses trusted-dealer / TEE genesis (fenced); the
+  LIVE M-Chain finality lane (corona) has the genuine dealerless genesis
+  proven above.

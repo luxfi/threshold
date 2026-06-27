@@ -271,10 +271,20 @@ with message exchange and one session per process. Identifiable abort
   ErrInsufficientQuor; t-1 quorum → non-verifying sig). All green against
   released pulsar v1.1.1. Resolves the cited `OrchestrateV03Sign`
   co-location for the signing custody boundary.
-- **DESIGNED, PARTIAL:** corona per-node distributed DKG driver (§5) and
-  the `EpochManager` self-node refactor (§4). The primitives exist and are
-  per-node-safe; the per-node network driver + consensus wiring is the
-  remaining engineering.
+- **BUILT + PROVEN:** corona dealerless distributed DKG, share-dealing +
+  custody + validity (`docs/_gatec/corona_distributed_dkg_test.go`):
+  `TestDistributedDKG_SingleShareCustody` (n=5 separate `dkg2.DKGSession`s,
+  per-node Round1 + Round2Identify, each node only its own distinct share,
+  no master secret formed) and `TestDistributedDKG_YieldsWorkingGroupKey`
+  (per-node Round1 → `keyera.FinishBootstrapPedersen` → group key + per-node
+  KeyShares → committee threshold-sign verifies; wrong message fails). Green
+  against released corona v0.7.6. This is the GENESIS half for the live
+  M-Chain finality lane.
+- **DESIGNED, PARTIAL:** the corona per-node ASSEMBLY (β-flooding / bTilde
+  derived per-node, replacing the still-co-locating `FinishBootstrapPedersen`
+  Round2/assembly) and the `EpochManager` self-node refactor (§4). The
+  primitives exist and are per-node-safe; the per-node assembly + consensus
+  wiring is the remaining engineering.
 - **RESEARCH-GRADE GAP (honest):** a dealerless, byte-FIPS-204-compatible
   ML-DSA (pulsar) DKG. Not built; not buildable by composition of existing
   primitives. The pulsar lane uses trusted-dealer / TEE genesis (fenced),
