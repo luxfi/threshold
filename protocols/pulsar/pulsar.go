@@ -19,10 +19,18 @@
 //	         luxfi/pulsar/ref/go/pkg/pulsar  ← reference math kernel
 //
 // The re-exports here are type aliases and thin function forwards; no
-// behaviour change. The set of re-exports covers the surface that
-// consensus's quasar / witness / wave-signer / pq-engine code paths
-// consume. Adding symbols is allowed when a new consumer needs them;
-// removing or renaming is a breaking change to the alias contract.
+// behaviour change. The set of re-exports covers identity, DKG,
+// single-party sign/verify, and parameter surfaces.
+//
+// H-1 (reconstruct-then-sign rip): the v0.1 threshold-signing re-exports
+// — ThresholdSigner / NewThresholdSigner / Combine and the Round1Message
+// / Round2Message wire types — were REMOVED. That path reconstructed the
+// full ML-DSA signing key in aggregator memory; its only consumer was
+// consensus's quasar wave-signer, which is deleted. Threshold signing on
+// the live consensus path runs through the corona dealerless kernel
+// (protocols/corona), not this alias. Do NOT re-add a reconstruct-then-
+// sign forward here. Adding non-reconstruct symbols is allowed when a new
+// consumer needs them; removing or renaming is a breaking change.
 package pulsar
 
 import (
@@ -98,13 +106,6 @@ type (
 	Signature  = pulsar.Signature
 )
 
-// Round1Message and Round2Message are the wire types for the two-round
-// threshold signing protocol.
-type (
-	Round1Message = pulsar.Round1Message
-	Round2Message = pulsar.Round2Message
-)
-
 // ---------------------------------------------------------------------
 // Identity layer: long-term keys, directory, session derivation.
 // ---------------------------------------------------------------------
@@ -140,50 +141,6 @@ func SymmetricSession(
 	sessionID [16]byte, transcript []byte,
 ) ([32]byte, error) {
 	return pulsar.SymmetricSession(a, ikA, b, ikB, sessionID, transcript)
-}
-
-// ---------------------------------------------------------------------
-// Threshold signing: two-round protocol + final combine.
-// ---------------------------------------------------------------------
-
-// ThresholdSigner drives one party's role in the two-round threshold
-// signing protocol.
-type ThresholdSigner = pulsar.ThresholdSigner
-
-// NewThresholdSigner constructs a ThresholdSigner pinned to a
-// (sessionID, attempt, quorum) tuple. Each ThresholdSigner instance
-// is single-use per attempt; rerun NewThresholdSigner to retry.
-func NewThresholdSigner(
-	params *Params,
-	sessionID [16]byte,
-	attempt uint32,
-	quorum []NodeID,
-	share *KeyShare,
-	sessionKeys map[NodeID][32]byte,
-	message []byte,
-	rng io.Reader,
-) (*ThresholdSigner, error) {
-	return pulsar.NewThresholdSigner(params, sessionID, attempt, quorum, share, sessionKeys, message, rng)
-}
-
-// Combine aggregates the Round1 / Round2 messages from a threshold
-// quorum into a single FIPS 204 ML-DSA signature that verifies under
-// the group's PublicKey via VerifyCtx.
-func Combine(
-	params *Params,
-	groupPubkey *PublicKey,
-	message []byte,
-	ctx []byte,
-	randomized bool,
-	sessionID [16]byte,
-	attempt uint32,
-	quorum []NodeID,
-	threshold int,
-	round1 []*Round1Message,
-	round2 []*Round2Message,
-	allShares []*KeyShare,
-) (*Signature, error) {
-	return pulsar.Combine(params, groupPubkey, message, ctx, randomized, sessionID, attempt, quorum, threshold, round1, round2, allShares)
 }
 
 // ---------------------------------------------------------------------
