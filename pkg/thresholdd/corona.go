@@ -141,7 +141,20 @@ func (s *coronaScheme) Keygen(p keygenParams) (keygenResult, error) {
 	// in-memory so the binding is for protocol freshness only.
 	hPK := sha256.Sum256(gkBytes)
 
-	signers := make([]int, p.Threshold)
+	// Corona's kernel bakes the FULL-COMMITTEE Lagrange coefficient into
+	// every share (keyera.computeFullCommitteeLagrange over all n; the
+	// kernel sets party.Lambda = share.Lambda at NewSigner time and has
+	// NO per-subset Lagrange recompute). The Lagrange identity
+	// Σ_{i=1..n} λ_i · f(i) = f(0) holds only when ALL n committee members
+	// contribute, so the threshold SIGN requires the full committee. t is
+	// the Shamir RECOVERY threshold — any t shares reconstruct the key, so
+	// an adversary still needs t shares to forge offline — while the live
+	// signing protocol is full-committee (n-of-n). Every corona kernel
+	// round-trip test signs with all n for exactly this reason; a t-subset
+	// would sum an incomplete Lagrange basis and fail Verify. TRUE t-of-n
+	// online signing needs a per-active-set Lagrange recompute that this
+	// kernel does not expose (tracked in luxfi/coronad).
+	signers := make([]int, p.Participants)
 	for i := range signers {
 		signers[i] = i
 	}
