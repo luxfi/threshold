@@ -145,9 +145,9 @@ func TestFrostRoundTrip(t *testing.T) {
 }
 
 // TestPulsarRoundTrip exercises the pulsar dispatcher end-to-end:
-// keygen runs DealAlgebraicV03Shares + per-party identity setup;
-// sign drives the v0.3 algebraic-aggregate protocol with FIPS 204
-// rejection-restart; verify is stateless over the published PULG-
+// keygen runs the DEALERLESS GF(q) committee DKG (NewLargeDKGSession)
+// + per-party identity setup; sign drives the t-of-n LargeThresholdSigner
+// → LargeCombine path; verify is stateless over the published PULG-
 // framed group public key. Forgery is rejected.
 //
 // 2-of-3 keeps the test fast — the v0.3 protocol's wall-clock cost
