@@ -173,7 +173,13 @@ func TestPulsarAdapter_NewCommitteeSigns(t *testing.T) {
 	round1 := make(map[int]*pulsarThreshold.Round1Data, len(newSet))
 	for _, id := range newSet {
 		idx := newCfgs[id].State.Shares[string(id)].Index
-		round1[idx] = signersByID[id].Round1(sessionID, prfKey, signerIndices)
+		// corona v0.8.0: Signer.Round1 now returns (*Round1Data, error)
+		// — it can refuse a degenerate session instead of panicking.
+		r1, err := signersByID[id].Round1(sessionID, prfKey, signerIndices)
+		if err != nil {
+			t.Fatalf("Round1 for %s: %v", id, err)
+		}
+		round1[idx] = r1
 	}
 	round2 := make(map[int]*pulsarThreshold.Round2Data, len(newSet))
 	for _, id := range newSet {
