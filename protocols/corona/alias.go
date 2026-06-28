@@ -39,14 +39,22 @@ func NewParams() (*Params, error) {
 
 // GenerateKeys runs the trusted-dealer keygen for a fresh t-of-n
 // committee, returning per-party KeyShares and the persistent
-// GroupKey. Equivalent to threshold.GenerateKeys.
+// GroupKey. Equivalent to threshold.GenerateKeysTrustedDealer.
+//
+// The kernel renamed this entry point GenerateKeys ->
+// GenerateKeysTrustedDealer (corona v0.8.0) to make the trust model
+// explicit and greppable: one party materializes the whole secret, so
+// it is a FOOTGUN for production. The alias keeps the shorter exported
+// name because its doc already pins the trust model, and consensus
+// consumes this surface for the test-harness / dispatcher-seeding fast
+// path only.
 //
 // This is the fast path for in-process keygen (test harnesses,
 // dispatcher seeding, off-chain ceremonies). Production chain
 // consensus runs keyera.Bootstrap (Pedersen DKG, no trusted dealer)
 // via the package-level Bootstrap function.
 func GenerateKeys(t, n int, randSource io.Reader) ([]*KeyShare, *GroupKey, error) {
-	return threshold.GenerateKeys(t, n, randSource)
+	return threshold.GenerateKeysTrustedDealer(t, n, randSource)
 }
 
 // VerifyBatch verifies a batch of Corona threshold signatures in

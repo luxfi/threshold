@@ -4,10 +4,12 @@ package thresholdd
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sync"
 
+	"github.com/luxfi/corona/keyera"
 	coronaThreshold "github.com/luxfi/corona/threshold"
 )
 
@@ -22,13 +24,13 @@ import (
 //
 // Trust model on keygen:
 //
-//   - The dispatcher runs the trusted-dealer GenerateKeys path
-//     in-process (this is the dispatcher contract for off-chain test
-//     harnesses, NOT the on-chain production path). The Pedersen-DKG
-//     no-trusted-dealer path lives at luxfi/corona/keyera.Bootstrap and
-//     is what consensus drives at chain genesis. The dispatcher exists
-//     for off-chain test harnesses, MPC bus integration tests, and
-//     SDK-driven dev tooling — not for chain-genesis ceremonies.
+//   - DEALERLESS. The dispatcher runs the same no-trusted-dealer
+//     Pedersen DKG (luxfi/corona/keyera.Bootstrap → dkg2 over R_q +
+//     noise flooding) that consensus drives at chain genesis. No single
+//     party ever holds the master secret s at any point in the ceremony
+//     (PUBLIC-BFT-SAFE). There is NO trusted-dealer path in this
+//     dispatcher — the off-chain harness and the on-chain ceremony use
+//     one and the same dealerless keygen.
 //
 // Trust model on sign:
 //
@@ -70,9 +72,14 @@ func newCoronaScheme() *coronaScheme {
 	return &coronaScheme{sessions: make(map[string]*coronaSession)}
 }
 
-// Keygen runs corona.threshold.GenerateKeys for t-of-n, publishes
-// canonical GroupKey wire bytes as PublicKey, and returns one hex blob
-// per party in Shares.
+// Keygen runs the DEALERLESS Pedersen DKG (corona keyera.Bootstrap,
+// dkg2 over R_q + noise flooding) for t-of-n, publishes canonical
+// GroupKey wire bytes as PublicKey, and returns one hex blob per party
+// in Shares.
+//
+// NO trusted dealer: every validator runs dkg2.Round1 independently and
+// no single party ever holds the master secret s during the ceremony.
+// This is the identical path consensus drives at chain genesis.
 //
 // The Shares slice contains the per-party KeyShare INDICES (decimal),
 // not the raw secret material. The dispatcher retains the actual
@@ -84,15 +91,42 @@ func (s *coronaScheme) Keygen(p keygenParams) (keygenResult, error) {
 	if err := validateKeygenParams(p); err != nil {
 		return keygenResult{}, err
 	}
-	// corona requires t < n strictly (the kernel enforces this in
-	// GenerateKeys: see threshold.go:118).
+	// corona dkg2 requires t < n strictly and n >= 2.
 	if p.Threshold >= p.Participants {
-		return keygenResult{}, fmt.Errorf("corona keygen: threshold must be < participants (corona kernel constraint)")
+		return keygenResult{}, fmt.Errorf("corona keygen: threshold must be < participants (corona dkg2 constraint)")
 	}
 
-	shares, gk, err := coronaThreshold.GenerateKeys(p.Threshold, p.Participants, rand.Reader)
+	// Canonical 1-indexed validator set. keyera.Bootstrap returns the
+	// share map keyed by these same strings, so we re-order by them.
+	validators := make([]string, p.Participants)
+	for i := range validators {
+		validators[i] = fmt.Sprintf("%d", i+1)
+	}
+
+	// Fresh group id so concurrent in-process keygens cannot alias; era
+	// id is the genesis era (1) for this fresh group.
+	var gidBuf [8]byte
+	if _, err := rand.Read(gidBuf[:]); err != nil {
+		return keygenResult{}, fmt.Errorf("corona keygen: group-id entropy: %w", err)
+	}
+	groupID := keyera.CoronaGroupID(binary.BigEndian.Uint64(gidBuf[:]))
+
+	// Dealerless Pedersen DKG. No master secret is ever materialized.
+	era, _, err := keyera.Bootstrap(p.Threshold, validators, groupID, keyera.CoronaKeyEraID(1), rand.Reader)
 	if err != nil {
-		return keygenResult{}, fmt.Errorf("corona keygen: %w", err)
+		return keygenResult{}, fmt.Errorf("corona keygen (dealerless dkg2): %w", err)
+	}
+	gk := era.GroupKey
+
+	// Re-order the dealerless share map into the canonical 1..n slice the
+	// in-process Sign path indexes by position.
+	shares := make([]*coronaThreshold.KeyShare, p.Participants)
+	for i, v := range validators {
+		sh, ok := era.State.Shares[v]
+		if !ok {
+			return keygenResult{}, fmt.Errorf("corona keygen: dkg2 produced no share for validator %q", v)
+		}
+		shares[i] = sh
 	}
 
 	gkBytes, err := gk.MarshalBinary()
@@ -107,7 +141,20 @@ func (s *coronaScheme) Keygen(p keygenParams) (keygenResult, error) {
 	// in-memory so the binding is for protocol freshness only.
 	hPK := sha256.Sum256(gkBytes)
 
-	signers := make([]int, p.Threshold)
+	// Corona's kernel bakes the FULL-COMMITTEE Lagrange coefficient into
+	// every share (keyera.computeFullCommitteeLagrange over all n; the
+	// kernel sets party.Lambda = share.Lambda at NewSigner time and has
+	// NO per-subset Lagrange recompute). The Lagrange identity
+	// Σ_{i=1..n} λ_i · f(i) = f(0) holds only when ALL n committee members
+	// contribute, so the threshold SIGN requires the full committee. t is
+	// the Shamir RECOVERY threshold — any t shares reconstruct the key, so
+	// an adversary still needs t shares to forge offline — while the live
+	// signing protocol is full-committee (n-of-n). Every corona kernel
+	// round-trip test signs with all n for exactly this reason; a t-subset
+	// would sum an incomplete Lagrange basis and fail Verify. TRUE t-of-n
+	// online signing needs a per-active-set Lagrange recompute that this
+	// kernel does not expose (tracked in luxfi/coronad).
+	signers := make([]int, p.Participants)
 	for i := range signers {
 		signers[i] = i
 	}
@@ -169,10 +216,16 @@ func (s *coronaScheme) Sign(p signParams) (signResult, error) {
 		signers[i] = coronaThreshold.NewSigner(sessionShares[idx])
 	}
 
-	// Round 1: each party broadcasts D matrix + MACs.
+	// Round 1: each party broadcasts D matrix + MACs. corona v0.8.0's
+	// Signer.Round1 now returns (*Round1Data, error) — it can refuse a
+	// degenerate session (sessionID uniqueness violation) instead of
+	// panicking, so the dispatcher propagates that as a sign error.
 	r1Data := make(map[int]*coronaThreshold.Round1Data, len(sessionSigners))
 	for _, signer := range signers {
-		r1 := signer.Round1(sessionID, sessionPRF, sessionSigners)
+		r1, err := signer.Round1(sessionID, sessionPRF, sessionSigners)
+		if err != nil {
+			return signResult{}, fmt.Errorf("corona sign round1: %w", err)
+		}
 		r1Data[r1.PartyID] = r1
 	}
 

@@ -62,13 +62,15 @@
 //	Strict-PQ profile semantics:
 //
 //	  - Strict-PQ profile (ProfileID 0x01 or 0x03 in
-//	    luxfi/consensus/config terms): NO single-party dealer
-//	    shortcuts ANYWHERE on the dispatcher. Sign_Ctx refuses
-//	    with a ZAP ErrorResponse carrying strictPQ=true (callers
-//	    branch via errors.Is(ErrRefusedUnderStrictPQ)) until the
-//	    underlying primitive is swapped to a proper threshold
-//	    ctx-bound path (pulsar v0.4 OrchestrateV03SignCtx;
-//	    magnetar aggregate cert with ctx).
+//	    luxfi/consensus/config terms): NO reconstruct-style or
+//	    single-party dealer shortcut ctx-bound signature ANYWHERE on
+//	    the dispatcher. Sign_Ctx refuses with a ZAP ErrorResponse
+//	    carrying strictPQ=true (callers branch via
+//	    errors.Is(ErrRefusedUnderStrictPQ)). pulsar keygen is now
+//	    dealerless (NewLargeDKGSession) but LargeCombine still
+//	    reconstructs the master key in-combiner, so strict-PQ chains
+//	    must use the consensus-driven no-reconstruct ceremony instead;
+//	    magnetar still routes ctx through keys[0].
 //	  - Legacy-compat profile (everything else): dealer shortcuts
 //	    are acceptable as documented dev-tooling. Operators are
 //	    responsible for not building production on top of
