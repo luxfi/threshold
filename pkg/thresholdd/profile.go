@@ -56,20 +56,24 @@ import (
 //     RefuseUnderStrictPQ — embedders that want fail-closed wire
 //     their own outer admission gate.
 //
-// Removal:
+// Why the gate is STILL load-bearing for pulsar (post-v1.2.0):
 //
-//   - Once sister agent's pulsar v1.1.0 (v0.4 ctx-bound) ships AND
-//     pulsar.go::Sign_Ctx swaps to OrchestrateV03SignCtx (the
-//     proper threshold ctx-bound path with NO dealerKey), this gate
-//     becomes a no-op for the pulsar single-party-shortcut path.
-//     Likewise the magnetar gate vanishes when magnetar Sign_Ctx
-//     drives a per-validator standalone aggregate-cert path that
-//     binds ctx into the N-of-N aggregation instead of routing
-//     through keys[0]. At that point RefuseUnderStrictPQ stops
-//     being load-bearing on those call sites — but the function
-//     stays as the documented audit hook for any future
-//     primitive-soundness gate on strict-PQ chains. (One function,
-//     one place — outliving any particular bug.)
+//   - The pulsar dispatcher's single-party DEALER shortcut is GONE —
+//     keygen is now the dealerless committee DKG (NewLargeDKGSession)
+//     and sign is a genuine t-of-n LargeCombine. But LargeCombine is a
+//     RECONSTRUCT-style combiner: it transiently materialises the master
+//     ML-DSA secret key in one party's memory at every sign (Lagrange-
+//     interpolate seed → KeyFromSeed → sign → zeroize). That is strictly
+//     weaker than the no-reconstruct TALUS BCC/CEF distributed signer.
+//     A strict-PQ chain must source ctx-bound finality signatures from
+//     the consensus-driven no-reconstruct ceremony, NOT from this
+//     in-process dev-tooling dispatcher whose combiner reconstructs the
+//     key — so the gate stays load-bearing on pulsar.go::Sign_Ctx_Profile
+//     (see the reasoning there). The magnetar gate likewise vanishes only
+//     when magnetar Sign_Ctx drives a per-validator standalone
+//     aggregate-cert path instead of routing through keys[0]. One
+//     function, one place — outliving any particular primitive's
+//     evolution.
 
 // Profile is the chain-wide security-class label this dispatcher
 // reasons about. Three buckets are enough — the consensus toolkit
