@@ -70,9 +70,9 @@ func newCoronaScheme() *coronaScheme {
 	return &coronaScheme{sessions: make(map[string]*coronaSession)}
 }
 
-// Keygen runs corona.threshold.GenerateKeys for t-of-n, publishes
-// canonical GroupKey wire bytes as PublicKey, and returns one hex blob
-// per party in Shares.
+// Keygen runs corona.threshold.GenerateKeysTrustedDealer for t-of-n,
+// publishes canonical GroupKey wire bytes as PublicKey, and returns one
+// hex blob per party in Shares.
 //
 // The Shares slice contains the per-party KeyShare INDICES (decimal),
 // not the raw secret material. The dispatcher retains the actual
@@ -85,12 +85,17 @@ func (s *coronaScheme) Keygen(p keygenParams) (keygenResult, error) {
 		return keygenResult{}, err
 	}
 	// corona requires t < n strictly (the kernel enforces this in
-	// GenerateKeys: see threshold.go:118).
+	// GenerateKeysTrustedDealer: see threshold.go:128).
 	if p.Threshold >= p.Participants {
 		return keygenResult{}, fmt.Errorf("corona keygen: threshold must be < participants (corona kernel constraint)")
 	}
 
-	shares, gk, err := coronaThreshold.GenerateKeys(p.Threshold, p.Participants, rand.Reader)
+	// corona v0.8.0 renamed GenerateKeys -> GenerateKeysTrustedDealer to
+	// make the dealer trust model explicit and greppable (one party
+	// materializes the whole secret). The dispatcher is the off-chain
+	// test-harness / dev-tooling surface, so the trusted-dealer fast path
+	// is the intended call here; chain genesis uses keyera.Bootstrap.
+	shares, gk, err := coronaThreshold.GenerateKeysTrustedDealer(p.Threshold, p.Participants, rand.Reader)
 	if err != nil {
 		return keygenResult{}, fmt.Errorf("corona keygen: %w", err)
 	}
@@ -169,10 +174,16 @@ func (s *coronaScheme) Sign(p signParams) (signResult, error) {
 		signers[i] = coronaThreshold.NewSigner(sessionShares[idx])
 	}
 
-	// Round 1: each party broadcasts D matrix + MACs.
+	// Round 1: each party broadcasts D matrix + MACs. corona v0.8.0's
+	// Signer.Round1 now returns (*Round1Data, error) — it can refuse a
+	// degenerate session (sessionID uniqueness violation) instead of
+	// panicking, so the dispatcher propagates that as a sign error.
 	r1Data := make(map[int]*coronaThreshold.Round1Data, len(sessionSigners))
 	for _, signer := range signers {
-		r1 := signer.Round1(sessionID, sessionPRF, sessionSigners)
+		r1, err := signer.Round1(sessionID, sessionPRF, sessionSigners)
+		if err != nil {
+			return signResult{}, fmt.Errorf("corona sign round1: %w", err)
+		}
 		r1Data[r1.PartyID] = r1
 	}
 
