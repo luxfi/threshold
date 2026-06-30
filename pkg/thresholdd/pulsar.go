@@ -2,16 +2,12 @@
 package thresholdd
 
 import (
-	"bytes"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"sync"
 
-	pulsar "github.com/luxfi/pulsar/ref/go/pkg/pulsar"
+	pulsar "github.com/luxfi/pulsar/pkg/pulsar"
 )
 
 // pulsarScheme wires luxfi/pulsar (Module-LWE FIPS 204 ML-DSA-65
@@ -25,61 +21,58 @@ import (
 // key can validate. The headline cryptographic claim — that the Pulsar
 // threshold signature is bit-identical to a single-party FIPS 204
 // ML-DSA-65 signature on the same (message, group public key) — is
-// pinned upstream by TestPrecompile_E2E_LargeCombine_FIPS204_VerifyCtx
-// and TestLarge_E2E_DKG_ThresholdSign_Verify.
+// pinned upstream by TestHyperballStockCirclVerify (the no-reconstruct
+// hyperball output verifies under unmodified cloudflare/circl
+// mldsa65.Verify).
 //
 // ----------------------------------------------------------------------
-// Trust model on KEYGEN — DEALERLESS committee DKG (pulsar v1.2.0).
+// Trust model on KEYGEN — DEALERLESS RSS (Mithril, ePrint 2026/013).
 // ----------------------------------------------------------------------
 //
-//   - The dispatcher runs the GF(q) wide-committee distributed key
-//     generation (pulsar.NewLargeDKGSession → Round1/Round2/Round3).
-//     There is NO trusted dealer. Each of the n parties samples its own
-//     secret contribution c_i, GF(q)-Shamir-shares it to every committee
-//     member inside an ML-KEM-768-sealed per-recipient envelope, and the
-//     master ML-DSA seed emerges as Σ_i c_i. NO single party ever holds
-//     the master seed at any point during keygen: each party learns only
-//     its own aggregate Shamir share f(x_i) = Σ_i f_i(x_i) and the public
-//     group key. This is the owner's-law path: "remove trusted-dealer,
-//     not allowed" — the prior v0.3 pulsar.DealAlgebraicV03Shares dealer
-//     is GONE. The same dealerless DKG is what a permissioned-consortium
-//     / audit-attestation deployment runs; consensus chain-genesis uses
-//     the same primitive driven across the messaging bus instead of
-//     in-process.
+//   - The dispatcher runs the dealerless Replicated-Secret-Sharing key
+//     generation (pulsar.MithrilRSSKeygen). There is NO trusted dealer:
+//     each of the n parties contributes a fresh seed, the joint public
+//     seed rho is derived from every contribution, and the composite
+//     ML-DSA secret is the SUM of the C(N,M) per-subset short secrets,
+//     each sampled by its subset's leader and replicated only to that
+//     subset's members. With T ≥ 2 no single party is a member of every
+//     subset, so NO party ever holds the whole (s1, s2). The published
+//     group public key (rho ‖ t1) is a genuine FIPS 204 ML-DSA-65 public
+//     key whose t1 is exactly what cloudflare/circl derives from
+//     (rho, s1, s2). The viability bound (2 ≤ t ≤ n and the norm budget
+//     τ·C·η < γ2) is enforced inside MithrilRSSKeygen and surfaced here
+//     as a keygen error — fail-closed, never a silent downgrade.
 //
 // ----------------------------------------------------------------------
-// Trust model on SIGN — t-of-n threshold, reconstruct-at-combine.
+// Trust model on SIGN — t-of-n, NO-RECONSTRUCT (Mithril 3-round hyperball).
 // ----------------------------------------------------------------------
 //
-//   - The 2-round protocol (NewLargeThresholdSigner → Round1 → Round2)
-//     runs in-process across the t signers in the quorum, then
-//     pulsar.LargeCombine aggregates the t Round-2 reveals into ONE
-//     FIPS 204 ML-DSA-65 signature. A single party CANNOT produce the
-//     signature alone — t valid Round-2 reveals are required, so the
-//     threshold guarantee is genuine.
+//   - Signing drives pulsar.MithrilKey.SignHyperball: the Mithril 3-round
+//     hyperball protocol across the t active parties. Each active party
+//     holds ONLY its balanced-partition share s1_(j) and emits ONLY its
+//     partial response z_j = y_j + c·s1_(j); the coordinator sums
+//     z = Σ_j z_j = y + c·s1 and recovers the FIPS 204 hint from the
+//     PUBLIC w' = A·z − c·t1·2^d exactly as a verifier would. NO party
+//     and NO coordinator ever forms the full s1, s2, t0, the mask y, the
+//     commitment w, w0 = LowBits(w), or any ML-DSA secret key. This is a
+//     genuine no-reconstruct threshold signature — strictly stronger than
+//     the prior reconstruct-at-combine path (which transiently
+//     materialised the master sk in the combiner's memory). SignHyperball
+//     fail-closed self-verifies the summed signature under the FIPS 204
+//     verifier before returning, so a biased or malformed partial can
+//     never yield a bad signature on the wire.
 //
-//   - HONEST CRYPTOGRAPHIC NOTE (load-bearing for the strict-PQ gate
-//     below): LargeCombine is a RECONSTRUCT-style combiner. It Lagrange-
-//     interpolates the t revealed GF(q) shares to recover the master
-//     seed, derives the full ML-DSA secret key (KeyFromSeed), signs with
-//     it, and immediately zeroizes it. So unlike the no-reconstruct
-//     TALUS BCC/CEF distributed signer (which never materialises the
-//     master sk anywhere), this path TRANSIENTLY materialises the master
-//     secret key in the combiner's memory at every sign. For the
-//     in-process dispatcher — where all n shares already co-reside in one
-//     process and the role is off-chain dev tooling / MPC-bus integration
-//     tests / SDK-driven harnesses, NOT chain-genesis finality — this
-//     changes nothing: the master key is reconstructible here regardless
-//     of which combiner is used. It DOES matter for a real distributed
-//     deployment, which is exactly why the strict-PQ gate refuses this
-//     path (see Sign_Ctx_Profile).
+//   - A single party CANNOT produce the signature alone: a sub-threshold
+//     active set is disjoint from at least one subset whose fresh short
+//     secret masks the key, so the threshold guarantee is genuine.
 //
 //   - One ctx-aware path. The plain Sign (empty ctx) and the ctx-bound
-//     Sign_Ctx collapse into a single largeSign helper that threads the
-//     FIPS 204 §5.2 ctx octet string into LargeCombine; ctx=nil yields
-//     the empty-context signature. The dispatcher returns the PULS-framed
-//     wire bytes; callers MUST verify via VerifyBytes (or pulsar.VerifyCtx)
-//     using ONLY the published PULG-framed group public key.
+//     Sign_Ctx collapse into a single hyperballSign helper that threads
+//     the FIPS 204 §5.2 ctx octet string into SignHyperball; ctx=nil
+//     yields the empty-context signature. The dispatcher returns the
+//     PULS-framed wire bytes; callers verify via VerifyBytes (empty ctx)
+//     or pulsar.VerifyCtx (ctx-bound) using ONLY the published PULG-framed
+//     group public key.
 //
 // ----------------------------------------------------------------------
 // Trust model on VERIFY.
@@ -94,313 +87,160 @@ type pulsarScheme struct {
 	sessions map[string]*pulsarSession
 }
 
-// pulsarSession holds the in-process per-party state produced by one
-// dealerless committee-DKG keygen, keyed in the scheme by the PULG-framed
-// group public key hex.
+// pulsarSession holds the in-process state produced by one dealerless RSS
+// keygen, keyed in the scheme by the PULG-framed group public key hex.
 type pulsarSession struct {
-	threshold int
+	// key is the dealerless RSS threshold ML-DSA-65 key. It carries the
+	// committee shape (key.T, key.N), the genuine FIPS 204 public key
+	// (key.Pub()), and the per-party subset holdings the hyperball signer
+	// addresses by party index. SignHyperball reads it without mutation,
+	// so concurrent signs under the same group key are safe.
+	key *pulsar.MithrilKey
 
-	// groupPK is the dealerless-derived FIPS 204 ML-DSA-65 group public
-	// key. Every committee member's DKG output agrees on this value.
-	groupPK *pulsar.PublicKey
-
-	// committee is the canonical byte-ascending NodeID committee (matches
-	// pulsar's internal canonicalisation). The signing quorum is the
-	// first `threshold` entries.
-	committee []pulsar.NodeID
-
-	// shareByID maps each committee member's NodeID to its GF(q) aggregate
-	// Shamir key share (the dealerless DKG output). The dispatcher retains
-	// these in-process; raw share material never crosses the wire.
-	shareByID map[pulsar.NodeID]*pulsar.LargeKeyShare
-
-	// allShares is every committee member's share, in canonical committee
-	// order. LargeCombine consumes the full slice for its NodeID→eval-point
-	// mapping (it reads only the eval points, never the secret lanes).
-	allShares []*pulsar.LargeKeyShare
-
-	// identities holds each committee member's long-term ML-KEM-768 +
-	// ML-DSA-65 identity. In production each party holds its own keypair
-	// in HSM / KMS; in the in-process dispatcher they all live here so the
-	// per-pair authenticated session-key establishment can run locally.
-	identities map[pulsar.NodeID]*pulsar.IdentityKey
-
-	// sessionCounter increments per Sign call so distinct messages signed
-	// under the same group key use distinct sessionIDs (pulsar's
-	// per-signature freshness contract). Bumped inside the scheme mutex.
-	sessionCounter uint64
+	// gpk is the published PULG-framed group public key bytes — the
+	// stateless-verify authority and the source of this session's map key.
+	gpk []byte
 }
 
-// sessionID call-site tags (trailing 8 bytes of the 16-byte sessionID).
-// The leading 8 bytes carry the per-session freshness counter; these tags
-// only make a captured wire trace unambiguously attributable to the plain
-// Sign vs the ctx-bound Sign_Ctx call site.
-const (
-	pulsarTagSignPlain uint64 = 0xDEADBEEFCAFEBABE
-	pulsarTagSignCtx   uint64 = 0xC1C1BAB1ECAFE505
-)
+// pulsarHyperballMaxRounds bounds the Mithril 3-round hyperball re-runs
+// (each round fans kReps parallel commitment slots) before signing aborts.
+// 64 is the value the upstream gate TestHyperballStockCirclVerify proves
+// sufficient across every viable committee up to n=8; exhaustion at this
+// bound indicates a degenerate RNG, never a forged or invalid signature.
+const pulsarHyperballMaxRounds = 64
 
 func newPulsarScheme() *pulsarScheme {
 	return &pulsarScheme{sessions: make(map[string]*pulsarSession)}
 }
 
-// Keygen runs the DEALERLESS GF(q) committee DKG
-// (pulsar.NewLargeDKGSession → Round1/Round2/Round3) for t-of-n,
-// publishes the canonical PULG-framed group public key bytes as
-// PublicKey, and returns one decimal eval-point per party in Shares.
+// Keygen runs the DEALERLESS RSS key generation (pulsar.MithrilRSSKeygen)
+// for t-of-n at ML-DSA-65, publishes the canonical PULG-framed group
+// public key bytes as PublicKey, and returns one party-index per
+// committee member in Shares.
 //
-// NO trusted dealer: every party samples and Shamir-shares its own
-// contribution; no single party ever holds the master ML-DSA seed during
-// the ceremony. The dispatcher retains the per-party aggregate Shamir
-// shares in-process keyed by the PublicKey hex; subsequent Sign calls
-// reference the session via PubKeyHex. Raw share material never crosses
-// the wire — the Shares slice carries only eval-point indices.
+// NO trusted dealer: every party contributes a fresh seed and the
+// composite secret is the sum of per-subset short secrets, no single
+// party of which holds the whole (s1, s2). The dispatcher retains the
+// resulting MithrilKey in-process keyed by the PublicKey hex; subsequent
+// Sign calls reference the session via PubKeyHex. Raw share material (the
+// per-subset secrets) never crosses the wire — the Shares slice carries
+// only party indices.
 func (s *pulsarScheme) Keygen(p keygenParams) (keygenResult, error) {
 	if err := validateKeygenParams(p); err != nil {
 		return keygenResult{}, err
 	}
+	t, n := p.Threshold, p.Participants
 
-	params := pulsar.MustParamsFor(pulsar.ModeP65)
-
-	// Build a committee of n distinct NodeIDs from a fresh session salt,
-	// then canonicalise (byte-ascending) so the dispatcher's positional
-	// view matches pulsar's internal committee canonicalisation and the
-	// signing quorum is deterministic. Distinct salts across keygens stop
-	// concurrent sessions from aliasing.
-	var sessionSalt [32]byte
-	if _, err := rand.Read(sessionSalt[:]); err != nil {
-		return keygenResult{}, fmt.Errorf("pulsar keygen: salt entropy: %w", err)
-	}
-	committee := make([]pulsar.NodeID, p.Participants)
-	for i := 0; i < p.Participants; i++ {
-		var idBuf [4]byte
-		binary.BigEndian.PutUint32(idBuf[:], uint32(i+1)) // 1-indexed
-		seed := sha256.Sum256(append(append([]byte{}, sessionSalt[:]...), idBuf[:]...))
-		committee[i] = pulsar.NodeID(seed)
-	}
-	sort.Slice(committee, func(i, j int) bool {
-		return bytes.Compare(committee[i][:], committee[j][:]) < 0
-	})
-
-	// Per-party long-term identities (ML-KEM-768 + ML-DSA-65) + directory.
-	// The DKG seals per-recipient envelopes under each recipient's KEM
-	// public key, so the directory must cover every committee member.
-	identities := make(map[pulsar.NodeID]*pulsar.IdentityKey, len(committee))
-	pubs := make(map[pulsar.NodeID]*pulsar.IdentityPublicKey, len(committee))
-	for _, id := range committee {
-		ident, err := pulsar.GenerateIdentity(rand.Reader)
-		if err != nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: GenerateIdentity: %w", err)
+	// One ≥32-byte contributed seed per party. MithrilRSSKeygen derives
+	// the joint public seed rho and each subset's short secret from these;
+	// no single party's seed determines the group key.
+	partySeeds := make([][]byte, n)
+	for i := range partySeeds {
+		seed := make([]byte, 32)
+		if _, err := rand.Read(seed); err != nil {
+			return keygenResult{}, fmt.Errorf("pulsar keygen: party %d seed entropy: %w", i, err)
 		}
-		identities[id] = ident
-		pubs[id] = ident.PublicKey()
+		partySeeds[i] = seed
 	}
-	directory, err := pulsar.NewIdentityDirectory(pubs)
+
+	// Dealerless RSS keygen. MithrilRSSKeygen runs rss.ValidateCommittee
+	// internally and fails CLOSED outside the Mithril viability bound
+	// (2 ≤ t ≤ n, norm budget τ·C·η < γ2) — surface that as the keygen
+	// error rather than letting a non-viable committee proceed.
+	mk, err := pulsar.MithrilRSSKeygen(pulsar.ModeP65, t, n, partySeeds)
 	if err != nil {
-		return keygenResult{}, fmt.Errorf("pulsar keygen: NewIdentityDirectory: %w", err)
+		return keygenResult{}, fmt.Errorf("pulsar keygen: MithrilRSSKeygen(t=%d,n=%d): %w", t, n, err)
 	}
 
-	// ---- DEALERLESS committee DKG: 3 rounds across all n parties. ----
-	sessions := make([]*pulsar.LargeDKGSession, len(committee))
-	for i, id := range committee {
-		ds, err := pulsar.NewLargeDKGSession(params, committee, p.Threshold, id, identities[id], directory, rand.Reader)
-		if err != nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: NewLargeDKGSession[%d]: %w", i, err)
-		}
-		sessions[i] = ds
-	}
-	r1 := make([]*pulsar.LargeDKGRound1Msg, len(sessions))
-	for i, ds := range sessions {
-		m, err := ds.Round1()
-		if err != nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: DKG Round1[%d]: %w", i, err)
-		}
-		r1[i] = m
-	}
-	r2 := make([]*pulsar.LargeDKGRound2Msg, len(sessions))
-	for i, ds := range sessions {
-		m, err := ds.Round2(r1)
-		if err != nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: DKG Round2[%d]: %w", i, err)
-		}
-		r2[i] = m
-	}
-	outs := make([]*pulsar.LargeDKGOutput, len(sessions))
-	for i, ds := range sessions {
-		out, err := ds.Round3(r1, r2)
-		if err != nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: DKG Round3[%d]: %w", i, err)
-		}
-		if out.AbortEvidence != nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: DKG aborted at party %d: %v (accuser=%x accused=%x)",
-				i, out.AbortEvidence.Kind, out.AbortEvidence.Accuser[:4], out.AbortEvidence.Accused[:4])
-		}
-		outs[i] = out
-	}
-
-	groupPK := outs[0].GroupPubkey
-	if groupPK == nil {
-		return keygenResult{}, fmt.Errorf("pulsar keygen: DKG produced nil group public key")
-	}
-	// Consistency: every party MUST derive the same group public key. A
-	// divergence is a DKG soundness failure, not a caller error.
-	shareByID := make(map[pulsar.NodeID]*pulsar.LargeKeyShare, len(outs))
-	allShares := make([]*pulsar.LargeKeyShare, len(outs))
-	for i, out := range outs {
-		if out.GroupPubkey == nil || !out.GroupPubkey.Equal(groupPK) {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: party %d derived a divergent group key (DKG inconsistency)", i)
-		}
-		if out.SecretShare == nil {
-			return keygenResult{}, fmt.Errorf("pulsar keygen: party %d produced nil secret share", i)
-		}
-		shareByID[out.SecretShare.NodeID] = out.SecretShare
-		allShares[i] = out.SecretShare
-	}
-
-	gkBytes, err := groupPK.MarshalBinary()
+	// Publish the PULG-framed group public key (the FIPS 204 ML-DSA-65 pub
+	// rho‖t1 inside a PULG frame). This is the stateless-verify authority.
+	gpkPub := &pulsar.PublicKey{Mode: mk.Mode, Bytes: mk.Pub()}
+	gkBytes, err := gpkPub.MarshalBinary()
 	if err != nil {
-		return keygenResult{}, fmt.Errorf("pulsar keygen: groupPK.MarshalBinary: %w", err)
+		return keygenResult{}, fmt.Errorf("pulsar keygen: group public key MarshalBinary: %w", err)
 	}
 	pkHex := hex.EncodeToString(gkBytes)
 
 	s.mu.Lock()
-	s.sessions[pkHex] = &pulsarSession{
-		threshold:  p.Threshold,
-		groupPK:    groupPK,
-		committee:  committee,
-		shareByID:  shareByID,
-		allShares:  allShares,
-		identities: identities,
-	}
+	s.sessions[pkHex] = &pulsarSession{key: mk, gpk: gkBytes}
 	s.mu.Unlock()
 
-	shareIDs := make([]string, len(allShares))
-	for i := range allShares {
-		shareIDs[i] = fmt.Sprintf("%d", allShares[i].EvalPoint)
+	// Shares carries one party-index per committee member (0..n-1) — the
+	// no-reconstruct hyperball signer addresses parties by these indices.
+	shareIDs := make([]string, n)
+	for i := 0; i < n; i++ {
+		shareIDs[i] = fmt.Sprintf("%d", i)
 	}
 	return keygenResult{PublicKey: pkHex, Shares: shareIDs}, nil
 }
 
-// largeSign drives the dealerless-keygen t-of-n threshold sign for the
+// hyperballSign drives the NO-RECONSTRUCT t-of-n threshold sign for the
 // session identified by pubKeyHex and returns ONE FIPS 204 ML-DSA-65
 // signature bound to ctx (ctx=nil ⇒ empty-context signature).
 //
 // It is the single code path behind both Sign (ctx=nil) and the ctx-bound
-// Sign_Ctx family: NewLargeThresholdSigner → Round1 → Round2 →
-// LargeCombine, with the t-quorum's per-pair session keys established via
-// authenticated ML-KEM-768 key agreement (pulsar.SymmetricSession).
-//
-// callTag only tags the sessionID trailing bytes for wire-trace
-// attribution; freshness comes from the per-session counter.
-func (s *pulsarScheme) largeSign(pubKeyHex string, msg, ctx []byte, callTag uint64) (*pulsar.Signature, *pulsar.Params, *pulsar.PublicKey, error) {
+// Sign_Ctx family: pulsar.MithrilKey.SignHyperball runs the Mithril
+// 3-round hyperball protocol across the canonical t-party quorum. No party
+// or coordinator ever reconstructs the master ML-DSA key (see the file
+// header). SignHyperball uses fresh per-round entropy from rand.Reader, so
+// distinct calls under the same group key sign with distinct nonces.
+func (s *pulsarScheme) hyperballSign(pubKeyHex string, msg, ctx []byte) (*pulsar.Signature, *pulsar.Params, *pulsar.PublicKey, error) {
 	s.mu.Lock()
 	sess, ok := s.sessions[pubKeyHex]
+	s.mu.Unlock()
 	if !ok {
-		s.mu.Unlock()
 		return nil, nil, nil, fmt.Errorf("unknown pubKeyHex (keygen first)")
 	}
-	sess.sessionCounter++
-	counter := sess.sessionCounter
-	threshold := sess.threshold
-	groupPK := sess.groupPK
-	committee := append([]pulsar.NodeID(nil), sess.committee...)
-	shareByID := sess.shareByID
-	allShares := append([]*pulsar.LargeKeyShare(nil), sess.allShares...)
-	identities := sess.identities
-	s.mu.Unlock()
+	mk := sess.key
 
-	if threshold <= 0 || threshold > len(committee) {
-		return nil, nil, nil, fmt.Errorf("session has invalid threshold %d for committee %d", threshold, len(committee))
-	}
-	params := pulsar.MustParamsFor(groupPK.Mode)
-
-	// Canonical quorum: the first t committee members (committee is already
-	// byte-ascending). Any t-subset reconstructs; the first t is
-	// deterministic.
-	quorum := append([]pulsar.NodeID(nil), committee[:threshold]...)
-
-	// Distinct sessionID per Sign call (freshness across concurrent signs
-	// under the same group key). Trailing 8 bytes tag the call site.
-	var sid [16]byte
-	binary.BigEndian.PutUint64(sid[:8], counter)
-	binary.BigEndian.PutUint64(sid[8:], callTag)
-	attempt := uint32(0)
-
-	// Per-pair authenticated session keys for the quorum (ML-KEM-768
-	// encapsulation + ML-DSA-65 authentication). Bound to (sid, msg); ctx
-	// enters later, at LargeCombine's μ derivation.
-	sessionKeys, err := pulsarQuorumSessionKeys(quorum, identities, sid, msg)
+	params, err := pulsar.ParamsFor(mk.Mode)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("session keys: %w", err)
+		return nil, nil, nil, fmt.Errorf("params: %w", err)
 	}
 
-	// Build the t threshold signers.
-	signers := make([]*pulsar.LargeThresholdSigner, threshold)
-	for i, id := range quorum {
-		share, ok := shareByID[id]
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("missing key share for quorum member %x", id[:4])
-		}
-		ts, err := pulsar.NewLargeThresholdSigner(params, sid, attempt, quorum, share, sessionKeys[id], msg, rand.Reader)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("NewLargeThresholdSigner[%d]: %w", i, err)
-		}
-		signers[i] = ts
+	// Canonical signing quorum: the first t parties {0,…,t−1}. SignHyperball
+	// requires a sorted, duplicate-free t-subset of [0,n); the first t is
+	// deterministic and any viable t-subset signs identically.
+	active := make([]int, mk.T)
+	for i := range active {
+		active[i] = i
 	}
 
-	// Round 1: commit broadcasts.
-	tsR1 := make([]*pulsar.LargeRound1Message, threshold)
-	for i, ts := range signers {
-		m, err := ts.Round1(msg)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("sign Round1[%d]: %w", i, err)
-		}
-		tsR1[i] = m
-	}
-
-	// Round 2: MAC-checked (mask, masked-share) reveals.
-	tsR2 := make([]*pulsar.LargeRound2Message, threshold)
-	for i, ts := range signers {
-		m, ev, err := ts.Round2(tsR1)
-		if err != nil {
-			if ev != nil {
-				return nil, nil, nil, fmt.Errorf("sign Round2[%d]: %w (abort: %v accused=%x)", i, err, ev.Kind, ev.Accused[:4])
-			}
-			return nil, nil, nil, fmt.Errorf("sign Round2[%d]: %w", i, err)
-		}
-		tsR2[i] = m
-	}
-
-	// Combine the t reveals into one FIPS 204 ML-DSA-65 signature bound
-	// to ctx (ctx=nil ⇒ empty context). randomized=false ⇒ deterministic
-	// FIPS 204 hedged-but-derandomised path.
-	sig, err := pulsar.LargeCombine(params, groupPK, msg, ctx, false, sid, attempt, quorum, threshold, tsR1, tsR2, allShares)
+	// NO-RECONSTRUCT signing. Each active party holds only its balanced-
+	// partition share s1_(j) and emits only z_j = y_j + c·s1_(j); the
+	// coordinator forms only the PUBLIC aggregates. SignHyperball
+	// fail-closed self-verifies the summed result under the FIPS 204
+	// verifier before returning.
+	sig, _, err := mk.SignHyperball(active, msg, ctx, rand.Reader, pulsarHyperballMaxRounds)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("LargeCombine: %w", err)
+		return nil, nil, nil, fmt.Errorf("SignHyperball: %w", err)
 	}
-	return sig, params, groupPK, nil
+
+	gpkPub := &pulsar.PublicKey{Mode: mk.Mode, Bytes: mk.Pub()}
+	return sig, params, gpkPub, nil
 }
 
-// Sign drives the dealerless-keygen threshold protocol (empty ctx) for the
-// quorum in the session and returns the PULS-framed signature wire bytes.
-// The output is bit-identical to a single-party FIPS 204 ML-DSA-65
-// signature on (message, group public key) under the empty context — any
-// caller holding the corresponding PULG-framed group public key verifies
-// via VerifyBytes (or pulsar.Verify).
+// Sign drives the dealerless-keygen no-reconstruct threshold protocol
+// (empty ctx) for the canonical quorum and returns the PULS-framed
+// signature wire bytes. The output is bit-identical to a single-party
+// FIPS 204 ML-DSA-65 signature on (message, group public key) under the
+// empty context — any caller holding the corresponding PULG-framed group
+// public key verifies via VerifyBytes (or pulsar.Verify).
 func (s *pulsarScheme) Sign(p signParams) (signResult, error) {
 	msg, err := hex.DecodeString(p.MessageHex)
 	if err != nil {
 		return signResult{}, fmt.Errorf("messageHex: %w", err)
 	}
 
-	sig, params, groupPK, err := s.largeSign(p.PubKeyHex, msg, nil, pulsarTagSignPlain)
+	sig, params, groupPK, err := s.hyperballSign(p.PubKeyHex, msg, nil)
 	if err != nil {
 		return signResult{}, fmt.Errorf("pulsar sign: %w", err)
 	}
 
 	// Self-verify safety belt before publishing — refuses to return bytes
 	// that would fail at the caller (a failure here is a kernel bug, not a
-	// caller bug).
+	// caller bug). SignHyperball already self-verifies internally; this is
+	// belt-and-suspenders at the dispatcher boundary.
 	if err := pulsar.Verify(params, groupPK, msg, sig); err != nil {
 		return signResult{}, fmt.Errorf("pulsar sign: produced signature failed self-verify (kernel bug): %w", err)
 	}
@@ -421,7 +261,7 @@ func (s *pulsarScheme) Sign(p signParams) (signResult, error) {
 //	(pub.VerifySignatureCtx(msg, sig, ctx))
 //
 // Wire bytes: PULS-framed (Signature.MarshalBinary) — bit-identical to a
-// single-party FIPS 204 §5.2 ctx-bound signature on the same (master_sk,
+// single-party FIPS 204 §5.2 ctx-bound signature on the same (group key,
 // msg, ctx) tuple. Any FIPS 204 verifier holding the session's PULG-framed
 // group public key bytes accepts the result under VerifyCtx(pub, msg, ctx,
 // sig).
@@ -446,32 +286,34 @@ func (s *pulsarScheme) Sign_Ctx(p signCtxParams) (signResult, error) {
 // Why the strict-PQ gate STILL refuses pulsar (reasoned, not reflexive).
 // ----------------------------------------------------------------------
 //
-// The gate originally guarded the pulsar v1.0.x single-party DEALER
-// shortcut (a real single-party PrivateKey lived in pulsarSession, so
-// "threshold" was a lie). That shortcut is GONE: keygen is now the
-// dealerless committee DKG (NewLargeDKGSession) and sign is a genuine
-// t-of-n LargeCombine — one party cannot sign alone. So the SPECIFIC
-// thing the gate first named no longer exists.
+// The signing path is now genuinely no-reconstruct: SignHyperball forms
+// NO master ML-DSA secret key anywhere (each party emits only z_j; the
+// coordinator sums public partials). So the gate's ORIGINAL rationale —
+// "LargeCombine transiently reconstructs the master sk" — no longer
+// applies; that reconstruct-at-combine path is gone.
 //
-// But the gate is NOT a no-op for this path, and silently dropping it
-// would delete real safety. The v1.2.0 LargeCombine is a RECONSTRUCT-style
-// combiner: it Lagrange-interpolates the master seed, derives the full
-// ML-DSA secret key, signs, and wipes it — TRANSIENTLY materialising the
-// master sk in one party's memory at every sign. That is strictly weaker
-// than the no-reconstruct TALUS BCC/CEF distributed signer (which never
-// forms the master sk anywhere). A strict-PQ chain — the highest-assurance
-// tier — must source its ctx-bound, precompile-acceptable finality
-// signatures from the consensus-driven distributed no-reconstruct
-// ceremony, NOT from this in-process dev-tooling dispatcher whose combiner
-// reconstructs the key. The gate is the policy boundary that enforces that
+// But the gate is NOT a no-op, and silently dropping it would delete real
+// safety. This dispatcher is an IN-PROCESS dev-tooling combiner: the
+// dealerless RSS keygen produces ONE MithrilKey that holds EVERY party's
+// subset secrets co-resident in a single process (mk.holdings covers all
+// n parties). No-reconstruct protects the SIGNING transcript, but it does
+// not change the fact that the full secret material is materialisable here
+// by an operator of this process (e.g. via the reconstruct-style
+// MithrilKey.Sign, which this dispatcher deliberately does NOT call). A
+// strict-PQ chain — the highest-assurance tier — must source its ctx-bound,
+// precompile-acceptable finality signatures from a GENUINELY DISTRIBUTED
+// ceremony where each validator holds only its own subset holdings in
+// separate HSM / KMS and the no-reconstruct property is a true network
+// invariant, NOT from this in-process dispatcher where all holdings
+// co-reside. The gate is the deployment boundary that enforces that
 // separation, so it stays. (For the dispatcher's own in-process model the
-// reconstruct is moot — all shares already co-reside — which is precisely
+// distinction is moot — all holdings already co-reside — which is exactly
 // why the dispatcher is dev tooling and not a strict-PQ finality source.)
 //
 // One function, one place: profile.go owns the policy
 // (RefuseUnderStrictPQ); this method owns the call site. Non-strict and
 // no-resolver deployments fall straight through to the real dealerless
-// threshold sign.
+// no-reconstruct threshold sign.
 func (s *pulsarScheme) Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileResolver) (signResult, error) {
 	if err := RefuseUnderStrictPQ(p.ChainID, "pulsar.sign_ctx", resolver); err != nil {
 		return signResult{}, err
@@ -479,9 +321,9 @@ func (s *pulsarScheme) Sign_Ctx_Profile(p signCtxParams, resolver ChainProfileRe
 	return s.signCtxInternal(p)
 }
 
-// signCtxInternal is the ctx-bound dealerless threshold path. It decodes
-// the ctx octet string and drives the single largeSign helper; the empty
-// ctx case (CtxHex == "") is byte-identical to Sign(msg).
+// signCtxInternal is the ctx-bound dealerless no-reconstruct path. It
+// decodes the ctx octet string and drives the single hyperballSign helper;
+// the empty ctx case (CtxHex == "") is byte-identical to Sign(msg).
 func (s *pulsarScheme) signCtxInternal(p signCtxParams) (signResult, error) {
 	msg, err := hex.DecodeString(p.MessageHex)
 	if err != nil {
@@ -495,7 +337,7 @@ func (s *pulsarScheme) signCtxInternal(p signCtxParams) (signResult, error) {
 		}
 	}
 
-	sig, params, groupPK, err := s.largeSign(p.PubKeyHex, msg, signCtx, pulsarTagSignCtx)
+	sig, params, groupPK, err := s.hyperballSign(p.PubKeyHex, msg, signCtx)
 	if err != nil {
 		return signResult{}, fmt.Errorf("pulsar sign_ctx: %w", err)
 	}
@@ -534,44 +376,4 @@ func (s *pulsarScheme) Verify(p verifyParams) (verifyResult, error) {
 		return verifyResult{}, fmt.Errorf("pubKeyHex: %w", err)
 	}
 	return verifyResult{OK: pulsar.VerifyBytes(gkBytes, msg, sigBytes)}, nil
-}
-
-// pulsarQuorumSessionKeys establishes the per-pair authenticated session
-// keys for the quorum, mirroring the upstream test fixture's
-// quorumSessionKeys: for every unordered pair {a,b} it runs
-// pulsar.SymmetricSession (authenticated ML-KEM-768 key agreement) and
-// records the byte-identical key under both parties' views. The returned
-// map is keyed [me][peer] → 32-byte session key; NewLargeThresholdSigner
-// consumes sessionKeys[me].
-//
-// In a real distributed deployment each party drives Round 0 of the
-// identity KEM exchange over the message bus; the in-process dispatcher
-// runs both sides locally because it holds every identity key.
-func pulsarQuorumSessionKeys(
-	quorum []pulsar.NodeID,
-	identities map[pulsar.NodeID]*pulsar.IdentityKey,
-	sid [16]byte,
-	transcript []byte,
-) (map[pulsar.NodeID]map[pulsar.NodeID][32]byte, error) {
-	out := make(map[pulsar.NodeID]map[pulsar.NodeID][32]byte, len(quorum))
-	for _, id := range quorum {
-		out[id] = make(map[pulsar.NodeID][32]byte, len(quorum)-1)
-	}
-	for i := 0; i < len(quorum); i++ {
-		for j := i + 1; j < len(quorum); j++ {
-			a, b := quorum[i], quorum[j]
-			ka, oka := identities[a]
-			kb, okb := identities[b]
-			if !oka || !okb {
-				return nil, fmt.Errorf("missing identity for session pair %x/%x", a[:4], b[:4])
-			}
-			key, err := pulsar.SymmetricSession(a, ka, b, kb, sid, transcript)
-			if err != nil {
-				return nil, fmt.Errorf("SymmetricSession %x<->%x: %w", a[:4], b[:4], err)
-			}
-			out[a][b] = key
-			out[b][a] = key
-		}
-	}
-	return out, nil
 }

@@ -9,7 +9,7 @@ import (
 	luxmldsa "github.com/luxfi/crypto/mldsa"
 	luxslhdsa "github.com/luxfi/crypto/slhdsa"
 	magnetar "github.com/luxfi/magnetar/ref/go/pkg/magnetar"
-	pulsar "github.com/luxfi/pulsar/ref/go/pkg/pulsar"
+	pulsar "github.com/luxfi/pulsar/pkg/pulsar"
 )
 
 // sign_ctx_test.go — ZAP-driven Sign_Ctx tests. The prior HTTP+JSON
