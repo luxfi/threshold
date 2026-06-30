@@ -44,8 +44,10 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/luxfi/accel v1.2.0 // indirect
+	github.com/luxfi/dkg v0.3.5 // indirect
 	github.com/luxfi/math v1.4.1 // indirect
 	github.com/luxfi/mdns v0.1.1 // indirect
+	github.com/luxfi/mlwe v0.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
@@ -68,11 +70,11 @@ require (
 )
 
 require (
-	github.com/luxfi/corona v0.8.0
+	github.com/luxfi/corona v0.10.2
 	github.com/luxfi/lens v0.1.4
 	github.com/luxfi/magnetar v1.2.0
 	github.com/luxfi/metric v1.5.7
-	github.com/luxfi/pulsar v1.2.0
+	github.com/luxfi/pulsar v1.9.0
 	github.com/luxfi/zap v0.8.1
 )
 

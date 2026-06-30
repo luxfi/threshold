@@ -1,7 +1,7 @@
 // Copyright (C) 2025-2026, Lux Industries Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package pulsar re-exports github.com/luxfi/pulsar/ref/go/pkg/pulsar
+// Package pulsar re-exports github.com/luxfi/pulsar/pkg/pulsar
 // through the threshold/protocols alias surface. Downstream consumers
 // (luxfi/consensus) target this import path so the consensus engine
 // does not depend directly on the pulsar reference-implementation
@@ -16,7 +16,7 @@
 //
 //	consensus → threshold/protocols/pulsar  ← stable alias surface
 //	              ↓
-//	         luxfi/pulsar/ref/go/pkg/pulsar  ← reference math kernel
+//	         luxfi/pulsar/pkg/pulsar  ← reference math kernel
 //
 // The re-exports here are type aliases and thin function forwards; no
 // behaviour change. The set of re-exports covers identity, DKG,
@@ -36,7 +36,7 @@ package pulsar
 import (
 	"io"
 
-	"github.com/luxfi/pulsar/ref/go/pkg/pulsar"
+	"github.com/luxfi/pulsar/pkg/pulsar"
 )
 
 // ---------------------------------------------------------------------
