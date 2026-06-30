@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// protocols/pulsar/ is a thin alias surface over luxfi/pulsar/ref/go/pkg/pulsar.
+// protocols/pulsar/ is a thin alias surface over luxfi/pulsar/pkg/pulsar.
 // These tests pin the alias contracts: parameter-set selection, identity
 // generation, and the single-party Sign / VerifyCtx round trip. They are
 // the alias-surface equivalent of the tests in protocols/corona/.
