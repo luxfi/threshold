@@ -5,7 +5,6 @@ import (
 	crypto_rand "crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
 
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"github.com/luxfi/threshold/pkg/party"
@@ -471,7 +470,7 @@ func (d *DilithiumAdapter) sampleSecret(dimension int) [][]int32 {
 		s[i] = make([]int32, d.params.N)
 		for j := range s[i] {
 			// Sample from [-eta, eta]
-			s[i][j] = int32(rand.Intn(2*d.params.Eta+1)) - int32(d.params.Eta)
+			s[i][j] = int32(randIntn(2*d.params.Eta+1)) - int32(d.params.Eta)
 		}
 	}
 	return s
@@ -487,7 +486,7 @@ func (d *DilithiumAdapter) sampleMask() [][]int32 {
 		y[i] = make([]int32, d.params.N)
 		for j := range y[i] {
 			// Sample from [-gamma1, gamma1]
-			y[i][j] = int32(rand.Intn(2*d.params.Gamma1+1)) - int32(d.params.Gamma1)
+			y[i][j] = int32(randIntn(2*d.params.Gamma1+1)) - int32(d.params.Gamma1)
 		}
 	}
 	return y

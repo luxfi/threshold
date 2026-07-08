@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"sort"
 
 	"github.com/luxfi/threshold/pkg/party"
@@ -418,7 +417,7 @@ func (m *MLDSAThresholdAdapter) sampleMaskingVector(dimension int, gamma1 int) [
 		coeffs := make([]F, m.params.N)
 		for j := 0; j < m.params.N; j++ {
 			// Sample from [-gamma1+1, gamma1-1]
-			v := rand.Intn(2*gamma1-1) - (gamma1 - 1)
+			v := randIntn(2*gamma1-1) - (gamma1 - 1)
 			coeffs[j] = F(v)
 		}
 		y[i] = SecretPoly{Coeffs: coeffs}
