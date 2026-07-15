@@ -8,7 +8,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.1
 	// Lux crypto stack - this is the HIGH-LEVEL orchestration layer
 	// that consumes primitives from these packages (LP-5703, LP-5704)
-	github.com/luxfi/crypto v1.19.17 // ECDSA, EdDSA, BLS curves
+	github.com/luxfi/crypto v1.20.2 // ECDSA, EdDSA, BLS curves
 	github.com/luxfi/lattice/v7 v7.1.4 // Lattice ops for Corona (post-quantum) + GPU acceleration
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
@@ -45,7 +45,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/luxfi/accel v1.2.0 // indirect
 	github.com/luxfi/dkg v0.3.5 // indirect
-	github.com/luxfi/math v1.4.1 // indirect
+	github.com/luxfi/math v1.5.1 // indirect
 	github.com/luxfi/mdns v0.1.1 // indirect
 	github.com/luxfi/mlwe v0.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -70,12 +70,13 @@ require (
 )
 
 require (
-	github.com/luxfi/corona v0.10.2
-	github.com/luxfi/lens v0.1.4
+	github.com/luxfi/corona v0.10.4
+	github.com/luxfi/geth v1.20.1
+	github.com/luxfi/lens v0.2.1
 	github.com/luxfi/magnetar v1.2.0
-	github.com/luxfi/metric v1.5.7
-	github.com/luxfi/pulsar v1.9.0
-	github.com/luxfi/zap v0.8.1
+	github.com/luxfi/metric v1.8.1
+	github.com/luxfi/pulsar v1.9.2
+	github.com/luxfi/zap v1.2.6
 )
 
 // e2e validation harness pin (2026-05-31): luxfi/node v1.27.8 is
