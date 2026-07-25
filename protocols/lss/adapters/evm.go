@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/luxfi/threshold/pkg/math/curve"
 	"golang.org/x/crypto/sha3"
 )
@@ -482,18 +483,32 @@ func (e *EVMAdapter) encodeBlobTx(tx *EVMTransaction) []byte {
 	return encoded
 }
 
-// GenerateEVMAddress generates an EVM address from public key
-func (e *EVMAdapter) GenerateEVMAddress(publicKey curve.Point) [20]byte {
-	// Keccak256(pubkey)[12:]
-	pubBytes, _ := publicKey.MarshalBinary()
+// GenerateEVMAddress derives the 20-byte EVM account address of a public key:
+// the low 20 bytes of Keccak256 over the 64-byte UNCOMPRESSED encoding, X‖Y,
+// with no format prefix.
+//
+// The point must be decompressed first. curve.Point.MarshalBinary returns the
+// 33-byte compressed form (0x02/0x03 ‖ X), so hashing it — or its 32-byte X
+// tail — produces a well-formed address that belongs to no key anyone holds.
+// Nothing about such an address looks wrong, and value sent to it is
+// unspendable, so this function returns ok=false rather than a plausible
+// wrong answer when the point cannot be decompressed.
+func (e *EVMAdapter) GenerateEVMAddress(publicKey curve.Point) ([20]byte, bool) {
+	var addr [20]byte
+
+	compressed, err := publicKey.MarshalBinary()
+	if err != nil || len(compressed) != 33 {
+		return addr, false
+	}
+	pub, err := secp256k1.ParsePubKey(compressed)
+	if err != nil {
+		return addr, false
+	}
 
 	h := sha3.NewLegacyKeccak256()
-	h.Write(pubBytes[1:]) // Skip format byte
-	hash := h.Sum(nil)
-
-	var addr [20]byte
-	copy(addr[:], hash[12:])
-	return addr
+	h.Write(pub.SerializeUncompressed()[1:]) // X‖Y, dropping the 0x04 prefix
+	copy(addr[:], h.Sum(nil)[12:])
+	return addr, true
 }
 
 // EstimateGas estimates gas for transaction
