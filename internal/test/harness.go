@@ -23,18 +23,29 @@ type Harness struct {
 	logger   log.Logger
 	registry metric.Registry
 
+	// timeout bounds both the harness context and each handler's own
+	// ProtocolTimeout. Keeping one value for both is what makes WithTimeout
+	// mean anything: the handler config used to hard-code 5 minutes, so
+	// raising the harness timeout moved the deadline that fired but not the
+	// one inside the handler, and a slow protocol (CGGMP21 DKG under -race)
+	// still died at five minutes with a misleading error.
+	timeout time.Duration
+
 	mu       sync.RWMutex
 	handlers map[party.ID]*protocol.Handler
 	results  map[party.ID]interface{}
 	errors   map[party.ID]error
 }
 
+// DefaultTimeout bounds a harness run unless WithTimeout raises it.
+const DefaultTimeout = 5 * time.Minute
+
 // NewHarness creates a new test harness with proper context management.
 // Default 5-minute timeout matches the per-handler ProtocolTimeout below;
 // `go test ./...` runs many packages in parallel and harness wall-clock can
 // stretch under CPU contention even when the protocol itself takes <1s.
 func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 
 	h := &Harness{
 		t:        t,
@@ -43,6 +54,7 @@ func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
 		network:  NewNetwork(partyIDs),
 		logger:   log.NewTestLogger(log.InfoLevel),
 		registry: metric.NewRegistry(),
+		timeout:  DefaultTimeout,
 		handlers: make(map[party.ID]*protocol.Handler),
 		results:  make(map[party.ID]interface{}),
 		errors:   make(map[party.ID]error),
@@ -57,10 +69,13 @@ func NewHarness(t testing.TB, partyIDs []party.ID) *Harness {
 	return h
 }
 
-// WithTimeout sets a custom timeout for the harness context
+// WithTimeout sets the deadline for the harness context and for every handler
+// created afterwards. Call it before CreateHandler; handlers already created
+// keep the timeout they were built with.
 func (h *Harness) WithTimeout(timeout time.Duration) *Harness {
 	h.cancel() // Cancel old context
 	h.ctx, h.cancel = context.WithTimeout(context.Background(), timeout)
+	h.timeout = timeout
 	return h
 }
 
@@ -86,7 +101,7 @@ func (h *Harness) CreateHandler(id party.ID, startFunc protocol.StartFunc, sessi
 		PriorityBuffer:  1000,
 		MessageTimeout:  30 * time.Second,
 		RoundTimeout:    60 * time.Second,
-		ProtocolTimeout: 5 * time.Minute, // Don't let handler create its own timeout
+		ProtocolTimeout: h.timeout, // the harness owns the deadline; see WithTimeout
 	}
 
 	// Use a context without timeout - the harness manages timeouts
@@ -262,34 +277,16 @@ func (h *Harness) Cleanup() {
 	h.mu.Unlock()
 }
 
-// RunProtocol is a convenience function to run a protocol with all parties
+// RunProtocol is a convenience function to run a protocol with all parties,
+// bounded by DefaultTimeout.
 func RunProtocol(t testing.TB, partyIDs []party.ID, sessionID []byte, createStart func(party.ID) protocol.StartFunc) (map[party.ID]interface{}, error) {
-	harness := NewHarness(t, partyIDs)
-
-	// If no session ID provided, generate a unique one
-	if sessionID == nil {
-		sessionID = []byte(fmt.Sprintf("session-%d-%d", time.Now().UnixNano(), rand.Int63()))
-	}
-
-	// Create handlers for all parties
-	for _, id := range partyIDs {
-		startFunc := createStart(id)
-		_, err := harness.CreateHandler(id, startFunc, sessionID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create handler for party %s: %w", id, err)
-		}
-	}
-
-	// Run the protocol
-	if err := harness.Run(); err != nil {
-		return nil, err
-	}
-
-	// Return all results
-	return harness.Results(), nil
+	return RunProtocolWithTimeout(t, partyIDs, sessionID, DefaultTimeout, createStart)
 }
 
-// RunProtocolWithTimeout runs a protocol with a custom timeout
+// RunProtocolWithTimeout is RunProtocol with an explicit deadline, for
+// protocols that legitimately need longer than DefaultTimeout — a full
+// CGGMP21 key generation builds Paillier moduli and their ring-mod proofs for
+// every party, which under the race detector runs well past five minutes.
 func RunProtocolWithTimeout(t testing.TB, partyIDs []party.ID, sessionID []byte, timeout time.Duration, createStart func(party.ID) protocol.StartFunc) (map[party.ID]interface{}, error) {
 	harness := NewHarness(t, partyIDs).WithTimeout(timeout)
 
