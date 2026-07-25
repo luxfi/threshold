@@ -101,6 +101,33 @@ func FromDegree(t, n int) (Policy, error) {
 	return New(t+1, n)
 }
 
+// MarshalText renders the policy in operator form so that any config, genesis
+// blob or API payload carrying a Policy is self-describing: "3-of-5" cannot be
+// misread as a degree, whereas a bare `"threshold": 3` can and has been.
+//
+// Policy implements encoding.TextMarshaler/TextUnmarshaler rather than a JSON
+// codec so the same single representation works for JSON, YAML, TOML, flags and
+// map keys — one form everywhere.
+func (p Policy) MarshalText() ([]byte, error) {
+	if !p.Valid() {
+		return nil, fmt.Errorf("quorum: refusing to encode invalid policy %d-of-%d", p.K, p.N)
+	}
+	return []byte(p.String()), nil
+}
+
+// UnmarshalText reads the operator form. An absent or malformed policy is an
+// error, never a silent zero value: a Policy that decoded to {0,0} would be
+// indistinguishable from "unset" at the keygen boundary, and the failure mode
+// of guessing there is an unrecoverable wrong-degree key.
+func (p *Policy) UnmarshalText(text []byte) error {
+	parsed, err := Parse(string(text))
+	if err != nil {
+		return err
+	}
+	*p = parsed
+	return nil
+}
+
 // Parse reads the operator form, "3-of-5". It accepts surrounding space and
 // an "of" separator with or without hyphens ("3 of 5"), because those are the
 // forms that show up in runbooks and dashboards.

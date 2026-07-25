@@ -48,7 +48,10 @@ func TestPolicy3of5(t *testing.T) {
 }
 
 func TestNewRejectsUndeployablePolicies(t *testing.T) {
-	for _, tc := range []struct{ name string; k, n int }{
+	for _, tc := range []struct {
+		name string
+		k, n int
+	}{
 		{"k exceeds n", 6, 5},
 		{"k=1 is not a threshold policy", 1, 5},
 		{"k=0", 0, 5},
