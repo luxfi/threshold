@@ -261,6 +261,24 @@ func (p *Ristretto255Point) XScalar() Scalar {
 	return nil
 }
 
+// FromUniformBytes maps 64 uniform bytes onto the group using the ristretto255
+// one-way map (the Elligator-based hash-to-group of RFC 9496 §4.3.4). It is the
+// point-side counterpart of Ristretto255Scalar.FromUniformBytes.
+//
+// Its purpose is generating a second generator whose discrete logarithm with
+// respect to the base point is unknown to everybody, which is what a
+// Chaum-Pedersen/TDH2-style well-formedness proof needs. Hashing a tag with a
+// wide hash and mapping the digest here yields such a point; multiplying the
+// base point by a hashed SCALAR would not, because the scalar IS the discrete
+// logarithm and whoever computed it knows the trapdoor.
+func (p *Ristretto255Point) FromUniformBytes(b []byte) *Ristretto255Point {
+	if len(b) != 64 {
+		panic("FromUniformBytes requires exactly 64 bytes")
+	}
+	p.value.FromUniformBytes(b)
+	return p
+}
+
 // Ensure interfaces are satisfied at compile time.
 var (
 	_ Curve  = Ristretto255{}
