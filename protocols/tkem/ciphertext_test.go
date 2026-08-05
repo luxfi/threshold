@@ -29,6 +29,25 @@ func TestClaim5_LabelBinding(t *testing.T) {
 		t.Fatal("two labels produced the same key")
 	}
 
+	// The check above passes for the wrong reason on its own: the two
+	// encapsulations used different randomness, so their keys would differ even
+	// if the label never reached the derivation. Isolate the label by deriving
+	// twice from IDENTICAL group elements. A caller that reused an ephemeral
+	// scalar — a real bug, and one this binding survives — would otherwise get
+	// one key for two different secrets.
+	sameR, sameS := ctA.R, ctA.RBar
+	derivedA, err := deriveKey(sameR, sameS, []byte(testLabel))
+	if err != nil {
+		t.Fatalf("derive A: %v", err)
+	}
+	derivedB, err := deriveKey(sameR, sameS, []byte(altTestLabel))
+	if err != nil {
+		t.Fatalf("derive B: %v", err)
+	}
+	if bytes.Equal(derivedA, derivedB) {
+		t.Fatal("the same group elements under two labels produced one key — the label is not bound into the derivation")
+	}
+
 	// Relabelling a ciphertext must not silently produce a usable key. The
 	// label is inside the well-formedness proof, so the edit is detected.
 	tampered := &Ciphertext{R: ctA.R, RBar: ctA.RBar, E: ctA.E, F: ctA.F, Label: []byte(altTestLabel)}
