@@ -25,6 +25,7 @@ require (
 	github.com/gtank/merlin v0.1.1
 	github.com/gtank/ristretto255 v0.2.0
 	github.com/luxfi/log v1.4.3
+	github.com/mr-tron/base58 v1.3.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 )
@@ -93,7 +94,6 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
-	github.com/mr-tron/base58 v1.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spf13/pflag v1.0.10 // indirect

@@ -246,6 +246,27 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 		cScalar := r.Group().NewScalar().(*curve.Ristretto255Scalar)
 		cScalar.FromUniformBytes(challengeBytes)
 		c = cScalar
+	} else if r.ed25519 {
+		// RFC 8032 §5.1.6: k = SHA-512(R ‖ A ‖ M) mod L, over the 32-byte
+		// compressed Edwards encodings of R and A and the raw message M.
+		//
+		// Nothing else here needs an Ed25519-specific adjustment. Unlike BIP-340
+		// below, RFC 8032 places no condition on R, so there is no nonce to
+		// negate; and unlike the generic branch, the challenge is fixed by the
+		// standard rather than by our hash of choice. That is the whole of the
+		// difference between this ciphersuite and the generic one.
+		RBytes, err := R.MarshalBinary()
+		if err != nil {
+			return r, fmt.Errorf("failed to marshal R: %w", err)
+		}
+		ABytes, err := r.Y.MarshalBinary()
+		if err != nil {
+			return r, fmt.Errorf("failed to marshal public key: %w", err)
+		}
+		c, err = ed25519Challenge(r.Group(), RBytes, ABytes, r.M)
+		if err != nil {
+			return r, err
+		}
 	} else if r.taproot {
 		// BIP-340 adjustment: We need R to have an even y coordinate. This means
 		// conditionally negating k = ∑ᵢ (dᵢ + (eᵢ ρᵢ)), which we can accomplish

@@ -1,6 +1,8 @@
 package sign
 
 import (
+	"crypto/ed25519"
+	"crypto/sha512"
 	"fmt"
 	"io"
 
@@ -127,6 +129,119 @@ func (sig Signature) Verify(public curve.Point, m []byte) bool {
 	actual := sig.z.ActOnBase()
 
 	return expected.Equal(actual)
+}
+
+// ed25519Challenge computes the RFC 8032 §5.1.6 challenge
+//
+//	k = SHA-512(R ‖ A ‖ M) mod L
+//
+// R and A are the 32-byte compressed Edwards encodings of the commitment and the
+// public key, and M is the raw message: this is PureEdDSA, so M is NOT pre-hashed
+// and no domain prefix is applied. The digest is reduced with the wide
+// little-endian reduction, making k byte-identical to the k crypto/ed25519
+// derives when it verifies.
+//
+// This is the only place the challenge is computed. Round 2 calls it to sign;
+// the RFC 8032 vector tests call it to check it against the standard.
+func ed25519Challenge(group curve.Curve, RBytes, ABytes, message []byte) (curve.Scalar, error) {
+	s, ok := group.NewScalar().(*curve.Ed25519Scalar)
+	if !ok {
+		return nil, fmt.Errorf("ed25519 signing requires the ed25519 group, got %q", group.Name())
+	}
+	h := sha512.New()
+	h.Write(RBytes)
+	h.Write(ABytes)
+	h.Write(message)
+	if _, err := s.SetUniformBytes(h.Sum(nil)); err != nil {
+		return nil, fmt.Errorf("failed to derive ed25519 challenge: %w", err)
+	}
+	return s, nil
+}
+
+// Ed25519Signature is an RFC 8032 PureEdDSA signature over edwards25519.
+//
+// The wire encoding is the 64 bytes R ‖ S: R is the compressed Edwards encoding
+// of the commitment point, and S is the response scalar in LITTLE-endian order.
+// curve.Scalar.MarshalBinary is big-endian by interface contract, so the byte
+// order is reversed here — and only here, at the RFC 8032 boundary.
+type Ed25519Signature struct {
+	// R is the commitment point.
+	R curve.Point
+	// S is the response scalar.
+	S curve.Scalar
+}
+
+// MarshalBinary serializes the signature as the 64 bytes R ‖ S required by
+// RFC 8032 §5.1.6, with S little-endian.
+func (sig Ed25519Signature) MarshalBinary() ([]byte, error) {
+	if sig.R == nil || sig.S == nil {
+		return nil, fmt.Errorf("ed25519 signature has nil fields")
+	}
+	RBytes, err := sig.R.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal R: %w", err)
+	}
+	sBE, err := sig.S.MarshalBinary()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal S: %w", err)
+	}
+	if len(RBytes) != 32 || len(sBE) != 32 {
+		return nil, fmt.Errorf("ed25519 signature parts must be 32 bytes, got R=%d S=%d", len(RBytes), len(sBE))
+	}
+	out := make([]byte, ed25519.SignatureSize)
+	copy(out[:32], RBytes)
+	for i := 0; i < 32; i++ {
+		out[32+i] = sBE[31-i]
+	}
+	return out, nil
+}
+
+// UnmarshalBinary deserializes a 64-byte RFC 8032 signature. group must be
+// curve.Ed25519. Decoding R enforces prime-order subgroup membership, and
+// decoding S rejects any non-canonical scalar (S ⩾ L).
+func (sig *Ed25519Signature) UnmarshalBinary(group curve.Curve, data []byte) error {
+	if len(data) != ed25519.SignatureSize {
+		return fmt.Errorf("invalid ed25519 signature length: expected %d, got %d", ed25519.SignatureSize, len(data))
+	}
+	R := group.NewPoint()
+	if err := R.UnmarshalBinary(data[:32]); err != nil {
+		return fmt.Errorf("failed to unmarshal R: %w", err)
+	}
+	sBE := make([]byte, 32)
+	for i := 0; i < 32; i++ {
+		sBE[i] = data[63-i]
+	}
+	S := group.NewScalar()
+	if err := S.UnmarshalBinary(sBE); err != nil {
+		return fmt.Errorf("failed to unmarshal S: %w", err)
+	}
+	sig.R, sig.S = R, S
+	return nil
+}
+
+// Verify checks the signature with crypto/ed25519 — the same RFC 8032 verifier
+// Solana and TON use.
+//
+// There is deliberately no second, in-house implementation of the verification
+// equation. An in-house verifier can only ever prove that we agree with
+// ourselves, which is exactly how a signature scheme that is not really Ed25519
+// passes its own tests. Verification is cofactorless: crypto/ed25519 recomputes
+// R' = [S]B - [k]A and compares its encoding to R byte-for-byte, so the equation
+// must hold exactly in the group and not merely up to the cofactor. FROST
+// satisfies that, since R, A and [S]B are all torsion-free by construction.
+func (sig Ed25519Signature) Verify(public curve.Point, message []byte) bool {
+	if public == nil {
+		return false
+	}
+	pub, err := public.MarshalBinary()
+	if err != nil || len(pub) != ed25519.PublicKeySize {
+		return false
+	}
+	raw, err := sig.MarshalBinary()
+	if err != nil {
+		return false
+	}
+	return ed25519.Verify(pub, message, raw)
 }
 
 // SR25519Signature holds an sr25519 (Schnorrkel) compatible signature.

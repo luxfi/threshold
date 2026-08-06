@@ -34,6 +34,12 @@ type round1 struct {
 	// If so, the challenge is computed via Merlin transcripts matching the Substrate/Polkadot
 	// sr25519 scheme. The result is an sr25519 Signature (R || s, 64 bytes).
 	sr25519 bool
+	// ed25519 indicates whether we produce RFC 8032 PureEdDSA signatures.
+	//
+	// If so, the challenge is SHA-512(R ‖ A ‖ M) mod L over the canonical
+	// encodings, and the result is an Ed25519Signature that crypto/ed25519 —
+	// and therefore Solana and TON — accepts.
+	ed25519 bool
 	// signingContext is the application-level context for sr25519 signing.
 	// For Substrate, this is always "substrate".
 	signingContext []byte
@@ -43,6 +49,10 @@ type round1 struct {
 	// is that instead of including the message directly in various hashes,
 	// we include the *hash* of that message instead. This provides the same
 	// security.
+	//
+	// sr25519 and ed25519 are the exceptions: both bind the raw message (for
+	// ed25519 because RFC 8032 PureEdDSA is defined over M itself), so for those
+	// schemes M carries the message rather than a digest of it.
 	M messageHash
 	// Y is the public key we're signing for.
 	Y curve.Point
