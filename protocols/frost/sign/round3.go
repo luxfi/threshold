@@ -143,6 +143,20 @@ func (r *round3) Finalize(chan<- *round.Message) (round.Session, error) {
 		}
 
 		return r.ResultRound(sig), nil
+	} else if r.ed25519 {
+		// R is already the compressed Edwards encoding RFC 8032 wants, and z is
+		// reduced mod L by edwards25519's scalar arithmetic, so it is canonical
+		// and its top three bits are clear. Ed25519Signature owns the one
+		// remaining detail: S goes on the wire little-endian.
+		sig := Ed25519Signature{R: r.R, S: z}
+
+		// Checked against crypto/ed25519 itself, so a signature can only leave
+		// this protocol if the verifier Solana and TON run accepts it.
+		if !sig.Verify(r.Y, r.M) {
+			return r.AbortRound(fmt.Errorf("ed25519 signature failed RFC 8032 verification")), nil
+		}
+
+		return r.ResultRound(sig), nil
 	} else if r.taproot {
 		sig := taproot.Signature(make([]byte, 0, taproot.SignatureLen))
 		sig = append(sig, r.R.(*curve.Secp256k1Point).XBytes()...)

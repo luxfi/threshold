@@ -11,6 +11,25 @@ import (
 var ed25519OrderNat, _ = new(saferith.Nat).SetHex("1000000000000000000000000000000014DEF9DEA2F79CD65812631A5CF5D3ED")
 var ed25519Order = saferith.ModulusFromNat(ed25519OrderNat)
 
+// ed25519LMinusOne is L-1 in the little-endian encoding edwards25519 uses.
+//
+// It exists so we can compute [L]P as [L-1]P + P: edwards25519.Scalar cannot
+// represent L itself, since every scalar is reduced mod L and L ≡ 0. This is the
+// only way to test subgroup membership with reduced-scalar arithmetic.
+// TestEd25519LMinusOne pins the constant by checking [L-1]G + G = O.
+var ed25519LMinusOne = func() *edwards25519.Scalar {
+	s, err := edwards25519.NewScalar().SetCanonicalBytes([]byte{
+		0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58,
+		0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+	})
+	if err != nil {
+		panic("curve: invalid Ed25519 L-1 constant: " + err.Error())
+	}
+	return s
+}()
+
 // Ed25519 implements the Curve interface for the Ed25519 group.
 type Ed25519 struct{}
 
@@ -151,6 +170,20 @@ func (s *Ed25519Scalar) SetNat(x *saferith.Nat) Scalar {
 	return s
 }
 
+// SetUniformBytes sets the scalar to the reduction mod L of a 64-byte
+// little-endian value.
+//
+// This is the wide reduction RFC 8032 §5.1.6 applies to the SHA-512 challenge
+// digest, and is byte-identical to what crypto/ed25519 does when it derives k.
+// It is distinct from SetNat, which takes big-endian input (the curve.Scalar
+// interface's encoding) and reduces a value that is already at most 32 bytes.
+func (s *Ed25519Scalar) SetUniformBytes(b []byte) (*Ed25519Scalar, error) {
+	if _, err := s.value.SetUniformBytes(b); err != nil {
+		return nil, fmt.Errorf("invalid uniform bytes for Ed25519 scalar: %w", err)
+	}
+	return s, nil
+}
+
 func (s *Ed25519Scalar) Act(that Point) Point {
 	other := ed25519CastPoint(that)
 	out := &Ed25519Point{value: new(edwards25519.Point)}
@@ -211,7 +244,26 @@ func (p *Ed25519Point) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("invalid bytes for Ed25519 point: %w", err)
 	}
+	if !p.IsPrimeOrder() {
+		return fmt.Errorf("Ed25519 point is not in the prime-order subgroup")
+	}
 	return nil
+}
+
+// IsPrimeOrder reports whether p lies in the prime-order subgroup, i.e. [L]p = O.
+//
+// Edwards25519 has cofactor 8, so a point that decodes successfully may still
+// carry a torsion component. No honest party can produce one: every point in
+// these protocols is a sum of scalar multiples of the base point. A dishonest
+// party can, and torsion is not merely cosmetic — it makes the Schnorr equation
+// z*G = R + c*Y unsatisfiable, because the left side is always torsion-free.
+// A tainted group key would therefore yield an address that looks valid, accepts
+// deposits, and can never be spent from. Enforcing this on decode is what keeps
+// that unreachable; see UnmarshalBinary, the single point of entry from the wire.
+func (p *Ed25519Point) IsPrimeOrder() bool {
+	lp := new(edwards25519.Point).ScalarMult(ed25519LMinusOne, p.value)
+	lp.Add(lp, p.value)
+	return lp.Equal(edwards25519.NewIdentityPoint()) == 1
 }
 
 func (p *Ed25519Point) Add(that Point) Point {

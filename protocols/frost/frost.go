@@ -14,6 +14,7 @@ type (
 	TaprootConfig    = keygen.TaprootConfig
 	Signature        = sign.Signature
 	SR25519Signature = sign.SR25519Signature
+	Ed25519Signature = sign.Ed25519Signature
 )
 
 // EmptyConfig creates an empty Config with a specific group.
@@ -96,6 +97,21 @@ func RefreshSR25519(config *Config, participants []party.ID) protocol.StartFunc 
 	return keygen.StartKeygenCommon(false, config.Curve(), participants, config.Threshold, config.ID, config.PrivateShare, config.PublicKey, config.VerificationShares.Points)
 }
 
+// KeygenEd25519 initiates the Frost key generation protocol for Ed25519 keys.
+//
+// This generates key shares over edwards25519. The resulting 32-byte public key
+// is a plain RFC 8032 public key: base58-encoded it is a Solana address, and it
+// is the key a TON wallet contract stores. Nothing distinguishes it on chain
+// from a single-signer key, because nothing about it is different — only the way
+// the corresponding secret is held.
+//
+// Signatures are produced by SignEd25519. There is no separate refresh entry
+// point: Refresh already takes the group from the config, so it refreshes an
+// Ed25519 config as it stands.
+func KeygenEd25519(selfID party.ID, participants []party.ID, threshold int) protocol.StartFunc {
+	return keygen.StartKeygenCommon(false, curve.Ed25519{}, participants, threshold, selfID, nil, nil, nil)
+}
+
 // Sign initiates the protocol for producing a threshold signature, with Frost.
 //
 // result is the result of the key generation phase, for this participant.
@@ -161,4 +177,22 @@ func SignSR25519(config *Config, signers []party.ID, signingContext []byte, mess
 		signingContext = []byte("substrate")
 	}
 	return sign.StartSignSR25519Common(false, true, signingContext, config, signers, message)
+}
+
+// SignEd25519 initiates the protocol for producing an RFC 8032 (PureEdDSA)
+// threshold signature.
+//
+// config must come from KeygenEd25519 (or a Refresh of one), i.e. the edwards25519
+// group.
+//
+// message is the raw message bytes. PureEdDSA signs M itself, hashing it inside
+// the challenge, so callers must NOT pre-hash: for Solana pass the serialized
+// transaction message, and for TON pass the 32 bytes of the cell hash to be
+// signed. Pre-hashing here would sign the wrong thing and the chain would reject
+// it — or worse, accept a signature over a digest of a digest.
+//
+// The result is an Ed25519Signature, whose 64-byte encoding crypto/ed25519
+// verifies against the 32-byte public key from keygen.
+func SignEd25519(config *Config, signers []party.ID, message []byte) protocol.StartFunc {
+	return sign.StartSignEd25519Common(config, signers, message)
 }
