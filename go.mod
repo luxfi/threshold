@@ -133,3 +133,12 @@ require (
 // v1.27.7 and v1.27.9). Local replace pins to the workspace
 // checkout so the e2e harness can build against the same node
 // sources that produced the live testnet luxd image.
+
+// v1.12.8 was cut from main, which had removed scheme/bls. That is a breaking
+// change and it went out as a PATCH, so `go get -u` inside the v1.12.x line
+// would take it and break every consumer of that package —
+// luxfi/consensus/protocol/quasar imports it directly. The tag was deleted from
+// the repository within minutes, but proxy.golang.org had already fetched it and
+// the proxy is immutable, so deletion does not unpublish. This is the mechanism
+// that does.
+retract v1.12.8 // Cut from main by mistake; removes scheme/bls, which consensus imports.
