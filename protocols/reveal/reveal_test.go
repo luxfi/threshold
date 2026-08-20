@@ -246,3 +246,84 @@ func TestARootKeyRoundTrips(t *testing.T) {
 		t.Fatal("the root did not survive the round trip")
 	}
 }
+
+// A ciphertext and an answer survive a wire, and open on the other side. This
+// is the property the whole distributed path rests on: the parties that answer
+// are not the process that combines.
+func TestTheWireCarriesBothHalves(t *testing.T) {
+	s := deal(t, 5, 2)
+	want := []byte("the root")
+
+	ct, err := Encrypt(rand.Reader, s.public, want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctBytes, err := ct.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	carried, err := UnmarshalCiphertext(s.group, ctBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var answers []*Answer
+	for _, id := range []party.ID{"a", "b", "c"} {
+		a, err := carried.Answer(rand.Reader, id, s.shares[id])
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := a.MarshalBinary()
+		if err != nil {
+			t.Fatal(err)
+		}
+		back, err := UnmarshalAnswer(s.group, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		answers = append(answers, back)
+	}
+
+	got, err := Open(carried, s.threshold, s.verification, answers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("opened %q, want %q", got, want)
+	}
+}
+
+// An answer decoded under the wrong group is refused, not silently reinterpreted.
+func TestTheWrongGroupDoesNotDecode(t *testing.T) {
+	s := deal(t, 3, 1)
+	ct, err := Encrypt(rand.Reader, s.public, []byte("x"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := ct.Answer(rand.Reader, "a", s.shares["a"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := a.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UnmarshalAnswer(curve.Ed25519{}, b); err == nil {
+		t.Fatal("a secp256k1 answer decoded as ed25519")
+	}
+}
+
+// An answer that names nobody cannot be built into a seat.
+func TestAnAnswerMustNameAParty(t *testing.T) {
+	s := deal(t, 3, 1)
+	ct, _ := Encrypt(rand.Reader, s.public, []byte("x"))
+	a, _ := ct.Answer(rand.Reader, "a", s.shares["a"])
+	a.ID = ""
+	b, err := a.MarshalBinary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UnmarshalAnswer(s.group, b); err == nil {
+		t.Fatal("an answer naming no party decoded")
+	}
+}
