@@ -4,7 +4,7 @@
 **Module:** `github.com/luxfi/threshold/e2e`
 **Cluster:** `do-sfo3-lux-k8s`, namespace `lux-testnet` (networkID=2)
 **luxd image:** `ghcr.io/luxfi/node:v1.28.5` (5 validators, all bootstrapped)
-**Public RPC:** `http://134.199.187.16:9640/ext/bc/C/rpc` (C-Chain ID 0x17870 = 96368)
+**Public RPC:** `http://134.199.187.16:9640/v1/bc/C/rpc` (C-Chain ID 0x17870 = 96368)
 **Host:** Apple M1 Max, 10 cores, Go 1.26.3, darwin/arm64
 
 This is the "does the stack actually work for real money" gate. The harness
