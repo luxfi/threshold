@@ -31,7 +31,7 @@ const (
 	// at the time of harness construction (eth_chainId returned 0x17870
 	// = 96368 and eth_blockNumber returned a non-zero head). Override
 	// at runtime via LUX_TESTNET_RPC.
-	defaultTestnetRPC = "http://134.199.187.16:9640/v1/bc/C/rpc"
+	defaultTestnetRPC = "http://134.199.187.16:9640/v1/chain/C/rpc"
 
 	// testnetChainID is the Lux testnet C-Chain ID (96368).
 	testnetChainID int64 = 96368

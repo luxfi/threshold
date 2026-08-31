@@ -27,7 +27,7 @@ import (
 //
 // Gated on env so a CI box without a node skips cleanly:
 //
-//	LUX_DEVNET_RPC  e.g. http://localhost:8545/v1/bc/C/rpc
+//	LUX_DEVNET_RPC  e.g. http://localhost:8545/v1/chain/C/rpc
 //	LUX_DEVNET_PK   deployer private key (hex, 0x optional), funded on-chain
 func TestSigEthereum_LandsEVMTxOnDevnet(t *testing.T) {
 	rpc := os.Getenv("LUX_DEVNET_RPC")
