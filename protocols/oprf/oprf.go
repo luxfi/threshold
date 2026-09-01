@@ -10,9 +10,26 @@
 //
 // What is shared here is the SYSTEM key k — the authority to answer — and never
 // a user's password or a hash of one. A password is not secret-shared, not
-// reconstructed, and not stored: it is blinded on the device, and what comes
-// back is a key derived from it. A register of these evaluations is not a
-// password database, because there is nothing in it to hammer.
+// reconstructed, and never reaches the committee: it is blinded on the device,
+// and what comes back is a key derived from it. No party can learn it, and no
+// register of these evaluations is a password file to be cracked.
+//
+// TWO THINGS THAT CLAIM DOES NOT COVER, both outside this package and both
+// required of anything built on it:
+//
+// The password IS in memory on the device, in Blind, for as long as the caller
+// holds one. Blind.Zero wipes it; nothing calls Zero for the caller.
+//
+// Online guessing is not addressed here and cannot be. A request carries no
+// account, by construction — the committee cannot see what was asked, so it
+// cannot count attempts against an account, lock one out, or notice that one is
+// under attack. Putting the account in the input (x = uid ‖ pw) is necessary
+// and not sufficient: the committee must ALSO be given an authenticated account
+// label, in the clear, to count against. RFC 9497 §7.2 treats that rate limit
+// as a requirement of the password application rather than an optional wrapper.
+// And with t parties compromised, k is reconstructed and any stored verifier
+// falls to an ordinary offline dictionary attack — the guarantee is that an
+// offline attack costs t compromises, not that it is impossible.
 //
 // Threshold evaluation is Lagrange interpolation in the exponent. With k shared
 // as kᵢ, party i answers a blinded element B with kᵢ·B, and a client holding any
@@ -196,6 +213,22 @@ func Combine(domain []party.ID, answers map[party.ID]curve.Point) (curve.Point, 
 		sum = sum.Add(lambda[id].Act(answer))
 	}
 	return sum, nil
+}
+
+// Zero wipes the password and the blind. A Blind is deliberately reusable —
+// Finalize does not consume it, because one evaluation is often finalized more
+// than once — so nothing can wipe it on the caller's behalf, and the input sits
+// in memory until this is called. It is the caller's last step, not an optional
+// one: everything else in this package is about the password never leaving the
+// device, and this is what bounds how long it stays on it.
+func (b *Blind) Zero() {
+	for i := range b.input {
+		b.input[i] = 0
+	}
+	b.input = nil
+	if b.r != nil {
+		b.r.Set(group.NewScalar())
+	}
 }
 
 // Finalize unblinds the combined answer and derives the output, which is the

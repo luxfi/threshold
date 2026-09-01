@@ -307,3 +307,40 @@ func TestRFC9497VerifiableBlindMatchesItsOwnMode(t *testing.T) {
 		t.Fatal("Request blinded under the verifiable tag; the modes are not separated")
 	}
 }
+
+// The package's claim is that a password never reaches the committee. It does
+// reach memory on the device, and stays there as long as a Blind does, because
+// a Blind is reusable and so nothing can wipe it on the caller's behalf.
+func TestZeroWipesThePasswordAndTheBlind(t *testing.T) {
+	pw := []byte("correct horse battery staple")
+	b, _, err := RequestVerifiable(rand.Reader, pw)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+
+	// Request copies the input, so the caller's slice is not the one held.
+	if &b.input[0] == &pw[0] {
+		t.Fatal("Blind aliases the caller's password rather than copying it")
+	}
+	if !bytes.Equal(b.input, pw) {
+		t.Fatal("Blind does not hold the password it was given")
+	}
+	held := b.input // the same backing array Zero must clear
+
+	b.Zero()
+
+	if bytes.Contains(held, []byte("horse")) {
+		t.Error("the password is still in the buffer the Blind held")
+	}
+	for _, c := range held {
+		if c != 0 {
+			t.Fatalf("the buffer was not wiped: %x", held)
+		}
+	}
+	if !b.r.Equal(group.NewScalar()) {
+		t.Error("the blind scalar survived Zero; with it an answer still unblinds")
+	}
+	if !bytes.Equal(pw, []byte("correct horse battery staple")) {
+		t.Error("Zero reached through into the caller's own slice")
+	}
+}
