@@ -86,3 +86,20 @@ func (Ristretto255) HashToPoint(dst, msg []byte) (Point, error) {
 	}
 	return &Ristretto255Point{value: r255.NewElement().FromUniformBytes(uniform)}, nil
 }
+
+// HashToScalar maps a message to a scalar under a domain separation tag, as
+// RFC 9497 §4.1 does: expand to 64 uniform bytes and reduce them wide.
+//
+// This is NOT FromHash. FromHash truncates the input to the order's byte length
+// and reads it big-endian, which is the SECG/OpenSSL convention for ECDSA and
+// is a different function from this one. A protocol that specifies the wide
+// reduction — every RFC 9497 challenge and composite scalar does — gets a
+// different scalar from FromHash for the same bytes, and would interoperate
+// with nothing.
+func (Ristretto255) HashToScalar(dst, msg []byte) (Scalar, error) {
+	uniform, err := expandXMD(msg, dst, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &Ristretto255Scalar{value: r255.NewScalar().FromUniformBytes(uniform)}, nil
+}
