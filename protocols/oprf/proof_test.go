@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"errors"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -30,21 +31,69 @@ const (
 	vProofRand = "222a5e897cf59db8145db8d16e597e8facb80ae7d4e26d9881aa6f61d645fc0e"
 )
 
-// fixedReader hands out exactly the vector's proof scalar, so the proof this
-// produces is comparable with theirs. A proof is randomised; pinning the
-// randomness is the only way to compare the bytes rather than merely the
-// verdict.
-type fixedReader struct{ b []byte }
+// scalarReader drives sample() to a chosen scalar, so a randomised proof can be
+// compared byte for byte with the RFC's rather than merely accepted.
+//
+// It has to encode the scalar the way sample() will read it, which is not the
+// way the RFC writes it down. sample() reads 64 bytes and calls curve.FromHash,
+// and FromHash keeps only the FIRST 32, reads them BIG-endian, and right-shifts
+// by three because the order is 253 bits. The bytes that yield r are therefore
+// the big-endian encoding of r·8 — not r little-endian, and not a wide reduction
+// over all 64.
+type scalarReader struct{ b []byte }
 
-func (f *fixedReader) Read(p []byte) (int, error) {
-	// sample() asks for 64 bytes and reduces them wide; the vector's scalar is
-	// 32 little-endian bytes, so hand it back in the low half where the wide
-	// reduction leaves it unchanged.
+func (f *scalarReader) Read(p []byte) (int, error) {
 	for i := range p {
 		p[i] = 0
 	}
 	copy(p, f.b)
 	return len(p), nil
+}
+
+// readerFor returns a reader that makes sample() produce the scalar written in
+// RFC order (little-endian) as hexStr.
+func readerFor(t *testing.T, hexStr string) *scalarReader {
+	t.Helper()
+	le := mustHex(t, hexStr)
+	be := make([]byte, len(le))
+	for i := range le {
+		be[i] = le[len(le)-1-i]
+	}
+	r := new(big.Int).SetBytes(be)
+	r.Lsh(r, 3) // undo FromHash's right-shift by three
+	buf := make([]byte, 32)
+	r.FillBytes(buf)
+	return &scalarReader{b: buf}
+}
+
+// The reader is worth its own check: if it did not reproduce the vector's
+// scalar the proof comparison below would be testing two wrong things against
+// each other.
+func TestTheVectorsProofScalarIsWhatSampleReturns(t *testing.T) {
+	got := sample(readerFor(t, vProofRand))
+	if want := scalarFrom(t, vProofRand); !got.Equal(want) {
+		gb, _ := got.MarshalBinary()
+		t.Fatalf("sample did not reproduce the vector's proof scalar: got %x", gb)
+	}
+}
+
+// THE PROVER, not just the verifier. The vector test below feeds the RFC's own
+// proof to Verify, which pins one direction: a Prove that emitted anything at
+// all would go unnoticed. Pinning the randomness makes the other direction
+// comparable, and the bytes must match the RFC's exactly.
+func TestRFC9497VOPRFVectorProver(t *testing.T) {
+	k := scalarFrom(t, vSkSm)
+	p, err := Prove(readerFor(t, vProofRand), k, pointFrom(t, vPkSm),
+		pointFrom(t, vBlinded), pointFrom(t, vEvaluated))
+	if err != nil {
+		t.Fatalf("prove: %v", err)
+	}
+	want := proofFrom(t, vProof)
+	if !p.C.Equal(want.C) || !p.S.Equal(want.S) {
+		cb, _ := p.C.MarshalBinary()
+		sb, _ := p.S.MarshalBinary()
+		t.Fatalf("proof does not match RFC 9497 A.1.2.1\n got c=%x s=%x\nwant %s", cb, sb, vProof)
+	}
 }
 
 func TestRFC9497VOPRFVector(t *testing.T) {
