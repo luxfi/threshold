@@ -264,3 +264,46 @@ func TestAnswerFromOutsideTheCommitteeIsRefused(t *testing.T) {
 		t.Fatal("a share from outside the interpolation domain was accepted")
 	}
 }
+
+// RFC 9497 A.1.2.1 — the VOPRF-mode vector. Its BlindedElement differs from the
+// OPRF-mode one above for the same input and the same blind, because the mode
+// byte is in the domain tag. That difference is the reason the verifiable flow
+// needs its own constructor: an evaluation blinded here and proven under the
+// other tag is neither of the two protocols the RFC defines.
+func TestRFC9497VerifiableBlindMatchesItsOwnMode(t *testing.T) {
+	input := mustHex(t, vInput)
+
+	// The vector pins the map: under the VOPRF tag this input and this blind
+	// give this element.
+	h, err := group.HashToPoint([]byte(vhashToGroupDST), input)
+	if err != nil {
+		t.Fatalf("hash to group: %v", err)
+	}
+	got, err := scalarFrom(t, vBlind).Act(h).MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if want := mustHex(t, vBlinded); !bytes.Equal(got, want) {
+		t.Fatalf("verifiable blinded element\n got %x\nwant %x", got, want)
+	}
+
+	// And RequestVerifiable is the function that uses it. Its own blind is
+	// fresh, so the element is compared against that blind acting on the map
+	// above — which fails if it reached for the plain mode's tag instead.
+	b, el, err := RequestVerifiable(rand.Reader, input)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if want := b.r.Act(h); !el.Equal(want) {
+		t.Fatal("RequestVerifiable did not blind under the verifiable mode's tag")
+	}
+
+	// Request is the other mode and must not agree, or the tag separates nothing.
+	pb, pel, err := Request(rand.Reader, input)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if pel.Equal(pb.r.Act(h)) {
+		t.Fatal("Request blinded under the verifiable tag; the modes are not separated")
+	}
+}

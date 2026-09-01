@@ -57,8 +57,8 @@ const (
 	contextString  = "OPRFV1-\x00-" + suite
 	hashToGroupDST = "HashToGroup-" + contextString
 
-	vcontextString  = "OPRFV1-\x01-" + suite
-	vhashToGroupDST = "HashToGroup-" + vcontextString
+	vcontextString   = "OPRFV1-\x01-" + suite
+	vhashToGroupDST  = "HashToGroup-" + vcontextString
 	vhashToScalarDST = "HashToScalar-" + vcontextString
 	vseedDST         = "Seed-" + vcontextString
 
@@ -104,8 +104,28 @@ type Blind struct {
 // Request blinds an input for evaluation. The returned element is what travels;
 // it is uniform in the group and independent of the input, so a party that sees
 // every request learns nothing about what was asked.
+//
+// This is the PLAIN mode. Pair it with Evaluate and Combine; for the mode whose
+// answers carry a proof, use RequestVerifiable.
 func Request(rand io.Reader, input []byte) (*Blind, curve.Point, error) {
-	h, err := group.HashToPoint([]byte(hashToGroupDST), input)
+	return request(rand, input, hashToGroupDST)
+}
+
+// RequestVerifiable blinds an input for the VERIFIABLE evaluation — the mode
+// EvaluateVerifiable answers and CombineVerified checks.
+//
+// It exists because the mode is in the domain tag. The two modes hash an input
+// to different points, so blinding here and proving there would leave one
+// evaluation carrying two modes: not the protocol the RFC defines, and not one
+// any conformant peer computes the same way. RFC 9497 A.1.2.1 blinds 0x00 to
+// 863f330c… under this tag and A.1.1.1 blinds it to 609a0ae6… under the other,
+// which is the whole difference and is what the vector tests pin.
+func RequestVerifiable(rand io.Reader, input []byte) (*Blind, curve.Point, error) {
+	return request(rand, input, vhashToGroupDST)
+}
+
+func request(rand io.Reader, input []byte, dst string) (*Blind, curve.Point, error) {
+	h, err := group.HashToPoint([]byte(dst), input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("oprf: hash to group: %w", err)
 	}
