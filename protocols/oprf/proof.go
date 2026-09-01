@@ -67,6 +67,17 @@ func Verify(pub, blinded, answer curve.Point, p *Proof) error {
 	if p == nil || p.C == nil || p.S == nil {
 		return ErrProof
 	}
+	// An identity anywhere collapses the relation instead of satisfying it. With
+	// blinded = answer = identity, M and Z are the identity too, so t3 = s·M +
+	// c·Z is the identity for ANY (c,s) and what is left proves knowledge of
+	// dlog(pub) and nothing whatever about the answer. RFC 9497 §2.1 refuses the
+	// identity at deserialization; Evaluate and EvaluateVerifiable refuse it on
+	// the way in, and this is the same refusal for a proof that arrives from
+	// somewhere else, which is the only way Verify is reached with one.
+	if pub == nil || blinded == nil || answer == nil ||
+		pub.IsIdentity() || blinded.IsIdentity() || answer.IsIdentity() {
+		return ErrProof
+	}
 	m, z, err := composites(pub, blinded, answer, nil)
 	if err != nil {
 		return err
@@ -164,6 +175,14 @@ func EvaluateVerifiable(rand io.Reader, k Key, blinded curve.Point) (Answer, err
 	}
 	if k.Public == nil {
 		return Answer{}, fmt.Errorf("oprf: party %q has no public share to prove against", k.Party)
+	}
+	// A share and the commitment to it are carried together so they can be
+	// checked against each other. Unchecked, a Key assembled with a mismatched
+	// Public proves against one value and answers with another, so every proof
+	// it makes is unverifiable — a total outage that presents as "the committee
+	// is lying" rather than as the loading mistake it is.
+	if !k.Share.ActOnBase().Equal(k.Public) {
+		return Answer{}, fmt.Errorf("oprf: party %q: public share is not its own share's commitment", k.Party)
 	}
 	el := k.Share.Act(blinded)
 	p, err := Prove(rand, k.Share, k.Public, blinded, el)

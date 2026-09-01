@@ -290,3 +290,62 @@ func TestASubstitutedCommitteeIsRefusedAlthoughEveryProofIsValid(t *testing.T) {
 	_ = keys
 	_ = pubs
 }
+
+// An identity element does not satisfy the DLEQ relation, it collapses it. With
+// blinded = answer = identity, M and Z are the identity, so t3 = s·M + c·Z is
+// the identity whatever (c,s) are, and the relation degenerates to a Schnorr
+// proof of knowledge of dlog(pub) — which says nothing at all about the answer.
+func TestVerifyRefusesAnIdentityElement(t *testing.T) {
+	k := sample(rand.Reader)
+	pub := k.ActOnBase()
+	id := group.NewPoint() // the identity
+
+	// A proof made over the identity pair, by the honest prover.
+	p, err := Prove(rand.Reader, k, pub, id, id)
+	if err == nil {
+		if err := Verify(pub, id, id, p); err == nil {
+			t.Fatal("a proof over the identity pair verified; it proves nothing about the answer")
+		}
+	}
+
+	// And a real proof is not accepted once either element is replaced by the
+	// identity.
+	_, blinded, err := RequestVerifiable(rand.Reader, []byte("x"))
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	answer := k.Act(blinded)
+	good, err := Prove(rand.Reader, k, pub, blinded, answer)
+	if err != nil {
+		t.Fatalf("prove: %v", err)
+	}
+	if err := Verify(pub, blinded, answer, good); err != nil {
+		t.Fatalf("the honest proof was refused: %v", err)
+	}
+	if err := Verify(pub, id, answer, good); err == nil {
+		t.Error("an identity blinded element was accepted")
+	}
+	if err := Verify(pub, blinded, id, good); err == nil {
+		t.Error("an identity answer was accepted")
+	}
+}
+
+// The share and its commitment travel together in a Key so they can be checked
+// against each other. A mismatch makes every proof this party emits
+// unverifiable, which reads as "the committee is lying" rather than as the key
+// having been assembled wrong.
+func TestAKeyWhosePublicIsNotItsOwnCommitmentIsRefused(t *testing.T) {
+	k := Key{Party: "a", Share: sample(rand.Reader), Public: sample(rand.Reader).ActOnBase()}
+	_, blinded, err := RequestVerifiable(rand.Reader, []byte("x"))
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if _, err := EvaluateVerifiable(rand.Reader, k, blinded); err == nil {
+		t.Fatal("a key whose public share is another share's commitment was used to prove")
+	}
+	// The same share with its own commitment is fine.
+	k.Public = k.Share.ActOnBase()
+	if _, err := EvaluateVerifiable(rand.Reader, k, blinded); err != nil {
+		t.Fatalf("a well-formed key was refused: %v", err)
+	}
+}
