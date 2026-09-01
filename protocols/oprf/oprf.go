@@ -77,6 +77,9 @@ var (
 	// ErrIdentity is returned when a blinded element is the identity, which
 	// carries no information about the input and would evaluate to a constant.
 	ErrIdentity = errors.New("oprf: element is the identity")
+	// ErrWrongKey is returned when the public shares that the proofs verified
+	// against do not interpolate to the key the evaluation was asked for.
+	ErrWrongKey = errors.New("oprf: public shares do not belong to this key")
 )
 
 // Key is one party's share of the committee's key — of the authority to answer,
@@ -148,27 +151,45 @@ func Evaluate(k Key, blinded curve.Point) (curve.Point, error) {
 	return k.Share.Act(blinded), nil
 }
 
-// Combine interpolates t answers back to the single answer the undivided key
-// would have given. The domain is the committee the key was shared over, which
-// the caller must pass because Lagrange coefficients depend on WHICH parties
-// exist, not only on which ones replied.
-func Combine(domain []party.ID, answers map[party.ID]curve.Point) (curve.Point, error) {
-	if len(answers) == 0 {
-		return nil, ErrNoShares
-	}
-	subset := make([]party.ID, 0, len(answers))
-	for id := range answers {
+// coefficients are the interpolation weights for the parties that ANSWERED,
+// which is the only set they may be computed over. A Lagrange coefficient is
+// defined by the points being interpolated through: λᵢ = Π_{j∈S, j≠i} xⱼ/(xⱼ-xᵢ).
+// Computed over all n they reconstruct only when all n answer, which defeats
+// the threshold — and they fail silently, giving a well-formed element that is
+// not k·B.
+//
+// domain is a membership list and nothing more: it says which ids the committee
+// admits, and does not enter the arithmetic.
+func coefficients(domain []party.ID, ids []party.ID) (map[party.ID]curve.Scalar, error) {
+	subset := make([]party.ID, 0, len(ids))
+	for _, id := range ids {
 		if !contains(domain, id) {
 			return nil, fmt.Errorf("%w: %q", ErrUnknownParty, id)
 		}
 		subset = append(subset, id)
 	}
-	// Interpolate over the parties that ANSWERED, not over the whole committee.
-	// A Lagrange coefficient is defined by the set of points being interpolated
-	// through: λᵢ = Π_{j∈S, j≠i} xⱼ/(xⱼ-xᵢ). Coefficients computed over all n
-	// reconstruct only when all n answer, which defeats the threshold — and they
-	// fail silently, giving a well-formed element that is not k·B.
-	lambda := polynomial.Lagrange(group, subset)
+	return polynomial.Lagrange(group, subset), nil
+}
+
+func answered[T any](m map[party.ID]T) []party.ID {
+	ids := make([]party.ID, 0, len(m))
+	for id := range m {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// Combine interpolates t answers back to the single answer the undivided key
+// would have given. domain is the committee the key was shared over, and is
+// used to refuse an id the committee does not admit.
+func Combine(domain []party.ID, answers map[party.ID]curve.Point) (curve.Point, error) {
+	if len(answers) == 0 {
+		return nil, ErrNoShares
+	}
+	lambda, err := coefficients(domain, answered(answers))
+	if err != nil {
+		return nil, err
+	}
 
 	sum := group.NewPoint()
 	for id, answer := range answers {

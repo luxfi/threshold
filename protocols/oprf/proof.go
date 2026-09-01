@@ -181,14 +181,26 @@ func EvaluateVerifiable(rand io.Reader, k Key, blinded curve.Point) (Answer, err
 // That distinction is the whole reason this exists: "your password is wrong"
 // and "one of the five machines lied to you" are different facts, and a scheme
 // that cannot separate them makes the second one look like the first forever.
+// key is the group public key K = k·G, the one value that says WHICH key this
+// evaluation is under. Each proof binds an answer to the share it was made
+// with, and nothing in a proof says that share belongs to K — so a client given
+// a substituted set of public shares checks every proof against the substituted
+// set, finds them all valid, and derives an output under a key someone else
+// chose. The shares must therefore be tied back to K, which they are by the
+// same interpolation the answers get: Σᵢ λᵢ·pubᵢ over the parties that replied
+// is k·G exactly when those shares are shares of k.
 func CombineVerified(
 	domain []party.ID,
 	publics map[party.ID]curve.Point,
+	key curve.Point,
 	blinded curve.Point,
 	answers map[party.ID]Answer,
 ) (curve.Point, error) {
 	if len(answers) == 0 {
 		return nil, ErrNoShares
+	}
+	if key == nil || key.IsIdentity() {
+		return nil, fmt.Errorf("%w: no key to check them against", ErrWrongKey)
 	}
 	elements := make(map[party.ID]curve.Point, len(answers))
 	for id, a := range answers {
@@ -200,6 +212,20 @@ func CombineVerified(
 			return nil, fmt.Errorf("oprf: party %q: %w", id, err)
 		}
 		elements[id] = a.Element
+	}
+
+	// The same weights the answers are interpolated with, over the same parties,
+	// so the check cannot pass for a set the combination would treat otherwise.
+	lambda, err := coefficients(domain, answered(answers))
+	if err != nil {
+		return nil, err
+	}
+	sum := group.NewPoint()
+	for id := range answers {
+		sum = sum.Add(lambda[id].Act(publics[id]))
+	}
+	if !sum.Equal(key) {
+		return nil, ErrWrongKey
 	}
 	return Combine(domain, elements)
 }
