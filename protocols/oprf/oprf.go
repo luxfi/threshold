@@ -20,12 +20,14 @@
 // parties produced it, so the committee can change between evaluations as long
 // as the key does not.
 //
-// LIMIT, stated because it is invisible from the outside: this is the OPRF mode
-// of RFC 9497, not the verifiable (VOPRF) mode. A party that returns a wrong
-// element is not detected — the client simply derives the wrong key, which it
-// cannot tell from having been given the wrong password. Detecting it needs a
-// per-evaluation DLEQ proof, which this does not carry. Do not use Combine's
-// success as evidence that the parties behaved.
+// TWO MODES, AND THE DIFFERENCE MATTERS. Evaluate/Combine are RFC 9497's plain
+// OPRF: a party that returns a wrong element is NOT detected, and the client
+// derives a wrong key it cannot tell from having been given the wrong password.
+// Combine's success is not evidence that the parties behaved.
+//
+// EvaluateVerifiable/CombineVerified (proof.go) carry a per-evaluation DLEQ
+// proof, so a wrong element is refused by name. Use those wherever the
+// committee is not uniformly trusted — which, for a committee, is the point.
 package oprf
 
 import (
@@ -44,11 +46,21 @@ import (
 // mode 0x00 for OPRF, and every domain tag hangs off it, so a deployment of a
 // different mode or suite cannot be confused with this one.
 const (
-	suite         = "ristretto255-SHA512"
-	modeOPRF      = 0x00
-	contextString = "OPRFV1-\x00-" + suite
+	suite    = "ristretto255-SHA512"
+	modeOPRF = 0x00
+	// modeVOPRF is the VERIFIABLE mode. It is a different byte in the context
+	// string, so every domain tag below differs from the plain mode's — an
+	// evaluation in one mode can never be replayed as the other, which is the
+	// point of the mode being in the string at all.
+	modeVOPRF = 0x01
 
+	contextString  = "OPRFV1-\x00-" + suite
 	hashToGroupDST = "HashToGroup-" + contextString
+
+	vcontextString  = "OPRFV1-\x01-" + suite
+	vhashToGroupDST = "HashToGroup-" + vcontextString
+	vhashToScalarDST = "HashToScalar-" + vcontextString
+	vseedDST         = "Seed-" + vcontextString
 
 	// Elements are 32 bytes in this group; the length prefixes below are fixed
 	// by that and by the input, not by anything a caller chooses.
@@ -74,6 +86,11 @@ var (
 type Key struct {
 	Party party.ID
 	Share curve.Scalar
+	// Public is this share on the generator, kᵢ·G. It is what a client checks a
+	// proof against, so it is public by construction and carrying it here keeps
+	// the pair together — a share whose commitment lives somewhere else is a
+	// share nobody can be held to.
+	Public curve.Point
 }
 
 // Blind is what a client keeps between sending a request and reading the

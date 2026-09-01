@@ -1,0 +1,231 @@
+package oprf
+
+import (
+	"bytes"
+	"crypto/rand"
+	"strings"
+	"testing"
+
+	"github.com/luxfi/threshold/pkg/math/curve"
+	"github.com/luxfi/threshold/pkg/math/polynomial"
+	"github.com/luxfi/threshold/pkg/party"
+)
+
+// RFC 9497 A.1.2.1 — the first VOPRF vector for ristretto255-SHA512.
+//
+// This decides whether the proof is the one the RFC defines rather than a
+// self-consistent one of my own. It pins the transcript byte-for-byte: the
+// element ORDER, the length prefixes, the two domain tags, and the mode byte
+// that separates this from the plain evaluation. A proof that verifies against
+// itself and disagrees here interoperates with nothing.
+const (
+	vSkSm       = "e6f73f344b79b379f1a0dd37e07ff62e38d9f71345ce62ae3a9bc60b04ccd909"
+	vPkSm       = "c803e2cc6b05fc15064549b5920659ca4a77b2cca6f04f6b357009335476ad4e"
+	vInput      = "00"
+	vBlind      = "64d37aed22a27f5191de1c1d69fadb899d8862b58eb4220029e036ec4c1f6706"
+	vBlinded    = "863f330cc1a1259ed5a5998a23acfd37fb4351a793a5b3c090b642ddc439b945"
+	vEvaluated  = "aa8fa048764d5623868679402ff6108d2521884fa138cd7f9c7669a9a014267e"
+	vProof      = "ddef93772692e535d1a53903db24367355cc2cc78de93b3be5a8ffcc6985dd066d4346421d17bf5117a2a1ff0fcb2a759f58a539dfbe857a40bce4cf49ec600d"
+	vProofRand  = "222a5e897cf59db8145db8d16e597e8facb80ae7d4e26d9881aa6f61d645fc0e"
+)
+
+// fixedReader hands out exactly the vector's proof scalar, so the proof this
+// produces is comparable with theirs. A proof is randomised; pinning the
+// randomness is the only way to compare the bytes rather than merely the
+// verdict.
+type fixedReader struct{ b []byte }
+
+func (f *fixedReader) Read(p []byte) (int, error) {
+	// sample() asks for 64 bytes and reduces them wide; the vector's scalar is
+	// 32 little-endian bytes, so hand it back in the low half where the wide
+	// reduction leaves it unchanged.
+	for i := range p {
+		p[i] = 0
+	}
+	copy(p, f.b)
+	return len(p), nil
+}
+
+func TestRFC9497VOPRFVector(t *testing.T) {
+	blinded := pointFrom(t, vBlinded)
+	evaluated := pointFrom(t, vEvaluated)
+	k := scalarFrom(t, vSkSm)
+	pub := pointFrom(t, vPkSm)
+
+	// The public key is the key on the generator — checked, because everything
+	// below is a statement relating the two and a mismatch would make the whole
+	// test vacuous.
+	if got := k.ActOnBase(); !got.Equal(pub) {
+		gb, _ := got.MarshalBinary()
+		t.Fatalf("skSm·G != pkSm\n got %x\nwant %s", gb, vPkSm)
+	}
+
+	// The evaluation itself.
+	if got := EvaluateWhole(k, blinded); !got.Equal(evaluated) {
+		gb, _ := got.MarshalBinary()
+		t.Fatalf("evaluated element\n got %x\nwant %s", gb, vEvaluated)
+	}
+
+	// And the proof over it must verify.
+	p := proofFrom(t, vProof)
+	if err := Verify(pub, blinded, evaluated, p); err != nil {
+		t.Fatalf("the RFC's own proof did not verify: %v", err)
+	}
+}
+
+// A proof over a DIFFERENT answer must not verify. Without this the test above
+// would pass against a Verify that returned nil unconditionally.
+func TestAProofDoesNotCoverAnotherAnswer(t *testing.T) {
+	blinded := pointFrom(t, vBlinded)
+	pub := pointFrom(t, vPkSm)
+	p := proofFrom(t, vProof)
+
+	// Someone else's key applied to the same blinded element: a well-formed
+	// group element, and not the one the proof is about.
+	other := sample(rand.Reader).Act(blinded)
+	if err := Verify(pub, blinded, other, p); err == nil {
+		t.Fatal("a proof verified against an answer it was not made for")
+	}
+}
+
+// Round trip with our own prover, which is what a party actually runs.
+func TestProveAndVerifyRoundTrip(t *testing.T) {
+	k := sample(rand.Reader)
+	pub := k.ActOnBase()
+
+	_, blinded, err := Request(rand.Reader, []byte("correct horse battery staple"))
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	answer := EvaluateWhole(k, blinded)
+
+	p, err := Prove(rand.Reader, k, pub, blinded, answer)
+	if err != nil {
+		t.Fatalf("prove: %v", err)
+	}
+	if err := Verify(pub, blinded, answer, p); err != nil {
+		t.Fatalf("our own proof did not verify: %v", err)
+	}
+
+	// A proof made for one party must not verify against another's key — that
+	// is what stops a committee member replaying a neighbour's answer as its own.
+	otherPub := sample(rand.Reader).ActOnBase()
+	if err := Verify(otherPub, blinded, answer, p); err == nil {
+		t.Fatal("a proof verified against a different party's public key")
+	}
+}
+
+func proofFrom(t *testing.T, hexStr string) *Proof {
+	t.Helper()
+	raw := mustHex(t, hexStr)
+	if len(raw) != 64 {
+		t.Fatalf("proof is %d bytes, want 64", len(raw))
+	}
+	return &Proof{C: scalarFromBytes(t, raw[:32]), S: scalarFromBytes(t, raw[32:])}
+}
+
+func scalarFromBytes(t *testing.T, le []byte) curve.Scalar {
+	t.Helper()
+	be := make([]byte, len(le))
+	for i := range le {
+		be[i] = le[len(le)-1-i]
+	}
+	s := group.NewScalar()
+	if err := s.UnmarshalBinary(be); err != nil {
+		t.Fatalf("scalar %x: %v", le, err)
+	}
+	return s
+}
+
+
+// shareVerifiable splits k and gives each party its commitment alongside it.
+func shareVerifiable(t *testing.T, k curve.Scalar, domain []party.ID, degree int) (map[party.ID]Key, map[party.ID]curve.Point) {
+	t.Helper()
+	poly := polynomial.NewPolynomial(group, degree, k)
+	keys := make(map[party.ID]Key, len(domain))
+	pubs := make(map[party.ID]curve.Point, len(domain))
+	for _, id := range domain {
+		sh := poly.Evaluate(id.Scalar(group))
+		keys[id] = Key{Party: id, Share: sh, Public: sh.ActOnBase()}
+		pubs[id] = keys[id].Public
+	}
+	return keys, pubs
+}
+
+// THE POINT OF THE VERIFIABLE MODE: a party that returns a wrong element is
+// refused BY NAME, where the plain path folds it in and yields a key that is
+// merely wrong — which, to the person typing, looks exactly like a wrong
+// password. Those are different facts and a committee has to be able to say
+// which one happened.
+func TestALyingPartyIsNamedRatherThanFoldedIn(t *testing.T) {
+	domain := []party.ID{"a", "b", "c", "d", "e"}
+	const degree = 2 // t = 3
+
+	k := sample(rand.Reader)
+	keys, pubs := shareVerifiable(t, k, domain, degree)
+
+	blind, blinded, err := Request(rand.Reader, []byte("hunter2"))
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	want, err := blind.Finalize(EvaluateWhole(k, blinded))
+	if err != nil {
+		t.Fatalf("finalize whole: %v", err)
+	}
+
+	honest := func(ids ...party.ID) map[party.ID]Answer {
+		out := make(map[party.ID]Answer, len(ids))
+		for _, id := range ids {
+			a, err := EvaluateVerifiable(rand.Reader, keys[id], blinded)
+			if err != nil {
+				t.Fatalf("evaluate %s: %v", id, err)
+			}
+			out[id] = a
+		}
+		return out
+	}
+
+	// An honest quorum verifies and reproduces the undivided key's answer.
+	answers := honest("a", "b", "c")
+	combined, err := CombineVerified(domain, pubs, blinded, answers)
+	if err != nil {
+		t.Fatalf("honest quorum refused: %v", err)
+	}
+	got, err := blind.Finalize(combined)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("an honest verified quorum disagreed with the undivided key")
+	}
+
+	// Now c lies: a well-formed element, just not its own share applied.
+	lying := honest("a", "b", "c")
+	lying["c"] = Answer{Element: sample(rand.Reader).Act(blinded), Proof: lying["c"].Proof}
+
+	_, err = CombineVerified(domain, pubs, blinded, lying)
+	if err == nil {
+		t.Fatal("a wrong element was folded in; the client would have derived a wrong key and blamed the password")
+	}
+	if !strings.Contains(err.Error(), "\"c\"") {
+		t.Errorf("the refusal does not name the party that lied: %v", err)
+	}
+
+	// And the plain path, for contrast, accepts it silently and yields a key
+	// that is simply wrong — which is the failure this mode exists to end.
+	plain := map[party.ID]curve.Point{}
+	for id, a := range lying {
+		plain[id] = a.Element
+	}
+	bad, err := Combine(domain, plain)
+	if err != nil {
+		t.Fatalf("plain combine: %v", err)
+	}
+	badKey, err := blind.Finalize(bad)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	if bytes.Equal(badKey, want) {
+		t.Fatal("the lie produced the right key, so this test proves nothing")
+	}
+}
