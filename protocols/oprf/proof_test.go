@@ -3,6 +3,7 @@ package oprf
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"strings"
 	"testing"
 
@@ -19,14 +20,14 @@ import (
 // that separates this from the plain evaluation. A proof that verifies against
 // itself and disagrees here interoperates with nothing.
 const (
-	vSkSm       = "e6f73f344b79b379f1a0dd37e07ff62e38d9f71345ce62ae3a9bc60b04ccd909"
-	vPkSm       = "c803e2cc6b05fc15064549b5920659ca4a77b2cca6f04f6b357009335476ad4e"
-	vInput      = "00"
-	vBlind      = "64d37aed22a27f5191de1c1d69fadb899d8862b58eb4220029e036ec4c1f6706"
-	vBlinded    = "863f330cc1a1259ed5a5998a23acfd37fb4351a793a5b3c090b642ddc439b945"
-	vEvaluated  = "aa8fa048764d5623868679402ff6108d2521884fa138cd7f9c7669a9a014267e"
-	vProof      = "ddef93772692e535d1a53903db24367355cc2cc78de93b3be5a8ffcc6985dd066d4346421d17bf5117a2a1ff0fcb2a759f58a539dfbe857a40bce4cf49ec600d"
-	vProofRand  = "222a5e897cf59db8145db8d16e597e8facb80ae7d4e26d9881aa6f61d645fc0e"
+	vSkSm      = "e6f73f344b79b379f1a0dd37e07ff62e38d9f71345ce62ae3a9bc60b04ccd909"
+	vPkSm      = "c803e2cc6b05fc15064549b5920659ca4a77b2cca6f04f6b357009335476ad4e"
+	vInput     = "00"
+	vBlind     = "64d37aed22a27f5191de1c1d69fadb899d8862b58eb4220029e036ec4c1f6706"
+	vBlinded   = "863f330cc1a1259ed5a5998a23acfd37fb4351a793a5b3c090b642ddc439b945"
+	vEvaluated = "aa8fa048764d5623868679402ff6108d2521884fa138cd7f9c7669a9a014267e"
+	vProof     = "ddef93772692e535d1a53903db24367355cc2cc78de93b3be5a8ffcc6985dd066d4346421d17bf5117a2a1ff0fcb2a759f58a539dfbe857a40bce4cf49ec600d"
+	vProofRand = "222a5e897cf59db8145db8d16e597e8facb80ae7d4e26d9881aa6f61d645fc0e"
 )
 
 // fixedReader hands out exactly the vector's proof scalar, so the proof this
@@ -137,7 +138,6 @@ func scalarFromBytes(t *testing.T, le []byte) curve.Scalar {
 	return s
 }
 
-
 // shareVerifiable splits k and gives each party its commitment alongside it.
 func shareVerifiable(t *testing.T, k curve.Scalar, domain []party.ID, degree int) (map[party.ID]Key, map[party.ID]curve.Point) {
 	t.Helper()
@@ -187,7 +187,7 @@ func TestALyingPartyIsNamedRatherThanFoldedIn(t *testing.T) {
 
 	// An honest quorum verifies and reproduces the undivided key's answer.
 	answers := honest("a", "b", "c")
-	combined, err := CombineVerified(domain, pubs, blinded, answers)
+	combined, err := CombineVerified(domain, pubs, k.ActOnBase(), blinded, answers)
 	if err != nil {
 		t.Fatalf("honest quorum refused: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestALyingPartyIsNamedRatherThanFoldedIn(t *testing.T) {
 	lying := honest("a", "b", "c")
 	lying["c"] = Answer{Element: sample(rand.Reader).Act(blinded), Proof: lying["c"].Proof}
 
-	_, err = CombineVerified(domain, pubs, blinded, lying)
+	_, err = CombineVerified(domain, pubs, k.ActOnBase(), blinded, lying)
 	if err == nil {
 		t.Fatal("a wrong element was folded in; the client would have derived a wrong key and blamed the password")
 	}
@@ -228,4 +228,65 @@ func TestALyingPartyIsNamedRatherThanFoldedIn(t *testing.T) {
 	if bytes.Equal(badKey, want) {
 		t.Fatal("the lie produced the right key, so this test proves nothing")
 	}
+}
+
+// A PROOF SAYS "THIS ANSWER IS MADE WITH THAT SHARE". It does not say the share
+// belongs to the key the client came to evaluate under, and until the shares
+// are tied back to K nothing does: a client handed a substituted committee
+// checks every proof against the substituted shares, finds them all valid, and
+// derives its output under a key someone else chose. With a password behind the
+// input that is the whole game — the attacker learns F(k',pw) for a k' it knows.
+func TestASubstitutedCommitteeIsRefusedAlthoughEveryProofIsValid(t *testing.T) {
+	domain := []party.ID{"a", "b", "c", "d", "e"}
+	k := sample(rand.Reader)
+	const degree = 2 // t = 3, matching the three parties that answer below
+	keys, pubs := shareVerifiable(t, k, domain, degree)
+
+	// A second, entirely honest committee over a DIFFERENT key. Every party in
+	// it answers correctly and proves it correctly.
+	other := sample(rand.Reader)
+	otherKeys, otherPubs := shareVerifiable(t, other, domain, degree)
+
+	blind, blinded, err := RequestVerifiable(rand.Reader, []byte("hunter2"))
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+
+	answers := make(map[party.ID]Answer, 3)
+	for _, id := range []party.ID{"a", "b", "c"} {
+		a, err := EvaluateVerifiable(rand.Reader, otherKeys[id], blinded)
+		if err != nil {
+			t.Fatalf("evaluate %s: %v", id, err)
+		}
+		answers[id] = a
+		// Each proof is valid against the substituted share it was made with.
+		if err := Verify(otherPubs[id], blinded, a.Element, a.Proof); err != nil {
+			t.Fatalf("the substituted committee's own proof does not verify: %v", err)
+		}
+	}
+
+	// Asked for K, given k'. Every proof checks out and the answer is still wrong.
+	if _, err := CombineVerified(domain, otherPubs, k.ActOnBase(), blinded, answers); !errors.Is(err, ErrWrongKey) {
+		t.Fatalf("a substituted committee was accepted for another key: %v", err)
+	}
+
+	// The same committee asked for its own key is fine — the check refuses a
+	// substitution, not a committee.
+	combined, err := CombineVerified(domain, otherPubs, other.ActOnBase(), blinded, answers)
+	if err != nil {
+		t.Fatalf("the committee was refused for its own key: %v", err)
+	}
+	got, err := blind.Finalize(combined)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	want, err := blind.Finalize(EvaluateWhole(other, blinded))
+	if err != nil {
+		t.Fatalf("finalize whole: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("the accepted quorum disagreed with its own undivided key")
+	}
+	_ = keys
+	_ = pubs
 }
