@@ -79,9 +79,8 @@ const (
 	vhashToScalarDST = "HashToScalar-" + vcontextString
 	vseedDST         = "Seed-" + vcontextString
 
-	// Elements are 32 bytes in this group; the length prefixes below are fixed
-	// by that and by the input, not by anything a caller chooses.
-	elementSize = 32
+	// A scalar is 32 bytes in this group.
+	scalarSize = 32
 )
 
 var group = curve.Ristretto255{}
@@ -94,6 +93,10 @@ var (
 	// ErrIdentity is returned when a blinded element is the identity, which
 	// carries no information about the input and would evaluate to a constant.
 	ErrIdentity = errors.New("oprf: element is the identity")
+	// ErrInput is returned for an input longer than its two-byte length prefix
+	// can state. Every value the transcript hashes carries one, and the input is
+	// the only one whose length a caller chooses.
+	ErrInput = errors.New("oprf: input longer than its length prefix can state")
 	// ErrWrongKey is returned when the public shares that the proofs verified
 	// against do not interpolate to the key the evaluation was asked for.
 	ErrWrongKey = errors.New("oprf: public shares do not belong to this key")
@@ -145,6 +148,12 @@ func RequestVerifiable(rand io.Reader, input []byte) (*Blind, curve.Point, error
 }
 
 func request(rand io.Reader, input []byte, dst string) (*Blind, curve.Point, error) {
+	// Bounded here, once, rather than at each prefix: the input is the only
+	// value the transcript hashes whose length a caller chooses, and a Blind
+	// keeps a copy of exactly this, so Finalize's prefixes are in range too.
+	if len(input) > 1<<16-1 {
+		return nil, nil, ErrInput
+	}
 	h, err := group.HashToPoint([]byte(dst), input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("oprf: hash to group: %w", err)

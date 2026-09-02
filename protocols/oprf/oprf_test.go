@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"testing"
 
 	"github.com/luxfi/threshold/pkg/math/curve"
@@ -342,5 +343,23 @@ func TestZeroWipesThePasswordAndTheBlind(t *testing.T) {
 	}
 	if !bytes.Equal(pw, []byte("correct horse battery staple")) {
 		t.Error("Zero reached through into the caller's own slice")
+	}
+}
+
+// Every value in the transcript carries a two-byte length. All but one are
+// fixed by the group — a seed, an element — and the input is the exception: it
+// is whatever the caller passed. Past 65535 bytes the prefix cannot state its
+// length, and I2OSP, which is what RFC 9497 hashes there, is undefined. The
+// input is bounded where it enters rather than at each of the four prefixes.
+func TestRequestRefusesAnInputTooLongForItsPrefix(t *testing.T) {
+	if _, _, err := Request(rand.Reader, make([]byte, 1<<16)); !errors.Is(err, ErrInput) {
+		t.Errorf("a 65536-byte input was accepted: %v", err)
+	}
+	if _, _, err := RequestVerifiable(rand.Reader, make([]byte, 1<<16)); !errors.Is(err, ErrInput) {
+		t.Errorf("a 65536-byte input was accepted in the verifiable mode: %v", err)
+	}
+	// The longest input the prefix can state is still an input.
+	if _, _, err := Request(rand.Reader, make([]byte, 1<<16-1)); err != nil {
+		t.Errorf("a 65535-byte input was refused: %v", err)
 	}
 }

@@ -41,6 +41,57 @@ type Proof struct {
 	S curve.Scalar
 }
 
+// A proof on the wire is two scalars, RFC 9497 §2.2.1's Serialize(c) ‖
+// Serialize(s).
+const proofSize = 2 * scalarSize
+
+// MarshalBinary writes the proof the way RFC 9497 §2.2.1 does: c then s, each
+// in ristretto255's own little-endian scalar encoding. Scalar.MarshalBinary is
+// big-endian, the order the rest of this module reads, so each half is turned
+// around here. This is the only form that travels.
+func (p *Proof) MarshalBinary() ([]byte, error) {
+	if p == nil || p.C == nil || p.S == nil {
+		return nil, ErrProof
+	}
+	out := make([]byte, 0, proofSize)
+	for _, s := range []curve.Scalar{p.C, p.S} {
+		b, err := s.MarshalBinary()
+		if err != nil {
+			return nil, fmt.Errorf("oprf: serialize proof scalar: %w", err)
+		}
+		out = append(out, reverse(b)...)
+	}
+	return out, nil
+}
+
+// UnmarshalBinary reads a proof in that same form. A scalar outside the group
+// order is refused by the scalar codec, so a proof that decodes is two scalars.
+func (p *Proof) UnmarshalBinary(data []byte) error {
+	if len(data) != proofSize {
+		return fmt.Errorf("oprf: proof is %d bytes, want %d", len(data), proofSize)
+	}
+	c, s := group.NewScalar(), group.NewScalar()
+	if err := c.UnmarshalBinary(reverse(data[:scalarSize])); err != nil {
+		return fmt.Errorf("oprf: proof challenge: %w", err)
+	}
+	if err := s.UnmarshalBinary(reverse(data[scalarSize:])); err != nil {
+		return fmt.Errorf("oprf: proof response: %w", err)
+	}
+	p.C, p.S = c, s
+	return nil
+}
+
+// reverse returns b back to front. It is the whole difference between the
+// scalar encoding this module reads, which is big-endian, and the one RFC 9497
+// writes, which is ristretto255's little-endian.
+func reverse(b []byte) []byte {
+	out := make([]byte, len(b))
+	for i, x := range b {
+		out[len(b)-1-i] = x
+	}
+	return out
+}
+
 // Prove shows that `answer` is `k` applied to `blinded`, against the public key
 // `pub` = k·G. rand supplies the proof's own blinding scalar.
 func Prove(rand io.Reader, k curve.Scalar, pub, blinded, answer curve.Point) (*Proof, error) {

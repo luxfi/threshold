@@ -398,3 +398,48 @@ func TestAKeyWhosePublicIsNotItsOwnCommitmentIsRefused(t *testing.T) {
 		t.Fatalf("a well-formed key was refused: %v", err)
 	}
 }
+
+// THE WIRE FORM. RFC 9497 §2.2.1 serializes a proof as c ‖ s, each scalar in
+// the group's own encoding, which for ristretto255 is little-endian. This
+// repo's Scalar codec is big-endian — the SECG order the rest of the module
+// reads — so a proof written through it is byte-reversed in each half and no
+// conformant peer can read it or be read. A.1.2.1's proof pins the order.
+func TestProofCodecIsRFCOrder(t *testing.T) {
+	want := mustHex(t, vProof)
+
+	p, err := Prove(readerFor(t, vProofRand), scalarFrom(t, vSkSm), pointFrom(t, vPkSm),
+		pointFrom(t, vBlinded), pointFrom(t, vEvaluated))
+	if err != nil {
+		t.Fatalf("prove: %v", err)
+	}
+	got, err := p.MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("proof bytes are not RFC 9497 A.1.2.1's\n got %x\nwant %s", got, vProof)
+	}
+
+	// And the other direction: the RFC's own bytes must read back as the proof
+	// they encode, which is only true if c and s are recovered in that order and
+	// in that endianness.
+	var back Proof
+	if err := back.UnmarshalBinary(want); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if err := Verify(pointFrom(t, vPkSm), pointFrom(t, vBlinded), pointFrom(t, vEvaluated), &back); err != nil {
+		t.Fatalf("the RFC's proof did not verify after a round trip through the codec: %v", err)
+	}
+}
+
+// A proof that is not two scalars is not a proof. Reading a short buffer as one
+// would leave a Proof whose halves are whatever followed it in memory.
+func TestProofCodecRefusesTheWrongLength(t *testing.T) {
+	raw := mustHex(t, vProof)
+	for _, b := range [][]byte{nil, raw[:63], append(append([]byte{}, raw...), 0)} {
+		var p Proof
+		if err := p.UnmarshalBinary(b); err == nil {
+			t.Errorf("a %d-byte buffer was read as a proof", len(b))
+		}
+	}
+}
