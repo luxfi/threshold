@@ -34,27 +34,17 @@ func (sig *SchnorrSignature) Verify(publicKey curve.Point, messageHash []byte) b
 	group := sig.R.Curve()
 
 	// Recompute challenge: c = H(R || Y || m)
-	rBytes, err := sig.R.MarshalBinary()
+	c, err := challenge(group, sig.R, publicKey, messageHash)
 	if err != nil {
 		return false
 	}
-	yBytes, err := publicKey.MarshalBinary()
-	if err != nil {
-		return false
-	}
-
-	challengeInput := make([]byte, 0, len(rBytes)+len(yBytes)+len(messageHash))
-	challengeInput = append(challengeInput, rBytes...)
-	challengeInput = append(challengeInput, yBytes...)
-	challengeInput = append(challengeInput, messageHash...)
-	challenge := curve.FromHash(group, challengeInput)
 
 	// Verify: z*G == R + c*Y
 	// Left side: z*G
 	left := sig.Z.ActOnBase()
 
 	// Right side: R + c*Y
-	cY := challenge.Act(publicKey)
+	cY := c.Act(publicKey)
 	right := sig.R.Add(cY)
 
 	return left.Equal(right)

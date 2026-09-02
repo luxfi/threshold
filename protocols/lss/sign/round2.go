@@ -106,22 +106,10 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	}
 
 	// Compute Schnorr challenge: c = H(R || Y || m)
-	// Using curve.FromHash for proper domain separation
-	rBytes, err := r.R.MarshalBinary()
+	c, err := challenge(r.Group(), r.R, publicKey, r.messageHash)
 	if err != nil {
 		return nil, err
 	}
-	yBytes, err := publicKey.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	// Concatenate R || Y || m for challenge hash
-	challengeInput := make([]byte, 0, len(rBytes)+len(yBytes)+len(r.messageHash))
-	challengeInput = append(challengeInput, rBytes...)
-	challengeInput = append(challengeInput, yBytes...)
-	challengeInput = append(challengeInput, r.messageHash...)
-	challenge := curve.FromHash(r.Group(), challengeInput)
 
 	// Compute Lagrange coefficient for our ID
 	lagrangeCoeff := polynomial.Lagrange(r.Group(), r.signers)[r.SelfID()]
@@ -130,7 +118,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	// where c is the challenge, λ_i is the Lagrange coefficient, x_i is our secret share
 	// When aggregated: z = sum(z_i) = sum(k_i) + c * sum(λ_i * x_i) = k + c * x
 	partialSig := r.Group().NewScalar()
-	partialSig = partialSig.Set(challenge)      // c
+	partialSig = partialSig.Set(c)              // c
 	partialSig = partialSig.Mul(lagrangeCoeff)  // c * λ_i
 	partialSig = partialSig.Mul(r.config.ECDSA) // c * λ_i * x_i
 	partialSig = partialSig.Add(r.k)            // k_i + c * λ_i * x_i
@@ -162,7 +150,7 @@ func (r *round2) Finalize(out chan<- *round.Message) (round.Session, error) {
 	return &round3{
 		round2:      r,
 		partialSigs: partialSigs,
-		challenge:   challenge,
+		challenge:   c,
 	}, nil
 }
 
