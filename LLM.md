@@ -60,6 +60,22 @@ This fork uses different field naming from upstream `taurusgroup/multi-party-sig
 
 When merging upstream, adapt their code to our conventions.
 
+### Scalars from bytes
+
+`curve.FromHash` is ECDSA's bits2int: it truncates its input to the group
+order's byte length, reads it big-endian, and right-shifts the excess bits.
+It does not hash. Feed it a message digest and nothing else — a
+concatenation loses everything past the first 32 bytes.
+
+A Fiat-Shamir challenge is built the other way, which is the module's one
+way: `hash.New()`, `WriteAny(...)` for each piece, then
+`sample.Scalar(h.Digest(), group)`.
+
+RFC 9497 and ristretto255 encode a scalar little-endian; `Ristretto255Scalar`
+marshals big-endian, the order the rest of the module reads. Anything that
+crosses a wire to a conformant peer reverses each scalar (see
+`protocols/oprf.Proof`).
+
 ### Security Parameters
 
 Key constants in `internal/params/params.go`:
@@ -165,6 +181,33 @@ go test -race ./... -timeout 180s
 ```
 
 Note: `pkg/protocol` has a known flaky test (`TestHandler_WaitForResultTimeout`) unrelated to core functionality.
+
+## LSS resharing does not complete, and had never been run
+
+Measured 2026-09-02. Every round in `protocols/lss/reshare` sits at **0%
+coverage**: its five tests build a session and assert it is non-nil, so no
+`Finalize`, `VerifyMessage` or `StoreMessage` had ever executed. Driven
+end-to-end over three parties with a real Shamir sharing
+(`internal/test.SharedLSSConfigs`) through `test.RunProtocol`, the run fails
+immediately — not on the timeout — with every party reporting `context
+canceled`, at both `newThreshold` 1 and 2.
+
+`round1.Finalize` works in isolation: called directly it returns a `*round2`
+and emits its one broadcast. So the defect is in round 2 or round 3.
+
+One thing found while looking, worth checking first: `round2.Finalize` sends a
+share to **every** new participant including itself, and `Message.IsFor`
+(`pkg/protocol/message.go`) returns **false when `From == id`** — a party never
+accepts its own message, and the handler drops it. `round3.Finalize` then adds
+its own contribution separately (`if r.inOldGroup { ... selfShare }`), so the
+self-send is at best redundant. `protocols/lss/keygen`, which works, loops
+`r.OtherPartyIDs()` and stores its own share locally instead.
+
+The same shape produced two confirmed bugs in this module already: a Schnorr
+challenge that did not cover the message, and a JVSS proof whose response never
+carried the share. Both survived behind tests that never ran the code. Signing
+is now driven end-to-end in `protocols/lss/sign/protocol_test.go`; resharing
+still is not.
 
 ## Blockchain Support
 
