@@ -2,6 +2,7 @@ package curve
 
 import (
 	"crypto/rand"
+	"errors"
 	"testing"
 
 	"github.com/cronokirby/saferith"
@@ -354,4 +355,24 @@ func ristretto255ScalarFromUint64(c Ristretto255, val uint64) Scalar {
 	}
 	s.UnmarshalBinary(bytes)
 	return s
+}
+
+// A domain separation tag separates nothing when it is empty, and RFC 9380 §3.1
+// requires at least one byte. Over 255 the tag no longer fits the length byte
+// that DST' appends, which is what keeps two tags from producing one stream, so
+// both ends of the range are refused rather than silently accepted.
+func TestRistretto255_HashRefusesATagItCannotSeparateWith(t *testing.T) {
+	g := Ristretto255{}
+	long := make([]byte, 256)
+	for _, dst := range [][]byte{nil, {}, long} {
+		if _, err := g.HashToPoint(dst, []byte("msg")); !errors.Is(err, ErrHashLength) {
+			t.Errorf("HashToPoint accepted a %d-byte tag: %v", len(dst), err)
+		}
+		if _, err := g.HashToScalar(dst, []byte("msg")); !errors.Is(err, ErrHashLength) {
+			t.Errorf("HashToScalar accepted a %d-byte tag: %v", len(dst), err)
+		}
+	}
+	if _, err := g.HashToPoint(long[:255], []byte("msg")); err != nil {
+		t.Errorf("a 255-byte tag was refused: %v", err)
+	}
 }

@@ -19,7 +19,10 @@ import (
 // every x, without asking. The map below has no such shortcut: nobody learns a
 // discrete logarithm from it.
 
-// ErrHashLength is returned for a length expand_message_xmd cannot produce.
+// ErrHashLength is returned for a length expand_message_xmd cannot produce, or
+// a domain separation tag it cannot carry: RFC 9380 §3.1 requires at least one
+// byte, and DST' appends the tag's length as a single byte, so 255 is the most
+// it can state.
 var ErrHashLength = errors.New("curve: requested hash length out of range")
 
 // expandXMD is expand_message_xmd with SHA-512 (RFC 9380 §5.3.1): a
@@ -33,7 +36,7 @@ var ErrHashLength = errors.New("curve: requested hash length out of range")
 func expandXMD(msg, dst []byte, length int) ([]byte, error) {
 	const bInBytes = sha512.Size  // 64
 	const sInBytes = 128          // SHA-512 block
-	if length <= 0 || length > 255*bInBytes || len(dst) > 255 {
+	if length <= 0 || length > 255*bInBytes || len(dst) == 0 || len(dst) > 255 {
 		return nil, ErrHashLength
 	}
 	ell := (length + bInBytes - 1) / bInBytes
