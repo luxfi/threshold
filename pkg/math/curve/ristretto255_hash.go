@@ -34,8 +34,8 @@ var ErrHashLength = errors.New("curve: requested hash length out of range")
 // DST' carries its own length, which is what keeps two different tags from
 // producing the same stream.
 func expandXMD(msg, dst []byte, length int) ([]byte, error) {
-	const bInBytes = sha512.Size  // 64
-	const sInBytes = 128          // SHA-512 block
+	const bInBytes = sha512.Size // 64
+	const sInBytes = 128         // SHA-512 block
 	if length <= 0 || length > 255*bInBytes || len(dst) == 0 || len(dst) > 255 {
 		return nil, ErrHashLength
 	}
