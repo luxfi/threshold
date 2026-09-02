@@ -100,6 +100,8 @@ var (
 	// ErrWrongKey is returned when the public shares that the proofs verified
 	// against do not interpolate to the key the evaluation was asked for.
 	ErrWrongKey = errors.New("oprf: public shares do not belong to this key")
+	// ErrZeroed is returned when a Blind is used after Zero.
+	ErrZeroed = errors.New("oprf: blind has been zeroed")
 )
 
 // Key is one party's share of the committee's key — of the authority to answer,
@@ -120,8 +122,9 @@ type Key struct {
 // answer. It is the only value that must not leave the device: with it the
 // answer unblinds to the key, without it the answer is a random group element.
 type Blind struct {
-	r     curve.Scalar
-	input []byte
+	r      curve.Scalar
+	input  []byte
+	zeroed bool
 }
 
 // Request blinds an input for evaluation. The returned element is what travels;
@@ -238,6 +241,7 @@ func (b *Blind) Zero() {
 	if b.r != nil {
 		b.r.Set(group.NewScalar())
 	}
+	b.zeroed = true
 }
 
 // Finalize unblinds the combined answer and derives the output, which is the
@@ -247,6 +251,13 @@ func (b *Blind) Zero() {
 func (b *Blind) Finalize(combined curve.Point) ([]byte, error) {
 	if combined.IsIdentity() {
 		return nil, ErrIdentity
+	}
+	// A zeroed Blind has no input to bind and no blind to undo. Finalizing one
+	// anyway is worse than refusing: the input is length-prefixed into the
+	// hash, so an absent one is prefixed as empty and the call returns a
+	// well-formed key that is simply a different key, with no error to say so.
+	if b.zeroed {
+		return nil, ErrZeroed
 	}
 	// Copy before inverting: Invert mutates the receiver, and b.r has to survive
 	// so a Blind can be finalized more than once.

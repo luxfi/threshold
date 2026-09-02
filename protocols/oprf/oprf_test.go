@@ -363,3 +363,31 @@ func TestRequestRefusesAnInputTooLongForItsPrefix(t *testing.T) {
 		t.Errorf("a 65535-byte input was refused: %v", err)
 	}
 }
+
+// Zero and Finalize both being ordinary calls on a reusable Blind, the order
+// they happen in is a caller's mistake to make. It must not be a silent one:
+// the input is length-prefixed into the hash, so a zeroed input is prefixed as
+// empty and Finalize would return a well-formed key that is a DIFFERENT key.
+func TestFinalizeAfterZeroRefusesRatherThanChangingTheKey(t *testing.T) {
+	b, _, err := RequestVerifiable(rand.Reader, []byte("hunter2"))
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	k := sample(rand.Reader)
+	answer := k.Act(EvaluateWhole(group.NewScalar().Set(k), group.NewBasePoint()))
+
+	before, err := b.Finalize(answer)
+	if err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	b.Zero()
+	after, err := b.Finalize(answer)
+	if !errors.Is(err, ErrZeroed) {
+		t.Fatalf("finalize after zero returned (%x, %v); it must refuse", after, err)
+	}
+	if after != nil {
+		t.Error("a refused finalize still returned bytes")
+	}
+	_ = before
+}
