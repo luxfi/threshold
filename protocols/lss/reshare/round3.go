@@ -62,12 +62,9 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 			}
 		}
 
-		// If we're also in the old group, add our self-contribution
-		if r.inOldGroup {
-			x := r.SelfID().Scalar(r.Group())
-			selfShare := r.poly.Evaluate(x)
-			newShare = newShare.Add(selfShare)
-		}
+		// Our own contribution is already in r.shares: round 2 stores it there
+		// instead of sending it to ourselves, so the sum above is every old
+		// party's evaluation at our point, ourselves included, exactly once.
 	} else {
 		// We're leaving the group, no new share
 		return nil, errors.New("party not in new group")
@@ -90,8 +87,12 @@ func (r *round3) Finalize(out chan<- *round.Message) (round.Session, error) {
 			}
 
 			if isOldParty {
-				if commitment, ok := commitments[j]; ok {
-					publicPoint = publicPoint.Add(commitment)
+				if b, ok := commitments[j]; ok {
+					c := r.Group().NewPoint()
+					if err := c.UnmarshalBinary(b); err != nil {
+						return nil, err
+					}
+					publicPoint = publicPoint.Add(c)
 				}
 			}
 		}

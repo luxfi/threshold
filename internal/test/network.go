@@ -66,8 +66,12 @@ func (n *Network) Send(msg *protocol.Message) {
 				targets = append(targets, ch)
 			}
 		}
-	} else {
-		// Send to specific party
+	} else if msg.To != msg.From {
+		// Send to specific party. A message addressed to its own sender is
+		// dropped here because that is what happens in production —
+		// protocol.Message.IsFor is false when From is the recipient — and a
+		// network that delivered it would let a round count its own
+		// contribution twice, or depend on a delivery that never occurs.
 		if ch, ok := n.messages[msg.To]; ok {
 			targets = append(targets, ch)
 		}

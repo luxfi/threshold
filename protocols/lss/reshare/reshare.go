@@ -3,6 +3,7 @@ package reshare
 
 import (
 	"fmt"
+	"github.com/luxfi/threshold/internal/types"
 
 	"github.com/luxfi/threshold/internal/round"
 	"github.com/luxfi/threshold/pkg/party"
@@ -79,6 +80,8 @@ func Start(oldConfig *config.Config, newParticipants []party.ID, newThreshold in
 			newThreshold:    newThreshold,
 			inOldGroup:      inOldGroup,
 			inNewGroup:      inNewGroup,
+			commitments:     make(map[party.ID]map[party.ID][]byte),
+			chainKeys:       make(map[party.ID]types.RID),
 		}, nil
 	}
 }
