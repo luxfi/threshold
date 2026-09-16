@@ -19,7 +19,7 @@ env:
 jobs:
   fresh-clone-test:
     name: Fresh clone go test
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     container:
       image: ubuntu:24.04
     steps:
