@@ -119,6 +119,7 @@ require (
 require (
 	github.com/holiman/uint256 v1.3.2
 	github.com/luxfi/corona v0.10.4
+	github.com/luxfi/fhe v1.11.2
 	github.com/luxfi/geth v1.20.2
 	github.com/luxfi/lens v0.2.1
 	github.com/luxfi/magnetar v1.2.3

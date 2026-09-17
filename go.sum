@@ -229,6 +229,8 @@ github.com/luxfi/database v1.21.5 h1:ZKSD5FfpDJzKhLzMusZMtJt64AhS8AAGgTYkdiDFH8c
 github.com/luxfi/database v1.21.5/go.mod h1:xyzYWICv/QEu+l/42jdaQtClF8/hPTiQywn+xsM7CtQ=
 github.com/luxfi/dkg v0.3.5 h1:s2L2mMQaz+n9m0b0ghvoV5VZNxiwb2z4WrGugvK0udY=
 github.com/luxfi/dkg v0.3.5/go.mod h1:M+WH7GFRN+YUD851Rlnumdp0Md98kplNN8pVx65U8I8=
+github.com/luxfi/fhe v1.11.2 h1:vgxsCSvcWmzeRLDE5pamvySlQnD7Z7tTc0VsIW6zCME=
+github.com/luxfi/fhe v1.11.2/go.mod h1:4fDERHSshkvOX5PdzJ61jk5Lb98T36uIR5KWb/A5+2w=
 github.com/luxfi/geth v1.20.2 h1:XwNVyIpb4ip4wy/SsQS8fHdVEVlmsvLNwGPykFDvutw=
 github.com/luxfi/geth v1.20.2/go.mod h1:5vJMlOrSvz4ORC+fe16k+i0CUqTadmiFi9ldAHb5TE4=
 github.com/luxfi/ids v1.3.2 h1:c6Rft5kZB4XqiCtWaGH47bfhaNFm3FGRfhEzI01GVeI=
